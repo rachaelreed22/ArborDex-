@@ -1,0 +1,10 @@
+node_modules/
+server/node_modules/
+client/node_modules/
+client/dist/
+server/arbordex.db
+server/uploads/*
+!server/uploads/.gitkeep
+*.local
+.env
+.DS_Store
