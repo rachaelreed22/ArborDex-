@@ -9,6 +9,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     common_name TEXT NOT NULL,
     scientific_name TEXT,
+    photo TEXT,
     species TEXT,
     family TEXT,
     description TEXT,
@@ -38,5 +39,7 @@ db.exec(`
     FOREIGN KEY (tree_id) REFERENCES trees(id) ON DELETE CASCADE
   );
 `);
-
+try {
+  db.prepare("ALTER TABLE trees ADD COLUMN photo TEXT").run();
+} catch {}
 module.exports = db;

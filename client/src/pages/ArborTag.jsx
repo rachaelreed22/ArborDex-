@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getTree, getPhotos, uploadPhoto } from '../api';
+import { useMode } from '../context/ModeContext';
 
 const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'];
 

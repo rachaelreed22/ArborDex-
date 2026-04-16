@@ -7,8 +7,10 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f4f7f0;
-  color: #2d3a2e;
+  background: linear-gradient(135deg, #31bb4a, #b1b53b);
+
+;
+  color: #5e381a;
   min-height: 100vh;
 }
 
@@ -60,6 +62,11 @@ a {
   background: rgba(255,255,255,0.15);
   color: #fff;
 }
+.brand-logo {
+  height: 60px;   /* adjust this */
+  width: auto;    /* keeps proportions correct */
+}
+
 
 /* Page container */
 .page {
@@ -507,7 +514,7 @@ a {
 .search-bar input {
   flex: 1;
   padding: 0.55rem 0.9rem;
-  border: 1px solid #b0c4b0;
+  border: 1px solid #a3c4a3;
   border-radius: 6px;
   font-size: 0.92rem;
 }
@@ -580,3 +587,120 @@ a {
 .condition-Fair { color: #f57c00; }
 .condition-Poor { color: #c62828; }
 .condition-Dead { color: #6d4c41; }
+.arbor-tag-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.visitor-hero {
+  border: 1px solid #d8e7d1;
+  background: linear-gradient(180deg, #f8fcf5 0%, #eef7e9 100%);
+}
+
+.eyebrow {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f7d5f;
+  margin-bottom: 0.75rem;
+}
+
+.tree-title {
+  font-size: 2.2rem;
+  line-height: 1.1;
+  color: #244524;
+  margin: 0;
+}
+
+.tree-subtitle {
+  margin-top: 0.35rem;
+  font-style: italic;
+  color: #6a896a;
+}
+
+.visitor-intro,
+.tree-description,
+.section-intro,
+.upload-note,
+.photo-date {
+  color: #4f664f;
+  line-height: 1.6;
+}
+
+.visitor-intro {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.meta-chip,
+.condition-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.meta-chip {
+  background: #edf4e8;
+  color: #315331;
+  border: 1px solid #d7e5cf;
+}
+
+.condition-pill.good {
+  background: #e8f6ea;
+  color: #20643a;
+  border: 1px solid #bfe3c8;
+}
+
+.condition-pill.watch {
+  background: #fff6df;
+  color: #8a6512;
+  border: 1px solid #ecd79d;
+}
+
+.condition-pill.alert {
+  background: #fdeaea;
+  color: #9b2f2f;
+  border: 1px solid #efc1c1;
+}
+
+.condition-pill.neutral {
+  background: #eef1ee;
+  color: #546454;
+  border: 1px solid #d7ded7;
+}
+
+.upload-cta {
+  margin-top: 1.25rem;
+}
+
+.upload-note {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.photo-date {
+  font-size: 0.78rem;
+  margin-top: 0.4rem;
+}
+
+@media (max-width: 768px) {
+  .tree-title {
+    font-size: 1.8rem;
+  }
+
+  .hero-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

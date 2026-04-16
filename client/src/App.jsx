@@ -1,31 +1,46 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+console.log('🔥 THIS APP.JSX IS RUNNING 🔥');
+
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import { ModeProvider } from './context/ModeContext';
+
 import TreeList from './pages/TreeList';
 import TreeForm from './pages/TreeForm';
-import TreeDetail from './pages/TreeDetail';
 import ArborTag from './pages/ArborTag';
+
+function Layout() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  );
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Visitor-facing ArborTag (no staff navbar) */}
-        <Route path="/tag/:id" element={<ArborTag />} />
+    <ModeProvider>
+      <BrowserRouter>
+        <Routes>
 
-        {/* Staff-facing ArborDex */}
-        <Route path="/*" element={
-          <>
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<TreeList />} />
-              <Route path="/add" element={<TreeForm />} />
-              <Route path="/trees/:id" element={<TreeDetail />} />
-              <Route path="/trees/:id/edit" element={<TreeForm />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </>
-        } />
-      </Routes>
-    </BrowserRouter>
+          {/* Public QR Entry */}
+          <Route element={<Layout />}>
+            <Route path="/tag/:id" element={<ArborTag />} />
+          </Route>
+
+          {/* Staff + Public unified pages */}
+          <Route element={<Layout />}>
+            <Route path="/" element={<TreeList />} />
+            <Route path="/add" element={<TreeForm />} />
+            <Route path="/trees/:id" element={<ArborTag />} />
+            <Route path="/trees/:id/edit" element={<TreeForm />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+
+        </Routes>
+      </BrowserRouter>
+    </ModeProvider>
   );
 }
+
