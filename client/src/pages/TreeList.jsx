@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTrees, deleteTree } from '../api';
+import { getTrees, getPhotos, deleteTree } from '../api';
+import { useMode } from '../context/ModeContext';
 
 const CONDITIONS = ['Excellent', 'Good', 'Fair', 'Poor', 'Dead'];
 
@@ -11,11 +12,27 @@ export default function TreeList() {
   const [conditionFilter, setConditionFilter] = useState('');
   const navigate = useNavigate();
 
-  const load = () => {
+  const { mode } = useMode();
+  const isStaff = mode === "dex";
+
+  const load = async () => {
     setLoading(true);
-    getTrees()
-      .then(setTrees)
-      .finally(() => setLoading(false));
+    const treeData = await getTrees();
+
+    // Fetch photos for each tree
+    const withPhotos = await Promise.all(
+      treeData.map(async (t) => {
+        try {
+          const photos = await getPhotos(t.id);
+          return { ...t, photos };
+        } catch {
+          return { ...t, photos: [] };
+        }
+      })
+    );
+
+    setTrees(withPhotos);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -43,7 +60,10 @@ export default function TreeList() {
   return (
     <div className="page">
       <h1 className="page-title">🌳 Tree &amp; Plant Database</h1>
-      <p className="page-subtitle">ArborDex — Staff Management Portal</p>
+
+      {isStaff && (
+        <p className="page-subtitle">ArborDex — Staff Management Portal</p>
+      )}
 
       <div className="search-bar">
         <input
@@ -56,55 +76,91 @@ export default function TreeList() {
           <option value="">All Conditions</option>
           {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <button className="btn btn-primary" onClick={() => navigate('/add')}>
-          + Add Tree
-        </button>
+
+        {isStaff && (
+          <button className="btn btn-primary" onClick={() => navigate('/add')}>
+            + Add Tree
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <div className="empty-state">
           <div className="icon">🌱</div>
-          <p>{trees.length === 0 ? 'No trees in the database yet. Add your first tree!' : 'No trees match your search.'}</p>
+          <p>
+            {trees.length === 0
+              ? 'No trees in the database yet. Add your first tree!'
+              : 'No trees match your search.'}
+          </p>
         </div>
       ) : (
         <div className="tree-grid">
-          {filtered.map(tree => (
-            <div
-              key={tree.id}
-              className="tree-card"
-              onClick={() => navigate(`/trees/${tree.id}`)}
-            >
-              <h3>{tree.common_name}</h3>
-              {tree.scientific_name && <div className="scientific">{tree.scientific_name}</div>}
-              <div className="meta">
-                {tree.species && <span className="badge">{tree.species}</span>}
-                {tree.condition && (
-                  <span className={`badge condition-${tree.condition}`}>{tree.condition}</span>
-                )}
-                {tree.gps_lat && tree.gps_lng && (
-                  <span className="badge badge-info">📍 GPS</span>
-                )}
-              </div>
-              {tree.location_description && (
-                <div style={{ fontSize: '0.82rem', color: '#6a896a', marginTop: '0.2rem' }}>
-                  📌 {tree.location_description}
+          {filtered.map(tree => {
+            const photoUrl = 
+              tree.photos?.[0]?.url ||
+              tree.photo ||
+              '/fallback-tree.jpg'; // Add a fallback image in /public
+            
+               
+            return (
+              <div
+                key={tree.id}
+                className="tree-card photo-card"
+                style={{ backgroundImage: `url(${photoUrl})` }}
+                onClick={() => navigate(`/trees/${tree.id}`)}
+              >
+                <div className="overlay">
+                  <h3 className="tree-title">{tree.common_name}</h3>
+                  {tree.scientific_name && (
+                    <div className="scientific">{tree.scientific_name}</div>
+                  )}
+
+                  <div className="meta">
+                    {tree.species && <span className="badge">{tree.species}</span>}
+                    {tree.condition && (
+                      <span className={`badge condition-${tree.condition}`}>{tree.condition}</span>
+                    )}
+                    {tree.gps_lat && tree.gps_lng && (
+                      <span className="badge badge-info">📍 GPS</span>
+                    )}
+                  </div>
+
+                  {tree.location_description && (
+                    <div className="location-text">
+                      📌 {tree.location_description}
+                    </div>
+                  )}
+
+                  {isStaff && (
+                    <div className="actions" onClick={e => e.stopPropagation()}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => navigate(`/trees/${tree.id}`)}
+                      >
+                        View
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => navigate(`/trees/${tree.id}/edit`)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={e => handleDelete(e, tree.id, tree.common_name)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-              <div className="actions" onClick={e => e.stopPropagation()}>
-                <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/trees/${tree.id}`)}>
-                  View
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/trees/${tree.id}/edit`)}>
-                  Edit
-                </button>
-                <button className="btn btn-danger btn-sm" onClick={e => handleDelete(e, tree.id, tree.common_name)}>
-                  Delete
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
+
+

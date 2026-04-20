@@ -1,15 +1,29 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const multer = require('multer');
 const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
+const Busboy = require('busboy');
+const { createClient } = require('@supabase/supabase-js');
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// --- Supabase setup ---
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'tree-photos';
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('Missing SUPABASE_URL or SUPABASE_KEY in .env');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Middleware
 app.use(cors());
@@ -17,7 +31,7 @@ app.use(express.json());
 
 // Rate limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
@@ -25,7 +39,7 @@ const apiLimiter = rateLimit({
 });
 
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -33,7 +47,7 @@ const uploadLimiter = rateLimit({
 });
 
 const staticLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
@@ -41,30 +55,11 @@ const staticLimiter = rateLimit({
 
 app.use('/api', apiLimiter);
 
-// Serve uploaded photos
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// --- Helper: build public URL for a photo ---
+function buildPhotoUrl(filename) {
+  if (!filename) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
 }
-app.use('/uploads', express.static(uploadsDir));
-
-// Multer config for photo uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
-const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp/;
-  if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed'), false);
-  }
-};
-const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // --- Trees ---
 
@@ -153,7 +148,7 @@ app.delete('/api/trees/:id', (req, res) => {
   res.json({ message: 'Tree deleted' });
 });
 
-// GET QR code for a tree (returns PNG data URL)
+// GET QR code
 app.get('/api/trees/:id/qrcode', async (req, res) => {
   const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
   if (!tree) return res.status(404).json({ error: 'Tree not found' });
@@ -169,44 +164,131 @@ app.get('/api/trees/:id/qrcode', async (req, res) => {
 
 // --- Photos ---
 
-// GET photos for a tree
+// GET approved photos for a tree (primary first)
 app.get('/api/trees/:id/photos', (req, res) => {
-  const photos = db.prepare('SELECT * FROM photos WHERE tree_id = ? ORDER BY uploaded_at DESC').all(req.params.id);
-  res.json(photos);
+  const photos = db.prepare(
+    `SELECT * FROM photos
+     WHERE tree_id = ? AND status = 'approved'
+     ORDER BY is_primary DESC, uploaded_at DESC`
+  ).all(req.params.id);
+
+  const withUrls = photos.map(p => ({
+    ...p,
+    url: buildPhotoUrl(p.filename),
+  }));
+
+  res.json(withUrls);
 });
 
-// POST upload photo for a tree
-app.post('/api/trees/:id/photos', uploadLimiter, upload.single('photo'), (req, res) => {
+// POST upload photo
+app.post('/api/trees/:id/photos', uploadLimiter, async (req, res) => {
   const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
   if (!tree) return res.status(404).json({ error: 'Tree not found' });
-  if (!req.file) return res.status(400).json({ error: 'Photo file is required' });
 
-  const id = uuidv4();
-  const now = new Date().toISOString();
-  const { photographer_name, photographer_email, caption, season } = req.body;
+  const busboy = Busboy({ headers: req.headers });
+  let fileBuffer = null;
+  let fileExt = null;
+  let mimeType = null;
 
-  db.prepare(`INSERT INTO photos (id, tree_id, filename, photographer_name, photographer_email, caption, season, uploaded_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    id, req.params.id, req.file.filename,
-    photographer_name || null, photographer_email || null,
-    caption || null, season || null, now,
-  );
+  const fields = {
+    photographer_name: null,
+    photographer_email: null,
+    caption: null,
+    season: null,
+  };
 
-  const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(id);
-  res.status(201).json(photo);
+  busboy.on('file', (fieldname, file, info) => {
+    const { filename, mimeType: mt } = info;
+    mimeType = mt;
+    const ext = path.extname(filename || '').toLowerCase();
+    fileExt = ext || '.jpg';
+
+    const chunks = [];
+    file.on('data', (data) => chunks.push(data));
+    file.on('end', () => {
+      fileBuffer = Buffer.concat(chunks);
+    });
+  });
+
+  busboy.on('field', (fieldname, val) => {
+    if (Object.prototype.hasOwnProperty.call(fields, fieldname)) {
+      fields[fieldname] = val || null;
+    }
+  });
+
+  busboy.on('finish', async () => {
+    try {
+      if (!fileBuffer) {
+        return res.status(400).json({ error: 'Photo file is required' });
+      }
+
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      const objectPath = `${req.params.id}/${id}${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .upload(objectPath, fileBuffer, {
+          contentType: mimeType || 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        return res.status(500).json({ error: 'Photo upload failed' });
+      }
+
+      db.prepare(
+        `INSERT INTO photos (
+          id, tree_id, filename, photographer_name, photographer_email,
+          caption, season, uploaded_at, status, is_primary
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id,
+        req.params.id,
+        objectPath,
+        fields.photographer_name,
+        fields.photographer_email,
+        fields.caption,
+        fields.season,
+        now,
+        'pending',
+        0
+      );
+
+      const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(id);
+      const withUrl = { ...photo, url: buildPhotoUrl(photo.filename) };
+
+      res.status(201).json(withUrl);
+    } catch (err) {
+      console.error('Upload handler error:', err);
+      res.status(500).json({ error: 'Upload failed. Please try again.' });
+    }
+  });
+
+  req.pipe(busboy);
 });
 
 // DELETE photo
-app.delete('/api/photos/:id', (req, res) => {
+app.delete('/api/photos/:id', async (req, res) => {
   const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Photo not found' });
 
-  const filePath = path.join(uploadsDir, photo.filename);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  try {
+    if (photo.filename) {
+      await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .remove([photo.filename]);
+    }
 
-  db.prepare('DELETE FROM photos WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Photo deleted' });
+    db.prepare('DELETE FROM photos WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Photo deleted' });
+  } catch (err) {
+    console.error('Delete photo error:', err);
+    res.status(500).json({ error: 'Failed to delete photo' });
+  }
 });
+
 
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {

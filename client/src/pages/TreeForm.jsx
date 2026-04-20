@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createTree, getTree, updateTree } from '../api';
+import { useMode } from '../context/ModeContext';
 
 const CONDITIONS = ['Excellent', 'Good', 'Fair', 'Poor', 'Dead'];
 
@@ -26,11 +27,28 @@ export default function TreeForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { mode } = useMode();
+  const isStaff = mode === 'dex';
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // 🚫 Block ArborTag users completely
+  if (!isStaff) {
+    return (
+      <div className="page">
+        <h1 style={{ color: '#2f4f2f' }}>Access Restricted</h1>
+        <p style={{ color: '#6a896a', fontSize: '1rem' }}>
+          This page is only available in <strong>ArborDex (Staff)</strong> mode.
+        </p>
+        <button className="btn btn-secondary" onClick={() => navigate('/')}>
+          ← Return to Tree Database
+        </button>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (isEdit) {
@@ -153,7 +171,7 @@ export default function TreeForm() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* PHOTO CURATION (UI scaffold) */}
+      {/* PHOTO CURATION */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div className="card-header">
           <h3>📸 Photo Curation</h3>
@@ -208,7 +226,7 @@ export default function TreeForm() {
               </div>
             </div>
 
-            <h3 className="section-title">📏 Growth &amp; Condition</h3>
+            <h3 className="section-title">📏 Growth & Condition</h3>
             <div className="form-grid">
               <div className="form-group">
                 <label>Height (ft)</label>
@@ -227,9 +245,7 @@ export default function TreeForm() {
                 <select value={form.condition} onChange={set('condition')}>
                   <option value="">Select condition</option>
                   {CONDITIONS.map(c => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
+                    <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </div>
@@ -268,7 +284,11 @@ export default function TreeForm() {
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => navigate(isEdit ? `/trees/${id}` : '/')}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => navigate(isEdit ? `/trees/${id}` : '/')}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -281,5 +301,3 @@ export default function TreeForm() {
     </div>
   );
 }
-
-

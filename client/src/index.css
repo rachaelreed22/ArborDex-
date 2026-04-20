@@ -704,3 +704,45 @@ a {
     align-items: flex-start;
   }
 }
+.tree-card.photo-card {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  height: 260px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  transition: transform 0.2s ease;
+}
+
+.tree-card.photo-card:hover {
+  transform: scale(1.02);
+}
+
+.tree-card .overlay {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0));
+  color: white;
+}
+
+.tree-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.location-text {
+  font-size: 0.82rem;
+  margin-top: 0.3rem;
+  color: #e0e0e0;
+}
+
+.actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.4rem;
+}

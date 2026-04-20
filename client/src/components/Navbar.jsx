@@ -8,6 +8,8 @@ export default function Navbar() {
   const brandName = mode === "tag" ? "ArborTag" : "ArborDex";
   const toggleLabel = mode === "tag" ? "ArborDex ⚙️" : "ArborTag 🌿";
 
+  const isStaff = mode === "dex";
+
   return (
     <header className="navbar">
       <div className="brand">
@@ -17,7 +19,11 @@ export default function Navbar() {
 
       <nav>
         <NavLink to="/" end>Tree Database</NavLink>
-        <NavLink to="/add">+ Add Tree</NavLink>
+
+        {/* Only show Add Tree in ArborDex (staff) mode */}
+        {isStaff && (
+          <NavLink to="/add">+ Add Tree</NavLink>
+        )}
 
         {/* Mode Toggle */}
         <button className="mode-toggle" onClick={toggleMode}>
@@ -27,5 +33,6 @@ export default function Navbar() {
     </header>
   );
 }
+
 
 
