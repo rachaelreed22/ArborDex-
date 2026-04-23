@@ -1,308 +1,367 @@
-require('dotenv').config();
-
+ // server/index.js
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const QRCode = require('qrcode');
-const rateLimit = require('express-rate-limit');
-const Busboy = require('busboy');
-const { createClient } = require('@supabase/supabase-js');
-const db = require('./db');
+require('dotenv').config();
+
+const supabase = require('./db');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-
-// --- Supabase setup ---
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'tree-photos';
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_KEY in .env');
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
+const PORT = process.env.PORT || 5000;
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'ArborDex API' });
 });
 
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many uploads, please try again later.' },
-});
+/**
+ * LISTINGS
+ */
 
-const staticLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use('/api', apiLimiter);
-
-// --- Helper: build public URL for a photo ---
-function buildPhotoUrl(filename) {
-  if (!filename) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
-}
-
-// --- Trees ---
-
-// GET all trees
-app.get('/api/trees', (req, res) => {
-  const trees = db.prepare('SELECT * FROM trees ORDER BY date_added DESC').all();
-  res.json(trees);
-});
-
-// GET single tree
-app.get('/api/trees/:id', (req, res) => {
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  if (!tree) return res.status(404).json({ error: 'Tree not found' });
-  res.json(tree);
-});
-
-// POST create tree
-app.post('/api/trees', (req, res) => {
-  const id = uuidv4();
-  const now = new Date().toISOString();
-  const {
-    common_name, scientific_name, species, family, description,
-    height_ft, diameter_in, age_years, condition,
-    gps_lat, gps_lng, location_description,
-    treatment_notes, last_treatment_date, date_planted,
-  } = req.body;
-
-  if (!common_name) return res.status(400).json({ error: 'common_name is required' });
-
-  db.prepare(`INSERT INTO trees (
-    id, common_name, scientific_name, species, family, description,
-    height_ft, diameter_in, age_years, condition,
-    gps_lat, gps_lng, location_description,
-    treatment_notes, last_treatment_date, date_planted,
-    date_added, date_updated
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    id, common_name, scientific_name || null, species || null, family || null, description || null,
-    height_ft || null, diameter_in || null, age_years || null, condition || null,
-    gps_lat || null, gps_lng || null, location_description || null,
-    treatment_notes || null, last_treatment_date || null, date_planted || null,
-    now, now,
-  );
-
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(id);
-  res.status(201).json(tree);
-});
-
-// PUT update tree
-app.put('/api/trees/:id', (req, res) => {
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  if (!tree) return res.status(404).json({ error: 'Tree not found' });
-
-  const now = new Date().toISOString();
-  const {
-    common_name, scientific_name, species, family, description,
-    height_ft, diameter_in, age_years, condition,
-    gps_lat, gps_lng, location_description,
-    treatment_notes, last_treatment_date, date_planted,
-  } = req.body;
-
-  if (!common_name) return res.status(400).json({ error: 'common_name is required' });
-
-  db.prepare(`UPDATE trees SET
-    common_name = ?, scientific_name = ?, species = ?, family = ?, description = ?,
-    height_ft = ?, diameter_in = ?, age_years = ?, condition = ?,
-    gps_lat = ?, gps_lng = ?, location_description = ?,
-    treatment_notes = ?, last_treatment_date = ?, date_planted = ?,
-    date_updated = ?
-  WHERE id = ?`).run(
-    common_name, scientific_name || null, species || null, family || null, description || null,
-    height_ft || null, diameter_in || null, age_years || null, condition || null,
-    gps_lat || null, gps_lng || null, location_description || null,
-    treatment_notes || null, last_treatment_date || null, date_planted || null,
-    now, req.params.id,
-  );
-
-  const updated = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  res.json(updated);
-});
-
-// DELETE tree
-app.delete('/api/trees/:id', (req, res) => {
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  if (!tree) return res.status(404).json({ error: 'Tree not found' });
-  db.prepare('DELETE FROM trees WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Tree deleted' });
-});
-
-// GET QR code
-app.get('/api/trees/:id/qrcode', async (req, res) => {
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  if (!tree) return res.status(404).json({ error: 'Tree not found' });
-
-  const visitorUrl = `${process.env.PUBLIC_URL || `http://localhost:3000`}/tag/${req.params.id}`;
+// Create a listing
+app.post('/listings', async (req, res) => {
   try {
-    const qrDataUrl = await QRCode.toDataURL(visitorUrl, { width: 300, margin: 2 });
-    res.json({ qrcode: qrDataUrl, url: visitorUrl });
+    const { title, description, location } = req.body;
+
+    const { data, error } = await supabase
+      .from('listings')
+      .insert([{ title, description, location }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating listing:', error);
+      return res.status(500).json({ error: 'Failed to create listing' });
+    }
+
+    res.status(201).json(data);
   } catch (err) {
-    res.status(500).json({ error: 'QR code generation failed' });
+    console.error('Unexpected error creating listing:', err);
+    res.status(500).json({ error: 'Unexpected error' });
   }
 });
 
-// --- Photos ---
-
-// GET approved photos for a tree (primary first)
-app.get('/api/trees/:id/photos', (req, res) => {
-  const photos = db.prepare(
-    `SELECT * FROM photos
-     WHERE tree_id = ? AND status = 'approved'
-     ORDER BY is_primary DESC, uploaded_at DESC`
-  ).all(req.params.id);
-
-  const withUrls = photos.map(p => ({
-    ...p,
-    url: buildPhotoUrl(p.filename),
-  }));
-
-  res.json(withUrls);
-});
-
-// POST upload photo
-app.post('/api/trees/:id/photos', uploadLimiter, async (req, res) => {
-  const tree = db.prepare('SELECT * FROM trees WHERE id = ?').get(req.params.id);
-  if (!tree) return res.status(404).json({ error: 'Tree not found' });
-
-  const busboy = Busboy({ headers: req.headers });
-  let fileBuffer = null;
-  let fileExt = null;
-  let mimeType = null;
-
-  const fields = {
-    photographer_name: null,
-    photographer_email: null,
-    caption: null,
-    season: null,
-  };
-
-  busboy.on('file', (fieldname, file, info) => {
-    const { filename, mimeType: mt } = info;
-    mimeType = mt;
-    const ext = path.extname(filename || '').toLowerCase();
-    fileExt = ext || '.jpg';
-
-    const chunks = [];
-    file.on('data', (data) => chunks.push(data));
-    file.on('end', () => {
-      fileBuffer = Buffer.concat(chunks);
-    });
-  });
-
-  busboy.on('field', (fieldname, val) => {
-    if (Object.prototype.hasOwnProperty.call(fields, fieldname)) {
-      fields[fieldname] = val || null;
-    }
-  });
-
-  busboy.on('finish', async () => {
-    try {
-      if (!fileBuffer) {
-        return res.status(400).json({ error: 'Photo file is required' });
-      }
-
-      const id = uuidv4();
-      const now = new Date().toISOString();
-      const objectPath = `${req.params.id}/${id}${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(SUPABASE_BUCKET)
-        .upload(objectPath, fileBuffer, {
-          contentType: mimeType || 'image/jpeg',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error('Supabase upload error:', uploadError);
-        return res.status(500).json({ error: 'Photo upload failed' });
-      }
-
-      db.prepare(
-        `INSERT INTO photos (
-          id, tree_id, filename, photographer_name, photographer_email,
-          caption, season, uploaded_at, status, is_primary
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
+// Get all listings with photos
+app.get('/listings', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('listings')
+      .select(`
         id,
-        req.params.id,
-        objectPath,
-        fields.photographer_name,
-        fields.photographer_email,
-        fields.caption,
-        fields.season,
-        now,
-        'pending',
-        0
-      );
+        title,
+        description,
+        location,
+        created_at,
+        photos (
+          id,
+          url,
+          photographer,
+          is_main,
+          winner,
+          created_at
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-      const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(id);
-      const withUrl = { ...photo, url: buildPhotoUrl(photo.filename) };
-
-      res.status(201).json(withUrl);
-    } catch (err) {
-      console.error('Upload handler error:', err);
-      res.status(500).json({ error: 'Upload failed. Please try again.' });
-    }
-  });
-
-  req.pipe(busboy);
-});
-
-// DELETE photo
-app.delete('/api/photos/:id', async (req, res) => {
-  const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(req.params.id);
-  if (!photo) return res.status(404).json({ error: 'Photo not found' });
-
-  try {
-    if (photo.filename) {
-      await supabase.storage
-        .from(SUPABASE_BUCKET)
-        .remove([photo.filename]);
+    if (error) {
+      console.error('Error fetching listings:', error);
+      return res.status(500).json({ error: 'Failed to fetch listings' });
     }
 
-    db.prepare('DELETE FROM photos WHERE id = ?').run(req.params.id);
-    res.json({ message: 'Photo deleted' });
+    res.json(data || []);
   } catch (err) {
-    console.error('Delete photo error:', err);
-    res.status(500).json({ error: 'Failed to delete photo' });
+    console.error('Unexpected error fetching listings:', err);
+    res.status(500).json({ error: 'Unexpected error' });
   }
 });
 
+// Get a single listing with photos
+app.get('/listings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
 
-// Serve React app in production
-if (process.env.NODE_ENV === 'production') {
-  const clientBuild = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientBuild));
-  app.get('*', staticLimiter, (req, res) => {
-    res.sendFile(path.join(clientBuild, 'index.html'));
-  });
-}
+    const { data, error } = await supabase
+      .from('listings')
+      .select(`
+        id,
+        title,
+        description,
+        location,
+        created_at,
+        photos (
+          id,
+          url,
+          photographer,
+          is_main,
+          winner,
+          created_at
+        )
+      `)
+      .eq('id', id)
+      .single();
 
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`ArborDex server running on port ${PORT}`);
-  });
-}
+    if (error) {
+      console.error('Error fetching listing:', error);
+      return res.status(404).json({ error: 'Listing not found' });
+    }
 
-module.exports = app;
+    res.json(data);
+  } catch (err) {
+    console.error('Unexpected error fetching listing:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+/**
+ * PHOTOS (metadata only – file already uploaded from frontend)
+ */
+
+// Add a photo record after upload
+app.post('/photos', async (req, res) => {
+  try {
+    const { listingId, url, photographer } = req.body;
+
+    if (!listingId || !url) {
+      return res.status(400).json({ error: 'listingId and url are required' });
+    }
+
+    // Insert photo
+    const { data, error } = await supabase
+      .from('photos')
+      .insert([
+        {
+          listing_id: listingId,
+          url,
+          photographer: photographer || null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating photo:', error);
+      return res.status(500).json({ error: 'Failed to create photo' });
+    }
+
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Unexpected error creating photo:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+// Set a photo as main for its listing
+app.patch('/photos/:id/main', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the photo to know its listing_id
+    const { data: photo, error: photoError } = await supabase
+      .from('photos')
+      .select('id, listing_id')
+      .eq('id', id)
+      .single();
+
+    if (photoError || !photo) {
+      console.error('Photo not found:', photoError);
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    const listingId = photo.listing_id;
+
+    // Clear existing main photo for this listing
+    const { error: clearError } = await supabase
+      .from('photos')
+      .update({ is_main: false })
+      .eq('listing_id', listingId);
+
+    if (clearError) {
+      console.error('Error clearing main photo:', clearError);
+      return res.status(500).json({ error: 'Failed to clear main photo' });
+    }
+
+    // Set this photo as main
+    const { data: updated, error: setError } = await supabase
+      .from('photos')
+      .update({ is_main: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (setError) {
+      console.error('Error setting main photo:', setError);
+      return res.status(500).json({ error: 'Failed to set main photo' });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Unexpected error setting main photo:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+// Set a photo as winner for its listing
+app.patch('/photos/:id/winner', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the photo to know its listing_id
+    const { data: photo, error: photoError } = await supabase
+      .from('photos')
+      .select('id, listing_id')
+      .eq('id', id)
+      .single();
+
+    if (photoError || !photo) {
+      console.error('Photo not found:', photoError);
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    const listingId = photo.listing_id;
+
+    // Clear existing winner for this listing
+    const { error: clearError } = await supabase
+      .from('photos')
+      .update({ winner: false })
+      .eq('listing_id', listingId);
+
+    if (clearError) {
+      console.error('Error clearing winner:', clearError);
+      return res.status(500).json({ error: 'Failed to clear winner' });
+    }
+
+    // Set this photo as winner
+    const { data: updated, error: setError } = await supabase
+      .from('photos')
+      .update({ winner: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (setError) {
+      console.error('Error setting winner:', setError);
+      return res.status(500).json({ error: 'Failed to set winner' });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Unexpected error setting winner:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+/**
+ * STAFF REVIEWS
+ */
+
+// Create a staff review (usually starts as pending)
+app.post('/reviews', async (req, res) => {
+  try {
+    const { photoId, status, reviewedBy } = req.body;
+
+    if (!photoId) {
+      return res.status(400).json({ error: 'photoId is required' });
+    }
+
+    const reviewStatus = status || 'pending';
+
+    const { data, error } = await supabase
+      .from('staff_reviews')
+      .insert([
+        {
+          photo_id: photoId,
+          status: reviewStatus,
+          reviewed_by: reviewedBy || null,
+          reviewed_at: reviewedBy ? new Date().toISOString() : null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating review:', error);
+      return res.status(500).json({ error: 'Failed to create review' });
+    }
+
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Unexpected error creating review:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+// Update a staff review (approve/reject)
+app.patch('/reviews/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reviewedBy } = req.body;
+
+    if (!status || !['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const { data, error } = await supabase
+      .from('staff_reviews')
+      .update({
+        status,
+        reviewed_by: reviewedBy || null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating review:', error);
+      return res.status(500).json({ error: 'Failed to update review' });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Unexpected error updating review:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+// Get all pending reviews with photo + listing context
+app.get('/reviews/pending', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('staff_reviews')
+      .select(`
+        id,
+        status,
+        reviewed_by,
+        reviewed_at,
+        photo:photos (
+          id,
+          url,
+          photographer,
+          listing:listings (
+            id,
+            title,
+            description,
+            location
+          )
+        )
+      `)
+      .eq('status', 'pending')
+      .order('id', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching pending reviews:', error);
+      return res.status(500).json({ error: 'Failed to fetch pending reviews' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('Unexpected error fetching pending reviews:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`ArborDex API running on port ${PORT}`);
+});
