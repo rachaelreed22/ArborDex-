@@ -1,10 +1,17 @@
- // server/index.js
+// server/index.js
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
 const supabase = require('./db');
+const multer = require("multer");
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+});
+
+const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || "tree-photos";
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -361,7 +368,77 @@ app.get('/reviews/pending', async (req, res) => {
     res.status(500).json({ error: 'Unexpected error' });
   }
 });
+// Upload photos to Supabase Storage and save photo records
+app.post("/photos/upload", upload.array("photos", 10), async (req, res) => {
+  try {
+    const { listingId, firstName, lastName, email, staffUploaded } = req.body;
+    const files = req.files;
 
+    if (!listingId) {
+      return res.status(400).json({ error: "listingId is required" });
+    }
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "At least one photo is required" });
+    }
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ error: "Photographer info is required" });
+    }
+
+    const photographer = `${firstName} ${lastName}`.trim();
+    const uploadedPhotos = [];
+
+    for (const file of files) {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const filePath = `listings/${listingId}/${Date.now()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Supabase storage upload error:", uploadError);
+        return res.status(500).json({ error: "Failed to upload photo" });
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(PHOTO_BUCKET)
+        .getPublicUrl(filePath);
+
+      const { data: photoRecord, error: photoError } = await supabase
+        .from("photos")
+        .insert([
+          {
+            listing_id: listingId,
+            url: publicUrlData.publicUrl,
+            photographer,
+            photographer_first: firstName,
+            photographer_last: lastName,
+            photographer_email: email,
+            staff_uploaded: staffUploaded === "true",
+          },
+        ])
+        .select()
+        .single();
+
+      if (photoError) {
+        console.error("Error saving photo record:", photoError);
+        return res.status(500).json({ error: "Failed to save photo record" });
+      }
+
+      uploadedPhotos.push(photoRecord);
+    }
+
+    res.status(201).json(uploadedPhotos);
+  } catch (err) {
+    console.error("Unexpected photo upload error:", err);
+    res.status(500).json({ error: "Unexpected upload error" });
+  }
+});
 app.listen(PORT, () => {
   console.log(`ArborDex API running on port ${PORT}`);
 });

@@ -1,254 +1,181 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { getTree, getPhotos, uploadPhoto } from '../api';
-import { useMode } from '../context/ModeContext';
-
-const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'];
-
-function fmt(val, suffix = '') {
-  return val != null ? `${val}${suffix}` : '—';
-}
-
-function fmtDate(val) {
-  if (!val) return '—';
-  return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { useMode } from "../context/ModeContext";
 
 export default function ArborTag() {
-  const { id } = useParams();
-  const [tree, setTree] = useState(null);
-  const [photos, setPhotos] = useState([]);
+  const { id } = useParams(); // listing ID from URL
+  const { mode } = useMode(); // "tag" = public, "dex" = staff
+
+  const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
 
-  // Upload form state
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [uploaderName, setUploaderName] = useState('');
-  const [uploaderEmail, setUploaderEmail] = useState('');
-  const [caption, setCaption] = useState('');
-  const [season, setSeason] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const fileInputRef = useRef();
-
+  // Fetch listing data
   useEffect(() => {
-    Promise.all([
-      getTree(id).catch(() => null),
-      getPhotos(id).catch(() => []),
-    ]).then(([t, p]) => {
-      if (!t) { setNotFound(true); }
-      else { setTree(t); setPhotos(p); }
-    }).finally(() => setLoading(false));
+    async function fetchListing() {
+      try {
+        const res = await fetch(`http://localhost:5000/listings/${id}`);
+        const data = await res.json();
+        setListing(data);
+      } catch (err) {
+        console.error("Error fetching listing:", err);
+      }
+      setLoading(false);
+    }
+
+    fetchListing();
   }, [id]);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target.result);
-    reader.readAsDataURL(file);
-    setUploadSuccess(false);
-    setUploadError('');
-  };
+  if (loading) return <p>Loading tree...</p>;
+  if (!listing) return <p>Tree not found.</p>;
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) { setUploadError('Please select a photo.'); return; }
-    setUploading(true);
-    setUploadError('');
-    try {
-      const formData = new FormData();
-      formData.append('photo', selectedFile);
-      if (uploaderName) formData.append('photographer_name', uploaderName);
-      if (uploaderEmail) formData.append('photographer_email', uploaderEmail);
-      if (caption) formData.append('caption', caption);
-      if (season) formData.append('season', season);
-
-      const newPhoto = await uploadPhoto(id, formData);
-      setPhotos(p => [newPhoto, ...p]);
-      setUploadSuccess(true);
-      setSelectedFile(null);
-      setPreview(null);
-      setUploaderName('');
-      setUploaderEmail('');
-      setCaption('');
-      setSeason('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
-      setUploadError(err.response?.data?.error || 'Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  if (loading) return <div className="loading" style={{ paddingTop: '4rem' }}>Loading…</div>;
-
-  if (notFound) {
-    return (
-      <div className="visitor-page" style={{ textAlign: 'center', paddingTop: '3rem' }}>
-        <div style={{ fontSize: '4rem' }}>🌿</div>
-        <h2 style={{ color: '#2e5e2e', marginTop: '0.5rem' }}>Tree Not Found</h2>
-        <p style={{ color: '#6a896a', marginTop: '0.5rem' }}>This QR code may be invalid or the entry has been removed.</p>
-      </div>
-    );
-  }
+  const photos = listing.photos || [];
+  const mainPhoto =
+    photos.find((p) => p.is_main) || photos[0] || null;
+  const winnerPhoto = photos.find((p) => p.winner) || null;
 
   return (
-    <div className="visitor-page">
-      {/* ArborTag Header */}
-      <div className="visitor-header">
-        <div className="visitor-brand">🌿 ArborTag</div>
-        <h1>{tree.common_name}</h1>
-        {tree.scientific_name && <p>{tree.scientific_name}</p>}
-      </div>
+    <div
+      style={{
+        maxWidth: "900px",
+        margin: "0 auto",
+        padding: "20px",
+        textAlign: "center",
+      }}
+    >
+      {/* Title */}
+      <h1 style={{ marginBottom: "10px" }}>{listing.title}</h1>
 
-      {/* Tree Stats */}
-      <div className="card" style={{ marginBottom: '1.25rem' }}>
-        <div className="card-header"><h2>🌳 Tree Information</h2></div>
-        <div className="card-body">
-          <div className="detail-row"><span className="label">Species</span><span className="value">{fmt(tree.species)}</span></div>
-          <div className="detail-row"><span className="label">Family</span><span className="value">{fmt(tree.family)}</span></div>
-          <div className="detail-row"><span className="label">Height</span><span className="value">{fmt(tree.height_ft, ' ft')}</span></div>
-          <div className="detail-row"><span className="label">Trunk Diameter</span><span className="value">{fmt(tree.diameter_in, ' in')}</span></div>
-          <div className="detail-row"><span className="label">Estimated Age</span><span className="value">{fmt(tree.age_years, ' years')}</span></div>
-          <div className="detail-row"><span className="label">Condition</span><span className={`value condition-${tree.condition}`}>{fmt(tree.condition)}</span></div>
-          {tree.location_description && (
-            <div className="detail-row"><span className="label">Location</span><span className="value">{tree.location_description}</span></div>
-          )}
-          {tree.date_planted && (
-            <div className="detail-row"><span className="label">Date Planted</span><span className="value">{fmtDate(tree.date_planted)}</span></div>
-          )}
-          {tree.description && (
-            <p style={{ marginTop: '0.75rem', fontSize: '0.9rem', color: '#4a6a4a', lineHeight: 1.6 }}>
-              {tree.description}
+      {/* Location */}
+      <p style={{ color: "#666", marginBottom: "20px" }}>
+        {listing.location}
+      </p>
+
+      {/* Main Photo */}
+      {mainPhoto ? (
+        <div style={{ marginBottom: "20px" }}>
+          <img
+            src={mainPhoto.url}
+            alt="Main"
+            style={{
+              width: "100%",
+              maxHeight: "450px",
+              objectFit: "cover",
+              borderRadius: "10px",
+            }}
+          />
+
+          {/* Photographer credit */}
+          {mainPhoto.photographer && (
+            <p style={{ marginTop: "8px", fontStyle: "italic" }}>
+              📸 {mainPhoto.photographer}
             </p>
           )}
         </div>
-      </div>
+      ) : (
+        <p>No photos available yet.</p>
+      )}
 
-      {/* GPS Map link */}
-      {tree.gps_lat && tree.gps_lng && (
-        <div style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
-          <a
-            href={`https://www.google.com/maps?q=${tree.gps_lat},${tree.gps_lng}`}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-secondary"
-          >
-            🗺 View on Map
-          </a>
+      {/* Winner Badge */}
+      {winnerPhoto && (
+        <div
+          style={{
+            background: "#e8ffe8",
+            padding: "10px",
+            borderRadius: "8px",
+            marginBottom: "20px",
+            display: "inline-block",
+          }}
+        >
+          <strong>⭐ Photo Contest Winner</strong>
+          <br />
+          <img
+            src={winnerPhoto.url}
+            alt="Winner"
+            style={{
+              width: "200px",
+              height: "200px",
+              objectFit: "cover",
+              borderRadius: "8px",
+              marginTop: "10px",
+            }}
+          />
+          {winnerPhoto.photographer && (
+            <p style={{ marginTop: "5px", fontStyle: "italic" }}>
+              📸 {winnerPhoto.photographer}
+            </p>
+          )}
         </div>
       )}
 
-      {/* Photo Upload */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div className="card-header">
-          <h2>📸 Submit Your Photo</h2>
-        </div>
-        <div className="card-body">
-          <p style={{ fontSize: '0.88rem', color: '#5a7a5a', marginBottom: '1rem', lineHeight: 1.5 }}>
-            Submit your photo of this tree for the seasonal photography challenge!
-            Your photo will be displayed in the ArborDex database with your name as credit.
-          </p>
+      {/* Description */}
+      <p
+        style={{
+          marginTop: "20px",
+          marginBottom: "30px",
+          fontSize: "18px",
+          lineHeight: "1.5",
+        }}
+      >
+        {listing.description}
+      </p>
 
-          {uploadSuccess && (
-            <div className="alert alert-success">
-              🎉 Photo submitted successfully! Thank you for your contribution.
-            </div>
-          )}
-          {uploadError && <div className="alert alert-error">{uploadError}</div>}
-
-          <form onSubmit={handleUpload}>
-            <label
-              className="upload-area"
-              htmlFor="photo-upload"
-            >
-              <input
-                id="photo-upload"
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-              />
-              {preview ? (
-                <div className="upload-preview">
-                  <img src={preview} alt="Preview" />
-                  <p style={{ fontSize: '0.85rem', color: '#5a7a5a' }}>Tap to change photo</p>
-                </div>
-              ) : (
-                <>
-                  <div className="upload-icon">📷</div>
-                  <p style={{ fontWeight: 600, color: '#2e5e2e' }}>Tap to select a photo</p>
-                  <p style={{ fontSize: '0.8rem', color: '#8aab8a', marginTop: '0.25rem' }}>JPEG, PNG, or WEBP · Max 10MB</p>
-                </>
-              )}
-            </label>
-
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Your Name</label>
-                <input
-                  type="text"
-                  value={uploaderName}
-                  onChange={e => setUploaderName(e.target.value)}
-                  placeholder="Jane Smith"
+      {/* Photo Gallery */}
+      {photos.length > 1 && (
+        <div>
+          <h3>Photo Gallery</h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              gap: "15px",
+              marginTop: "15px",
+            }}
+          >
+            {photos.map((photo) => (
+              <div key={photo.id}>
+                <img
+                  src={photo.url}
+                  alt="Gallery"
+                  style={{
+                    width: "100%",
+                    height: "150px",
+                    objectFit: "cover",
+                    borderRadius: "6px",
+                  }}
                 />
+                {photo.photographer && (
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      marginTop: "5px",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    📸 {photo.photographer}
+                  </p>
+                )}
               </div>
-              <div className="form-group">
-                <label>Season</label>
-                <select value={season} onChange={e => setSeason(e.target.value)}>
-                  <option value="">-- Select --</option>
-                  {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="form-group full-width">
-                <label>Caption</label>
-                <input
-                  type="text"
-                  value={caption}
-                  onChange={e => setCaption(e.target.value)}
-                  placeholder="What makes this tree special?"
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={uploading || !selectedFile}>
-                {uploading ? 'Uploading…' : '🌿 Submit Photo'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* Community Photos */}
-      {photos.length > 0 && (
-        <div className="card">
-          <div className="card-header"><h2>🖼 Community Gallery ({photos.length})</h2></div>
-          <div className="card-body">
-            <div className="photo-gallery">
-              {photos.map(photo => (
-                <div key={photo.id} className="photo-card">
-                  <img src={`/uploads/${photo.filename}`} alt={photo.caption || 'Tree photo'} />
-                  <div className="photo-info">
-                    <div className="photographer">📸 {photo.photographer_name || 'Anonymous'}</div>
-                    {photo.caption && <div className="photo-caption">{photo.caption}</div>}
-                    {photo.season && <div className="photo-season">🍂 {photo.season}</div>}
-                    <div style={{ fontSize: '0.75rem', color: '#9aab9a', marginTop: '0.2rem' }}>{fmtDate(photo.uploaded_at)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
       )}
 
-      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.78rem', color: '#9aab9a' }}>
-        Powered by ArborDex · Missouri Parks Tree Management System
-      </div>
+      {/* Staff Mode Debug Info */}
+      {mode === "dex" && (
+        <div
+          style={{
+            marginTop: "40px",
+            padding: "15px",
+            border: "1px dashed #aaa",
+            borderRadius: "8px",
+            background: "#f9f9f9",
+          }}
+        >
+          <h3>Staff Mode</h3>
+          <p>Listing ID: {listing.id}</p>
+          <p>Total Photos: {photos.length}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,9 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import Navbar from './components/Navbar';
 import { ModeProvider } from './context/ModeContext';
 
+import CreateListingForm from "./components/CreateListingForm";
 import TreeList from './pages/TreeList';
-import TreeForm from './pages/TreeForm';
 import ArborTag from './pages/ArborTag';
+import Scan from './pages/Scan';   // ← Add this once Scan.jsx exists
 
 function Layout() {
   return (
@@ -23,19 +24,22 @@ export default function App() {
       <BrowserRouter>
         <Routes>
 
-          {/* Public QR Entry */}
+          {/* Public QR Entry (no staff tools, but still uses Layout for navbar) */}
           <Route element={<Layout />}>
             <Route path="/tag/:id" element={<ArborTag />} />
           </Route>
 
-          {/* Staff + Public unified pages */}
+          {/* Unified Staff + Public Pages */}
           <Route element={<Layout />}>
             <Route path="/" element={<TreeList />} />
-            <Route path="/add" element={<TreeForm />} />
-            <Route path="/trees/:id" element={<ArborTag />} />
-            <Route path="/trees/:id/edit" element={<TreeForm />} />
+            <Route path="/add" element={<CreateListingForm />} />
+            <Route path="/listing/:id" element={<ArborTag />} />
+
+            {/* Scan QR Page */}
+            <Route path="/scan" element={<Scan />} />
           </Route>
 
+          {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
@@ -43,4 +47,3 @@ export default function App() {
     </ModeProvider>
   );
 }
-

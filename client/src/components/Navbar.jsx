@@ -1,9 +1,10 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import logo from '../assets/ArborTag-Logo.png';
 
 export default function Navbar() {
   const { mode, toggleMode } = useMode();
+  const navigate = useNavigate();
 
   const brandName = mode === "tag" ? "ArborTag" : "ArborDex";
   const toggleLabel = mode === "tag" ? "ArborDex ⚙️" : "ArborTag 🌿";
@@ -25,6 +26,14 @@ export default function Navbar() {
           <NavLink to="/add">+ Add Tree</NavLink>
         )}
 
+        {/* Scan QR in BOTH modes */}
+        <button 
+          className="scan-qr-btn"
+          onClick={() => navigate("/scan")}
+        >
+          Scan QR
+        </button>
+
         {/* Mode Toggle */}
         <button className="mode-toggle" onClick={toggleMode}>
           {toggleLabel}
@@ -33,6 +42,3 @@ export default function Navbar() {
     </header>
   );
 }
-
-
-
