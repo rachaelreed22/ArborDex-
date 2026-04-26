@@ -1,0 +1,159 @@
+ /* ===========================
+   NAVBAR
+   =========================== */
+.navbar {
+  background: #2e5e2e;
+  color: #fff;
+  padding: 0.6rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+/* — Brand / Logo — */
+.navbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.navbar .brand-logo {
+  height: 45px;
+  width: auto;
+}
+
+.navbar .brand-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+/* — Desktop Nav — */
+.navbar nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.navbar nav a {
+  color: #c8e6c9;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.navbar nav a:hover,
+.navbar nav a.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* — Nav Buttons (Scan QR, Mode Toggle) — */
+.navbar .scan-qr-btn,
+.navbar .mode-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #c8e6c9;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.navbar .scan-qr-btn:hover,
+.navbar .mode-toggle:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* — Hamburger (hidden on desktop) — */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 1001;
+}
+
+.hamburger .bar {
+  display: block;
+  width: 24px;
+  height: 3px;
+  background: #c8e6c9;
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Animate to X when open */
+.hamburger.open .bar:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+.hamburger.open .bar:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.open .bar:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+/* ===========================
+   MOBILE NAV (max-width: 600px)
+   =========================== */
+@media (max-width: 600px) {
+  .hamburger {
+    display: flex;
+  }
+
+  .navbar nav {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #244d24;
+    padding: 1rem 1.5rem;
+    gap: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+  }
+
+  .navbar nav.nav-open {
+    display: flex;
+  }
+
+  .navbar nav a,
+  .navbar .scan-qr-btn,
+  .navbar .mode-toggle {
+    width: 100%;
+    text-align: left;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    border-radius: 6px;
+  }
+
+  .navbar nav a:hover,
+  .navbar nav a.active,
+  .navbar .scan-qr-btn:hover,
+  .navbar .mode-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .navbar .brand-logo {
+    height: 36px;
+  }
+
+  .navbar .brand-name {
+    font-size: 1.1rem;
+  }
+}

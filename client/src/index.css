@@ -1,15 +1,24 @@
-/* ArborDex Global Styles */
+/* ===========================
+   ArborDex Global Styles
+   Clean build — duplicates removed,
+   green gradient restored
+   =========================== */
+
+/* ===========================
+   RESET
+   =========================== */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* ===========================
+   GLOBAL TYPOGRAPHY
+   =========================== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #31bb4a, #b1b53b);
-
-;
   color: #5e381a;
   min-height: 100vh;
 }
@@ -18,78 +27,28 @@ a {
   color: inherit;
   text-decoration: none;
 }
-
-/* Navbar */
-.navbar {
-  background: #2e5e2e;
-  color: #fff;
-  padding: 0.75rem 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-}
-
-.navbar .brand {
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.navbar .brand span.leaf {
-  font-size: 1.5rem;
-}
-
-.navbar nav {
-  display: flex;
-  gap: 1rem;
-  margin-left: auto;
-}
-
-.navbar nav a {
-  color: #c8e6c9;
-  padding: 0.3rem 0.7rem;
-  border-radius: 4px;
-  transition: background 0.2s;
-  font-size: 0.95rem;
-}
-
-.navbar nav a:hover,
-.navbar nav a.active {
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-}
-.brand-logo {
-  height: 60px;   /* adjust this */
-  width: auto;    /* keeps proportions correct */
-}
-
-
-/* Page container */
+/* ===========================
+   PAGE CONTAINER
+   =========================== */
 .page {
   max-width: 1100px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
-
-/* Page title */
 .page-title {
   font-size: 1.8rem;
   font-weight: 700;
   color: #2e5e2e;
   margin-bottom: 0.25rem;
 }
-
 .page-subtitle {
   color: #5a7a5a;
   margin-bottom: 1.5rem;
   font-size: 0.95rem;
 }
-
-/* Buttons */
+/* ===========================
+   BUTTONS
+   =========================== */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -103,14 +62,18 @@ a {
   transition: background 0.2s, transform 0.1s;
 }
 
-.btn:active { transform: scale(0.97); }
+.btn:active {
+  transform: scale(0.97);
+}
 
 .btn-primary {
   background: #2e5e2e;
   color: #fff;
 }
 
-.btn-primary:hover { background: #245024; }
+.btn-primary:hover {
+  background: #245024;
+}
 
 .btn-secondary {
   background: #e8f5e9;
@@ -118,25 +81,31 @@ a {
   border: 1px solid #a5d6a7;
 }
 
-.btn-secondary:hover { background: #c8e6c9; }
+.btn-secondary:hover {
+  background: #c8e6c9;
+}
 
 .btn-danger {
   background: #c62828;
   color: #fff;
 }
 
-.btn-danger:hover { background: #b71c1c; }
+.btn-danger:hover {
+  background: #b71c1c;
+}
 
 .btn-sm {
   padding: 0.3rem 0.7rem;
   font-size: 0.82rem;
 }
 
-/* Cards */
+/* ===========================
+   CARDS
+   =========================== */
 .card {
   background: #fff;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -158,7 +127,9 @@ a {
   padding: 1.25rem;
 }
 
-/* Tree list */
+/* ===========================
+   TREE GRID & CARDS
+   =========================== */
 .tree-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -169,7 +140,7 @@ a {
 .tree-card {
   background: #fff;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
   padding: 1.2rem;
   display: flex;
   flex-direction: column;
@@ -180,7 +151,7 @@ a {
 }
 
 .tree-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
@@ -203,6 +174,16 @@ a {
   margin-top: 0.3rem;
 }
 
+.tree-card .actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* ===========================
+   BADGES
+   =========================== */
 .badge {
   background: #e8f5e9;
   color: #2e5e2e;
@@ -222,14 +203,9 @@ a {
   color: #1565c0;
 }
 
-.tree-card .actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  justify-content: flex-end;
-}
-
-/* Form styles */
+/* ===========================
+   FORMS
+   =========================== */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -275,7 +251,7 @@ a {
 .form-group textarea:focus {
   outline: none;
   border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76,175,80,0.2);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .form-group textarea {
@@ -290,55 +266,9 @@ a {
   justify-content: flex-end;
 }
 
-/* Detail page */
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-@media (max-width: 700px) {
-  .detail-grid { grid-template-columns: 1fr; }
-}
-
-.detail-section {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  padding: 1.25rem;
-}
-
-.detail-section h3 {
-  font-size: 1rem;
-  color: #2e5e2e;
-  border-bottom: 2px solid #e8f5e9;
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid #f0f4f0;
-  font-size: 0.9rem;
-}
-
-.detail-row:last-child { border-bottom: none; }
-
-.detail-row .label {
-  color: #6a896a;
-  font-weight: 600;
-}
-
-.detail-row .value {
-  color: #2d3a2e;
-  text-align: right;
-  max-width: 60%;
-}
-
-/* Photo gallery */
+/* ===========================
+   PHOTO GALLERY
+   =========================== */
 .photo-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -350,7 +280,7 @@ a {
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .photo-card img {
@@ -381,7 +311,9 @@ a {
   margin-top: 0.1rem;
 }
 
-/* QR code */
+/* ===========================
+   QR CODE SECTION
+   =========================== */
 .qr-section {
   display: flex;
   flex-direction: column;
@@ -395,7 +327,9 @@ a {
   border-radius: 8px;
 }
 
-/* Visitor (ArborTag) page */
+/* ===========================
+   VISITOR (ARBORTAG) PAGE
+   =========================== */
 .visitor-page {
   max-width: 700px;
   margin: 0 auto;
@@ -431,7 +365,9 @@ a {
   letter-spacing: 1px;
 }
 
-/* Upload form */
+/* ===========================
+   UPLOAD
+   =========================== */
 .upload-area {
   border: 2px dashed #a5d6a7;
   border-radius: 8px;
@@ -463,7 +399,9 @@ a {
   margin-bottom: 0.75rem;
 }
 
-/* Alert/message */
+/* ===========================
+   ALERTS
+   =========================== */
 .alert {
   padding: 0.75rem 1rem;
   border-radius: 6px;
@@ -483,7 +421,9 @@ a {
   border: 1px solid #ef9a9a;
 }
 
-/* Loading */
+/* ===========================
+   LOADING & EMPTY STATES
+   =========================== */
 .loading {
   text-align: center;
   padding: 3rem;
@@ -491,7 +431,6 @@ a {
   font-size: 1.1rem;
 }
 
-/* Empty state */
 .empty-state {
   text-align: center;
   padding: 3rem;
@@ -503,7 +442,9 @@ a {
   margin-bottom: 0.75rem;
 }
 
-/* Search bar */
+/* ===========================
+   SEARCH BAR
+   =========================== */
 .search-bar {
   display: flex;
   gap: 0.75rem;
@@ -522,227 +463,55 @@ a {
 .search-bar input:focus {
   outline: none;
   border-color: #4caf50;
-  box-shadow: 0 0 0 2px rgba(76,175,80,0.2);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
-/* Back link */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: #4caf50;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  cursor: pointer;
+/* ===========================
+   UTILITIES
+   =========================== */
+.hidden {
+  display: none !important;
 }
+/* ===========================
+   SPECIFICITY OVERRIDES
+   (beats index.css globals)
+   =========================== */
 
-.back-link:hover { color: #2e7d32; }
-
-/* Modal overlay */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  padding: 1.75rem;
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #2e5e2e;
-  margin-bottom: 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.section-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #4a6a4a;
-  margin: 1.25rem 0 0.75rem;
-  border-left: 3px solid #4caf50;
-  padding-left: 0.5rem;
-}
-
-/* Condition colors */
-.condition-Excellent { color: #2e7d32; }
-.condition-Good { color: #388e3c; }
-.condition-Fair { color: #f57c00; }
-.condition-Poor { color: #c62828; }
-.condition-Dead { color: #6d4c41; }
-.arbor-tag-page {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.visitor-hero {
-  border: 1px solid #d8e7d1;
-  background: linear-gradient(180deg, #f8fcf5 0%, #eef7e9 100%);
-}
-
-.eyebrow {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #5f7d5f;
-  margin-bottom: 0.75rem;
-}
-
-.tree-title {
-  font-size: 2.2rem;
-  line-height: 1.1;
-  color: #244524;
-  margin: 0;
-}
-
-.tree-subtitle {
-  margin-top: 0.35rem;
+/* — "Your Photos" heading — */
+.scan-page .photo-gallery-section h3 {
+  color: #88ccaa;
+  font-family: 'Georgia', serif;
   font-style: italic;
-  color: #6a896a;
+  font-size: 1.1rem;
 }
 
-.visitor-intro,
-.tree-description,
-.section-intro,
-.upload-note,
-.photo-date {
-  color: #4f664f;
-  line-height: 1.6;
-}
-
-.visitor-intro {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-}
-
-.hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.meta-chip,
-.condition-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.55rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.meta-chip {
-  background: #edf4e8;
-  color: #315331;
-  border: 1px solid #d7e5cf;
-}
-
-.condition-pill.good {
-  background: #e8f6ea;
-  color: #20643a;
-  border: 1px solid #bfe3c8;
-}
-
-.condition-pill.watch {
-  background: #fff6df;
-  color: #8a6512;
-  border: 1px solid #ecd79d;
-}
-
-.condition-pill.alert {
-  background: #fdeaea;
-  color: #9b2f2f;
-  border: 1px solid #efc1c1;
-}
-
-.condition-pill.neutral {
-  background: #eef1ee;
-  color: #546454;
-  border: 1px solid #d7ded7;
-}
-
-.upload-cta {
-  margin-top: 1.25rem;
-}
-
-.upload-note {
+/* — "No photos selected" text — */
+.scan-page .gallery-empty p {
+  color: #88ccaa;
+  font-family: 'Georgia', serif;
+  font-style: italic;
   font-size: 0.9rem;
-  margin-top: 0.5rem;
 }
 
-.photo-date {
-  font-size: 0.78rem;
-  margin-top: 0.4rem;
-}
-
-@media (max-width: 768px) {
-  .tree-title {
-    font-size: 1.8rem;
-  }
-
-  .hero-meta {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-.tree-card.photo-card {
-  position: relative;
-  background-size: cover;
-  background-position: center;
-  height: 260px;
-  border-radius: 12px;
-  overflow: hidden;
+/* — Choose Files button — */
+.scan-page input[type="file"]::file-selector-button {
+  background: #080617;
+  border: 2px solid #00ff88;
+  color: #00ff88;
+  padding: 8px 16px;
+  font-weight: 600;
+  border-radius: 8px;
   cursor: pointer;
-  display: flex;
-  align-items: flex-end;
-  transition: transform 0.2s ease;
+  transition: 0.2s ease;
 }
 
-.tree-card.photo-card:hover {
-  transform: scale(1.02);
+.scan-page input[type="file"]::file-selector-button:hover {
+  background: #00ff88;
+  color: #111;
 }
 
-.tree-card .overlay {
-  width: 100%;
-  padding: 1rem;
-  background: linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0));
-  color: white;
-}
-
-.tree-title {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
-}
-
-.location-text {
-  font-size: 0.82rem;
-  margin-top: 0.3rem;
-  color: #e0e0e0;
-}
-
-.actions {
-  margin-top: 0.5rem;
-  display: flex;
-  gap: 0.4rem;
+/* — File input text (the filename display) — */
+.scan-page input[type="file"] {
+  color: #e0ffe0;
+  font-size: 0.85rem;
 }

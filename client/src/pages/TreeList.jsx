@@ -1,188 +1,157 @@
  import { useEffect, useState } from "react";
 import { useMode } from "../context/ModeContext";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import "./TreeList.css";
 
 export default function TreeList() {
-  const { mode } = useMode(); // "tag" = public, "dex" = staff
+  const { mode } = useMode();
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Fetch all listings from backend
-  useEffect(() => {
-    async function fetchListings() {
-      try {
-        const res = await fetch("http://localhost:5000/listings");
-        const data = await res.json();
-        setListings(data || []);
-      } catch (err) {
-        console.error("Error fetching listings:", err);
-      }
-      setLoading(false);
-    }
+  const isStaff = mode === "dex";
+  const brandName = isStaff ? "ArborDex" : "ArborTag";
 
+  useEffect(() => {
     fetchListings();
   }, []);
 
-  // Staff action: set main photo
-  const setMainPhoto = async (photoId) => {
+  async function fetchListings() {
     try {
-      await fetch(`http://localhost:5000/photos/${photoId}/main`, {
-        method: "PATCH",
-      });
-      // Refresh listings after update
-      const res = await fetch("http://localhost:5000/listings");
+      const res = await fetch("/api/listings");
       const data = await res.json();
       setListings(data || []);
     } catch (err) {
-      console.error("Error setting main photo:", err);
+      console.error("Error fetching listings:", err);
     }
-  };
+    setLoading(false);
+  }
 
-  // Staff action: set winner photo
-  const setWinnerPhoto = async (photoId) => {
+  // Staff only: delete a tree
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this tree?")) return;
     try {
-      await fetch(`http://localhost:5000/photos/${photoId}/winner`, {
-        method: "PATCH",
-      });
-      // Refresh listings after update
-      const res = await fetch("http://localhost:5000/listings");
-      const data = await res.json();
-      setListings(data || []);
+      await fetch(`/api/listings/${id}`, { method: "DELETE" });
+      setListings((prev) => prev.filter((l) => l.id !== id));
     } catch (err) {
-      console.error("Error setting winner:", err);
+      console.error("Error deleting listing:", err);
     }
   };
 
-  if (loading) return <p>Loading listings...</p>;
+  // Filter by search
+  const filtered = listings.filter((l) => {
+    const q = search.toLowerCase();
+    return (
+      l.title?.toLowerCase().includes(q) ||
+      l.description?.toLowerCase().includes(q) ||
+      l.location?.toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) return <div className="loading">Loading trees...</div>;
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>
-        {mode === "tag" ? "ArborTag" : "ArborDex"} — Tree & Plant Listings
-      </h1>
-      {listings.length === 0 && <p>No listings found.</p>}
+    <div className="page tree-list-page">
+      <h1 className="page-title">{brandName} — Tree Database</h1>
+      <p className="page-subtitle">
+        {isStaff
+          ? "Manage your tree and plant inventory"
+          : "Browse tagged trees and plants"}
+      </p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "20px",
-          marginTop: "20px",
-        }}
-      >
-        {listings.map((listing) => {
-          const mainPhoto =
-            listing.photos?.find((p) => p.is_main) ||
-            listing.photos?.[0] ||
-            null;
-
-          return (
-            <div
-              key={listing.id}
-              style={{
-                border: "1px solid #ccc",
-                borderRadius: "8px",
-                padding: "15px",
-                background: "#fafafa",
-              }}
-            >
-              {/* Main Photo */}
-              {mainPhoto ? (
-                <img
-                  src={mainPhoto.url}
-                  alt="Main"
-                  style={{
-                    width: "100%",
-                    height: "180px",
-                    objectFit: "cover",
-                    borderRadius: "6px",
-                    marginBottom: "10px",
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "180px",
-                    background: "#ddd",
-                    borderRadius: "6px",
-                    marginBottom: "10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#555",
-                  }}
-                >
-                  No photos yet
-                </div>
-              )}
-
-              {/* Listing Info */}
-              <h3>{listing.title}</h3>
-              <p>{listing.description}</p>
-              <p style={{ fontStyle: "italic", color: "#666" }}>
-                {listing.location}
-              </p>
-
-              {/* View Listing */}
-              <Link to={`/listing/${listing.id}`}>
-                <button style={{ marginTop: "10px" }}>View Listing</button>
-              </Link>
-
-              {/* Staff Controls */}
-              {mode === "dex" && listing.photos?.length > 0 && (
-                <div style={{ marginTop: "15px" }}>
-                  <h4>Staff Tools</h4>
-
-                  {listing.photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        marginBottom: "8px",
-                        gap: "10px",
-                      }}
-                    >
-                      <img
-                        src={photo.url}
-                        alt="thumb"
-                        style={{
-                          width: "50px",
-                          height: "50px",
-                          objectFit: "cover",
-                          borderRadius: "4px",
-                        }}
-                      />
-
-                      <div style={{ flexGrow: 1 }}>
-                        <p style={{ margin: 0 }}>
-                          {photo.photographer
-                            ? `📸 ${photo.photographer}`
-                            : "No credit"}
-                        </p>
-                        {photo.winner && (
-                          <span style={{ color: "green", fontWeight: "bold" }}>
-                            ⭐ Winner
-                          </span>
-                        )}
-                      </div>
-
-                      <button onClick={() => setMainPhoto(photo.id)}>
-                        Set Main
-                      </button>
-
-                      <button onClick={() => setWinnerPhoto(photo.id)}>
-                        Set Winner
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* Toolbar: Search + Add */}
+      <div className="tree-list-toolbar">
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Search trees by name, description, or location..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {isStaff && (
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate("/add")}
+          >
+            + Add Tree
+          </button>
+        )}
       </div>
+
+      {/* Tree Cards */}
+      {filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="icon">🌳</div>
+          <p>{search ? "No trees match your search." : "No trees found."}</p>
+        </div>
+      ) : (
+        <div className="tree-grid">
+          {filtered.map((listing) => {
+            const mainPhoto =
+              listing.photos?.find((p) => p.is_main) ||
+              listing.photos?.[0] ||
+              null;
+
+            return (
+              <div
+                key={listing.id}
+                className="tree-card"
+                onClick={() => navigate(`/listing/${listing.id}`)}
+              >
+                {/* Photo */}
+                {mainPhoto ? (
+                  <img
+                    src={mainPhoto.url}
+                    alt={listing.title}
+                    className="tree-card-photo"
+                  />
+                ) : (
+                  <div className="tree-card-placeholder">
+                    <span>🌿</span>
+                    <p>No photo yet</p>
+                  </div>
+                )}
+
+                {/* Info */}
+                <h3>{listing.title || "Unnamed Tree"}</h3>
+
+                {listing.description && (
+                  <p className="tree-card-desc">{listing.description}</p>
+                )}
+
+                {listing.location && (
+                  <div className="meta">
+                    <span className="badge">📍 {listing.location}</span>
+                  </div>
+                )}
+
+                {listing.photos?.length > 0 && (
+                  <div className="meta">
+                    <span className="badge">
+                      📸 {listing.photos.length} photo{listing.photos.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                )}
+
+                {/* Staff: Delete */}
+                {isStaff && (
+                  <div className="actions">
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={(e) => handleDelete(listing.id, e)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

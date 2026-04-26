@@ -1,0 +1,255 @@
+/* ===========================
+   TREE DETAIL PAGE
+   =========================== */
+
+.tree-detail-page {
+  max-width: 900px;
+}
+
+.back-btn {
+  margin-bottom: 1.25rem;
+}
+
+/* — Header — */
+.detail-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.detail-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2e5e2e;
+  margin-bottom: 0.3rem;
+}
+
+.detail-location {
+  color: #5a7a5a;
+  font-size: 1rem;
+  margin-top: 0.25rem;
+}
+
+.detail-coords {
+  color: #7a9a7a;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+  font-family: monospace;
+}
+
+.empty-hint {
+  color: #7a9a7a;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* — Edit Form — */
+.edit-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  text-align: left;
+}
+
+.edit-form .full-width {
+  grid-column: 1 / -1;
+}
+
+/* — Main Photo — */
+.detail-main-photo {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.detail-main-photo img {
+  width: 100%;
+  max-height: 450px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.photo-credit {
+  font-style: italic;
+  color: #6a896a;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+/* — No Photo Placeholder — */
+.detail-no-photo {
+  text-align: center;
+  padding: 3rem;
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  color: #4a6a4a;
+}
+
+.detail-no-photo span {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* — Winner Section — */
+.detail-winner {
+  text-align: center;
+  background: #f1f8e9;
+  padding: 1.25rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #c8e6c9;
+}
+
+.winner-badge {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #2e5e2e;
+  margin-bottom: 0.75rem;
+}
+
+.detail-winner img {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* — Description — */
+.detail-description {
+  margin-bottom: 1.5rem;
+}
+
+.detail-description h3 {
+  font-size: 1.15rem;
+  color: #2e5e2e;
+  margin-bottom: 0.5rem;
+}
+
+.detail-description p {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #3a5a3a;
+}
+
+/* — Staff Action Buttons — */
+.staff-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+
+/* — Photo Gallery — */
+.detail-gallery {
+  margin-top: 2rem;
+}
+
+.detail-gallery h3 {
+  font-size: 1.2rem;
+  color: #2e5e2e;
+  margin-bottom: 1rem;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.gallery-card {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 0.5rem;
+}
+
+.gallery-card img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.gallery-card .badge {
+  display: inline-block;
+  margin-top: 0.4rem;
+}
+
+.gallery-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* — Staff Info Panel — */
+.staff-info {
+  margin-top: 2rem;
+  padding: 1rem 1.25rem;
+  border: 1px dashed #b0c4b0;
+  border-radius: 8px;
+  background: #f9fdf9;
+}
+
+.staff-info h4 {
+  color: #2e5e2e;
+  margin-bottom: 0.5rem;
+}
+
+.staff-info p {
+  font-size: 0.9rem;
+  color: #5a7a5a;
+  margin-bottom: 0.25rem;
+}
+
+/* ===========================
+   MOBILE
+   =========================== */
+@media (max-width: 600px) {
+  .detail-title {
+    font-size: 1.5rem;
+  }
+
+  .detail-main-photo img {
+    max-height: 300px;
+  }
+
+  .edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-actions {
+    flex-direction: column;
+  }
+
+  .staff-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detail-winner img {
+    width: 150px;
+    height: 150px;
+  }
+}
+.qr-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.qr-image {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 8px;
+  background: white;
+}
