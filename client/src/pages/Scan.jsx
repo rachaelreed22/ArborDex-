@@ -6,6 +6,7 @@ import "./Scan.css";
 
 export default function Scan() {
   const { mode } = useMode();
+  const isStaff = mode === "dex";
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -29,41 +30,35 @@ export default function Scan() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("");
 
-  // -----------------------------
-  // CAMERA + QR SCANNING LOGIC
-  // -----------------------------
-    const startCamera = async (callback) => {
+  /* CAMERA + QR LOGIC */
+  const startCamera = async (callback) => {
     setMessage("");
 
     try {
-        let stream;
+      let stream;
 
-        try {
-        // Try rear camera first (mobile)
+      try {
         stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" },
+          video: { facingMode: "environment" },
         });
-        } catch (envErr) {
-        // Fall back to any available camera (desktop/laptop)
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-        });
-        }
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
 
-    streamRef.current = stream;
+      streamRef.current = stream;
 
-    const video = videoRef.current;
-    video.srcObject = stream;
-    video.setAttribute("playsinline", true);
-    await video.play();
+      const video = videoRef.current;
+      video.srcObject = stream;
+      video.setAttribute("playsinline", true);
+      await video.play();
 
-    setScanning(true);
-    animationRef.current = requestAnimationFrame(() => tick(callback));
-  } catch (err) {
-    console.error("Camera error:", err);
-    setMessage("Unable to access camera.");
-  }
-};
+      setScanning(true);
+      animationRef.current = requestAnimationFrame(() => tick(callback));
+    } catch (err) {
+      console.error("Camera error:", err);
+      setMessage("Unable to access camera.");
+    }
+  };
 
   const stopCamera = () => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -104,17 +99,14 @@ export default function Scan() {
           return;
         }
 
-        setMessage("QR code detected, but it is not a valid ArborTag code.");
+        setMessage("QR detected, but not a valid ArborTag code.");
       }
     }
 
     animationRef.current = requestAnimationFrame(() => tick(callback));
   };
 
-  // -----------------------------
-  // BUTTON ACTIONS
-  // -----------------------------
-
+  /* BUTTON ACTIONS */
   const handleScanForUpload = () => {
     startCamera((id) => {
       setListingId(id);
@@ -128,35 +120,21 @@ export default function Scan() {
     });
   };
 
-  // -----------------------------
-  // PHOTO SELECTION + REMOVAL
-  // -----------------------------
-
+  /* PHOTO SELECTION */
   const handlePhotoSelect = (e) => {
     const files = Array.from(e.target.files);
     setSelectedPhotos((prev) => [...prev, ...files]);
   };
 
   const removePhoto = (index) => {
-    setSelectedPhotos((prev) => {
-      const updated = [];
-      for (let i = 0; i < prev.length; i++) {
-        if (i !== index) {
-          updated.push(prev[i]);
-        }
-      }
-      return updated;
-    });
+    setSelectedPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const clearAllPhotos = () => {
     setSelectedPhotos([]);
   };
 
-  // -----------------------------
-  // UPLOAD LOGIC
-  // -----------------------------
-
+  /* UPLOAD LOGIC */
   const handleUploadClick = () => {
     if (!listingId) {
       setModalType("qr");
@@ -164,7 +142,7 @@ export default function Scan() {
       return;
     }
 
-    if (mode === "tag") {
+    if (!isStaff) {
       if (
         !photographerInfo.firstName ||
         !photographerInfo.lastName ||
@@ -188,7 +166,7 @@ export default function Scan() {
     const formData = new FormData();
     formData.append("listingId", listingId);
 
-    if (mode === "tag") {
+    if (!isStaff) {
       formData.append("firstName", photographerInfo.firstName);
       formData.append("lastName", photographerInfo.lastName);
       formData.append("email", photographerInfo.email);
@@ -223,21 +201,20 @@ export default function Scan() {
     }
   };
 
-  // -----------------------------
-  // MODAL CONTENT
-  // -----------------------------
-
+  /* MODAL */
   const renderModal = () => {
     if (!modalOpen) return null;
 
     return (
       <div className="modal-overlay">
-        <div className="modal-box">
+        <div className="modal-card">
           {modalType === "qr" && (
             <>
-              <h3>Identify Me</h3>
-              <p>Please scan the tree QR code before uploading photos.</p>
-              <button onClick={() => setModalOpen(false)}>OK</button>
+              <h3>Scan Required</h3>
+              <p>Please scan the tree’s QR code before uploading photos.</p>
+              <button className="btn btn-primary" onClick={() => setModalOpen(false)}>
+                OK
+              </button>
             </>
           )}
 
@@ -251,10 +228,7 @@ export default function Scan() {
                 placeholder="First Name"
                 value={photographerInfo.firstName}
                 onChange={(e) =>
-                  setPhotographerInfo({
-                    ...photographerInfo,
-                    firstName: e.target.value,
-                  })
+                  setPhotographerInfo({ ...photographerInfo, firstName: e.target.value })
                 }
               />
 
@@ -263,10 +237,7 @@ export default function Scan() {
                 placeholder="Last Name"
                 value={photographerInfo.lastName}
                 onChange={(e) =>
-                  setPhotographerInfo({
-                    ...photographerInfo,
-                    lastName: e.target.value,
-                  })
+                  setPhotographerInfo({ ...photographerInfo, lastName: e.target.value })
                 }
               />
 
@@ -275,14 +246,13 @@ export default function Scan() {
                 placeholder="Email"
                 value={photographerInfo.email}
                 onChange={(e) =>
-                  setPhotographerInfo({
-                    ...photographerInfo,
-                    email: e.target.value,
-                  })
+                  setPhotographerInfo({ ...photographerInfo, email: e.target.value })
                 }
               />
 
-              <button onClick={() => setModalOpen(false)}>Save</button>
+              <button className="btn btn-primary" onClick={() => setModalOpen(false)}>
+                Save
+              </button>
             </>
           )}
         </div>
@@ -290,43 +260,57 @@ export default function Scan() {
     );
   };
 
-  // -----------------------------
-  // RENDER
-  // -----------------------------
-
+  /* RENDER */
   return (
     <div className="scan-page">
-      <h2>ArborTag Scan</h2>
+      <h1 className="scan-title">Scan & Upload</h1>
 
-      {/* TOP BUTTONS */}
-      <div className="top-buttons">
-        <button onClick={handleScanForUpload}>Scan QR</button>
-        <button onClick={handleScanNewTree}>Scan New Tree</button>
-      </div>
+      {/* ACTIONS */}
+      <section className="scan-card">
+        <h2>Scan Actions</h2>
+        <div className="scan-actions">
+          <button className="btn btn-primary" onClick={handleScanForUpload}>
+            Scan QR for Upload
+          </button>
+          <button className="btn btn-secondary" onClick={handleScanNewTree}>
+            Scan to View Tree
+          </button>
+        </div>
+      </section>
 
-      
-      {/* QR SCANNER */}
-        <div className="scanner-box" style={{ display: scanning ? "block" : "none" }}>
-        <video ref={videoRef} className="scan-video" />
-        <canvas ref={canvasRef} style={{ display: "none" }} />
-        <button className="stop-camera-btn" onClick={stopCamera}>Cancel</button>
+      {/* CAMERA */}
+        <section className="scan-card" style={{ display: scanning ? "block" : "none" }}>
+        <h2>Camera Scanner</h2>
+
+        <div className="scanner-box">
+            <video ref={videoRef} className="scan-video" />
+            <canvas ref={canvasRef} style={{ display: "none" }} />
         </div>
 
-      {message && <p>{message}</p>}
+        <button className="btn btn-danger" onClick={stopCamera}>
+            Cancel Scan
+        </button>
+        </section>
+
+        {message && <p className="scan-message">{message}</p>}
 
       {/* PHOTO GALLERY */}
-      <section className="photo-gallery-section">
-        <h3>Your Photos</h3>
+      <section className="scan-card">
+        <h2>Your Photos</h2>
 
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoSelect}
-        />
+        <label className="btn btn-secondary file-btn">
+          Choose Photos
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePhotoSelect}
+            hidden
+          />
+        </label>
 
         {selectedPhotos.length > 0 && (
-          <button className="clear-all-btn" onClick={clearAllPhotos}>
+          <button className="btn btn-warning clear-all-btn" onClick={clearAllPhotos}>
             Clear All ({selectedPhotos.length})
           </button>
         )}
@@ -342,27 +326,62 @@ export default function Scan() {
                 className="photo-thumb"
               />
               <button
-                className="photo-remove-btn"
+                className="btn btn-danger btn-sm photo-remove-btn"
                 onClick={() => removePhoto(idx)}
-                title="Remove photo"
               >
-                X
+                ✕
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* UPLOAD BUTTON */}
-      <button
-        className="upload-btn"
-        disabled={selectedPhotos.length === 0}
-        onClick={handleUploadClick}
-      >
-        Upload Photos
-      </button>
+      {/* UPLOAD */}
+      <section className="scan-card">
+        <h2>Upload</h2>
 
-      {/* MODAL */}
+        {!isStaff && (
+          <div className="photographer-info">
+            <h3>Your Info</h3>
+
+            <input
+              type="text"
+              placeholder="First Name"
+              value={photographerInfo.firstName}
+              onChange={(e) =>
+                setPhotographerInfo({ ...photographerInfo, firstName: e.target.value })
+              }
+            />
+
+            <input
+              type="text"
+              placeholder="Last Name"
+              value={photographerInfo.lastName}
+              onChange={(e) =>
+                setPhotographerInfo({ ...photographerInfo, lastName: e.target.value })
+              }
+            />
+
+            <input
+              type="email"
+              placeholder="Email"
+              value={photographerInfo.email}
+              onChange={(e) =>
+                setPhotographerInfo({ ...photographerInfo, email: e.target.value })
+              }
+            />
+          </div>
+        )}
+
+        <button
+          className="btn btn-primary upload-btn"
+          disabled={selectedPhotos.length === 0}
+          onClick={handleUploadClick}
+        >
+          Upload Photos
+        </button>
+      </section>
+
       {renderModal()}
     </div>
   );

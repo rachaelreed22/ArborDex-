@@ -1,216 +1,176 @@
- /* ===========================
-   TREELIST - LISTING GRID PAGE
-   =========================== */
-
-.treelist-page {
-  padding: 20px;
+.tree-list-page {
+  padding: 1.5rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.treelist-page h1 {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #2e5e2e;
-  margin-bottom: 5px;
+/* Top Bar */
+
+.tree-list-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.treelist-empty {
-  color: #5a7a5a;
+.search-input {
+  flex: 1;
+  min-width: 240px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e7f581;
   font-size: 1rem;
-  padding: 40px 0;
-  text-align: center;
 }
 
-/* ===========================
-   LISTING CARD GRID
-   =========================== */
+.topbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
-.treelist-grid {
+.mode-indicator {
+  background: #9fe59c;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #740d0d;
+}
+
+/* Grid */
+
+.tree-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
 }
 
-/* ===========================
-   LISTING CARD
-   =========================== */
-
-.listing-card {
-  border: 1px solid #a5d6a7;
-  border-radius: 10px;
-  padding: 15px;
-  background: #e8f5e9;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.empty-list {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  color: #666;
 }
 
-.listing-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+/* Tree Card */
+
+.tree-card {
+  background: #9fe59c;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(242, 238, 126, 0.984);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease;
 }
 
-/* -- Card Photo -- */
-.listing-card-photo {
+.tree-card:hover {
+  transform: translateY(-3px);
+}
+
+.tree-card-photo-wrapper {
+  position: relative;
+  height: 160px;
+  background: #9fe59c;
+}
+
+.tree-card-photo {
   width: 100%;
-  height: 180px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  display: block;
 }
 
-/* -- No Photo Placeholder -- */
-.listing-card-nophoto {
-  width: 100%;
-  height: 180px;
-  background: #c8e6c9;
-  border-radius: 6px;
-  margin-bottom: 10px;
+.tree-card-no-photo {
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4a6a4a;
-  font-size: 0.9rem;
-}
-
-/* -- Card Info -- */
-.listing-card h3 {
+  color: #777;
   font-size: 1.1rem;
-  color: #2e5e2e;
-  margin-bottom: 6px;
 }
 
-.listing-card p {
-  font-size: 0.9rem;
-  color: #3d2b1a;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
+/* Winner badge */
 
-.listing-card-location {
-  font-style: italic;
-  color: #4a6a4a;
-}
-
-/* -- View Button -- */
-.listing-card-viewbtn {
-  display: inline-block;
-  margin-top: 10px;
-  padding: 8px 16px;
-  background: #2e5e2e;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
+.winner-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #9fe59c;
+  color: #e47011;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
 }
 
-.listing-card-viewbtn:hover {
-  background: #245024;
-}
+/* QR icon */
 
-/* ===========================
-   STAFF TOOLS PANEL
-   =========================== */
-
-.staff-tools {
-  margin-top: 15px;
-  padding-top: 12px;
-  border-top: 1px dashed #a5d6a7;
-}
-
-.staff-tools h4 {
-  font-size: 0.95rem;
-  color: #2e5e2e;
-  margin-bottom: 10px;
-}
-
-/* -- Staff Photo Row -- */
-.staff-photo-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  gap: 10px;
-}
-
-.staff-photo-thumb {
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #a5d6a7;
-  flex-shrink: 0;
-}
-
-.staff-photo-info {
-  flex-grow: 1;
-  min-width: 0;
-}
-
-.staff-photo-info p {
-  margin: 0;
+.qr-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #e0f2ff;
+  color: #0b4f7a;
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
   font-size: 0.85rem;
-  color: #3d2b1a;
-}
-
-.staff-winner-badge {
-  color: #2e7d32;
-  font-weight: 700;
-  font-size: 0.82rem;
-}
-
-/* -- Staff Action Buttons -- */
-.staff-btn {
-  padding: 4px 10px;
-  background: #2e5e2e;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.78rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
 }
 
-.staff-btn:hover {
-  background: #245024;
+/* Info */
+
+.tree-card-info {
+  padding: 0.75rem 1rem;
+  flex: 1;
 }
 
-/* ===========================
-   LOADING STATE
-   =========================== */
-
-.treelist-loading {
-  text-align: center;
-  padding: 60px 20px;
+.tree-card-title {
+  margin: 0;
   font-size: 1.1rem;
-  color: #4a6a4a;
+  font-weight: 600;
 }
 
-/* ===========================
-   RESPONSIVE
-   =========================== */
+.tree-card-location {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.tree-card-meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: #777;
+}
+
+/* Staff Actions */
+
+.tree-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid #f4e28a;
+  background: #9fe59c;
+}
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Loading */
+
+.loading {
+  text-align: center;
+  padding: 3rem 1rem;
+  font-size: 1rem;
+}
+
+/* Responsive */
 
 @media (max-width: 600px) {
-  .treelist-page {
-    padding: 15px;
-  }
-
-  .treelist-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-
-  .listing-card-photo,
-  .listing-card-nophoto {
-    height: 150px;
-  }
-
-  .staff-photo-row {
-    flex-wrap: wrap;
+  .tree-list-page {
+    padding: 1rem;
   }
 }

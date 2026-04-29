@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const supabase = require('./db');
 const multer = require('multer');
+const fetch = require('node-fetch');
 
 const app = express();
 app.use(cors());
@@ -26,7 +27,7 @@ const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
 const PORT = process.env.PORT || 5000;
 
 // ===========================
-// API ROUTES
+// API ROUTER
 // ===========================
 const api = express.Router();
 
@@ -35,12 +36,13 @@ api.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'ArborDex API' });
 });
 
-// CREATE LISTING (with QR generation + photo upload)
+// ===========================
+// CREATE LISTING
+// ===========================
 api.post("/listings", upload.array("photos"), async (req, res) => {
   try {
     const { title, description, location, latitude, longitude } = req.body;
 
-    // 1. Insert listing into Supabase
     const { data: listing, error: insertError } = await supabase
       .from("listings")
       .insert([
@@ -60,17 +62,14 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
       return res.status(500).json({ error: "Failed to create listing" });
     }
 
-    // 2. Generate QR code and get PUBLIC PNG URL
     const generateQrForTree = require("./utils/generateQrForTree");
     const qrUrl = await generateQrForTree(listing.id);
 
-    // 3. Save QR URL to the listing
     await supabase
       .from("listings")
       .update({ qr_url: qrUrl })
       .eq("id", listing.id);
 
-    // 4. Upload photos (if any)
     if (req.files && req.files.length > 0) {
       for (let i = 0; i < req.files.length; i++) {
         const file = req.files[i];
@@ -100,7 +99,6 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
       }
     }
 
-    // 5. Return the listing INCLUDING the QR URL
     res.status(201).json({ ...listing, qr_url: qrUrl });
 
   } catch (err) {
@@ -173,8 +171,9 @@ api.get('/listings/:id', async (req, res) => {
     res.status(500).json({ error: "Unexpected error" });
   }
 });
+
 // ===========================
-// UPDATE LISTING (PATCH)
+// UPDATE LISTING
 // ===========================
 api.patch('/listings/:id', async (req, res) => {
   try {
@@ -216,6 +215,7 @@ api.patch('/listings/:id', async (req, res) => {
     res.status(500).json({ error: "Unexpected error" });
   }
 });
+
 // ===========================
 // DELETE LISTING
 // ===========================
@@ -223,13 +223,11 @@ api.delete('/listings/:id', async (req, res) => {
   try {
     const id = req.params.id;
 
-    // 1. Delete all photos for this listing
     await supabase
       .from('photos')
       .delete()
       .eq('listing_id', id);
 
-    // 2. Delete the listing itself
     const { error } = await supabase
       .from('listings')
       .delete()
@@ -248,10 +246,8 @@ api.delete('/listings/:id', async (req, res) => {
 });
 
 // ===========================
-// PHOTO ROUTES (unchanged)
+// PHOTO ROUTES
 // ===========================
-
-// Add photo
 api.post('/photos', async (req, res) => {
   try {
     const { listingId, url, photographer } = req.body;
@@ -282,7 +278,6 @@ api.post('/photos', async (req, res) => {
   }
 });
 
-// Set main photo
 api.patch('/photos/:id/main', async (req, res) => {
   try {
     const id = req.params.id;
@@ -320,6 +315,97 @@ api.patch('/photos/:id/main', async (req, res) => {
 });
 
 // ===========================
+// AI ROUTE — OpenAI Vision (CORRECT FORMAT)
+// ===========================
+api.post('/ai/tree', async (req, res) => {
+  try {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: "OPENAI_API_KEY is not set" });
+    }
+
+    const { question, listing } = req.body;
+
+    if (!question || !listing) {
+      return res.status(400).json({ error: "question and listing are required" });
+    }
+
+    const photos = Array.isArray(listing.photos) ? listing.photos : [];
+
+    const treeSummary = `
+Tree ID: ${listing.id}
+Title: ${listing.title || "Untitled"}
+Location: ${listing.location || "Unknown"}
+Latitude: ${listing.latitude ?? "Unknown"}
+Longitude: ${listing.longitude ?? "Unknown"}
+Description: ${listing.description || "No description provided."}
+Total Photos: ${photos.length}
+    `.trim();
+
+    const prompt = `
+You are ArborAI, a tree-focused assistant.
+
+Analyze the provided tree photos and answer the user's question.
+
+Tree data:
+${treeSummary}
+
+User question:
+${question}
+    `.trim();
+
+    // Build messages correctly
+    const messages = [
+      {
+        role: "system",
+        content: "You are ArborAI, a helpful assistant that analyzes trees and photos."
+      },
+      {
+        role: "user",
+        content: prompt
+      },
+      ...photos.slice(0, 5).map(p => ({
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: p.url }
+          }
+        ]
+      }))
+    ];
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages,
+        max_tokens: 500
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("OpenAI error:", errText);
+      return res.status(500).json({ error: "AI request failed" });
+    }
+
+    const data = await response.json();
+    const answer = data.choices?.[0]?.message?.content || "I couldn't generate a response.";
+
+    res.json({ answer });
+
+  } catch (err) {
+    console.error("Unexpected AI error:", err);
+    res.status(500).json({ error: "Unexpected AI error" });
+  }
+});
+
+// ===========================
 // MOUNT API
 // ===========================
 app.use('/api', api);
@@ -328,7 +414,7 @@ app.use('/api', api);
 // STATIC FILES + SPA FALLBACK
 // ===========================
 const distPath = path.join(__dirname, '..', 'client', 'dist');
- 
+
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 

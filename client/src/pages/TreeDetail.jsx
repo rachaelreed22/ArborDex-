@@ -19,10 +19,21 @@ export default function TreeDetail() {
     longitude: "",
   });
 
+  const [aiInput, setAiInput] = useState("");
+  const [aiMessages, setAiMessages] = useState([
+    {
+      role: "system",
+      text: "Ask ArborAI anything about this tree — health, environment, care, or observations.",
+    },
+  ]);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const isStaff = mode === "dex";
+  console.log("LISTING DATA:", listing);
 
   useEffect(() => {
     fetchListing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function fetchListing() {
@@ -48,7 +59,6 @@ export default function TreeDetail() {
     setLoading(false);
   }
 
-  // Staff: save edits
   const handleSaveEdit = async () => {
     try {
       await fetch(`/api/listings/${id}`, {
@@ -63,7 +73,6 @@ export default function TreeDetail() {
     }
   };
 
-  // Staff: delete entire listing
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this tree? This cannot be undone.")) return;
     try {
@@ -74,7 +83,6 @@ export default function TreeDetail() {
     }
   };
 
-  // Staff: set main photo
   const handleSetMain = async (photoId) => {
     try {
       await fetch(`/api/photos/${photoId}/main`, { method: "PATCH" });
@@ -84,7 +92,6 @@ export default function TreeDetail() {
     }
   };
 
-  // Staff: set winner photo
   const handleSetWinner = async (photoId) => {
     try {
       await fetch(`/api/photos/${photoId}/winner`, { method: "PATCH" });
@@ -94,7 +101,6 @@ export default function TreeDetail() {
     }
   };
 
-  // Staff: delete a photo
   const handleDeletePhoto = async (photoId) => {
     if (!window.confirm("Delete this photo?")) return;
     try {
@@ -105,12 +111,69 @@ export default function TreeDetail() {
     }
   };
 
+  // Real AI handler: calls /api/ai/tree with listing + question
+  const handleAskAi = async (e) => {
+    e.preventDefault();
+    if (!aiInput.trim() || !listing) return;
+
+    const userMessage = { role: "user", text: aiInput.trim() };
+    setAiMessages((prev) => [...prev, userMessage]);
+    const question = aiInput.trim();
+    setAiInput("");
+    setAiLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/tree", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          listing,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("AI request failed");
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: "I had trouble reaching the AI service. Please try again in a moment.",
+          },
+        ]);
+        setAiLoading(false);
+        return;
+      }
+
+      const data = await res.json();
+      const answer = data.answer || "I couldn't generate a response.";
+
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: answer,
+        },
+      ]);
+    } catch (err) {
+      console.error("Error calling AI:", err);
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Something went wrong while contacting ArborAI.",
+        },
+      ]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   if (loading) return <div className="loading">Loading tree...</div>;
 
-  // No tree found — redirect to AddTree if staff, show message if public
   if (!listing) {
     return (
-      <div className="page">
+      <div className="page tree-detail-page">
         <div className="empty-state">
           <div className="icon">🌳</div>
           <p>This tree hasn't been registered yet.</p>
@@ -135,178 +198,336 @@ export default function TreeDetail() {
 
   return (
     <div className="page tree-detail-page">
-      {/* Back */}
-      <button className="btn btn-secondary back-btn" onClick={() => navigate("/")}>
-        ← Back to Database
-      </button>
-
-      {/* Header — view or edit */}
-      <div className="detail-header">
-        {editing ? (
-          <div className="edit-form">
-            <div className="form-group">
-              <label>Tree Name</label>
-              <input
-                type="text"
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Location</label>
-              <input
-                type="text"
-                value={editForm.location}
-                onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Latitude</label>
-              <input
-                type="text"
-                value={editForm.latitude}
-                onChange={(e) => setEditForm({ ...editForm, latitude: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Longitude</label>
-              <input
-                type="text"
-                value={editForm.longitude}
-                onChange={(e) => setEditForm({ ...editForm, longitude: e.target.value })}
-              />
-            </div>
-            <div className="form-group full-width">
-              <label>Description</label>
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={4}
-              />
-            </div>
-            <div className="form-actions full-width">
-              <button className="btn btn-primary" onClick={handleSaveEdit}>Save</button>
-              <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
-            </div>
+      {/* Top bar */}
+      <div className="tree-detail-topbar">
+        <button className="btn btn-secondary" onClick={() => navigate("/")}>
+          ← Back to Database
+        </button>
+        {isStaff && !editing && (
+          <div className="topbar-actions">
+            <button className="btn btn-secondary" onClick={() => setEditing(true)}>
+              ✏️ Edit Details
+            </button>
+            <button className="btn btn-danger" onClick={handleDelete}>
+              🗑️ Delete Tree
+            </button>
           </div>
-        ) : (
-          <>
-            <h1 className="detail-title">{listing.title}</h1>
-            {listing.location && (
-              <p className="detail-location">📍 {listing.location}</p>
-            )}
-            {(listing.latitude || listing.longitude) && (
-              <p className="detail-coords">
-                🧭 {listing.latitude}, {listing.longitude}
-              </p>
-            )}
-          </>
         )}
       </div>
 
-      {/* Main Photo */}
-      {mainPhoto ? (
-        <div className="detail-main-photo">
-          <img src={mainPhoto.url} alt={listing.title} />
-          {mainPhoto.photographer && (
-            <p className="photo-credit">📸 {mainPhoto.photographer}</p>
-          )}
-        </div>
-      ) : (
-        <div className="detail-no-photo">
-          <span>🌿</span>
-          <p>No photos available yet</p>
-        </div>
-      )}
+      {/* Main layout */}
+      <div className="tree-detail-layout">
+        {/* Left column: core info + photos */}
+        <div className="tree-detail-main">
+          {/* Header / Edit */}
+          <section className="card section-header">
+            {editing ? (
+              <div className="edit-form-grid">
+                <div className="form-group">
+                  <label>Tree Name</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Location</label>
+                  <input
+                    type="text"
+                    value={editForm.location}
+                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Latitude</label>
+                  <input
+                    type="text"
+                    value={editForm.latitude}
+                    onChange={(e) => setEditForm({ ...editForm, latitude: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Longitude</label>
+                  <input
+                    type="text"
+                    value={editForm.longitude}
+                    onChange={(e) => setEditForm({ ...editForm, longitude: e.target.value })}
+                  />
+                </div>
+                <div className="form-group form-group-full">
+                  <label>Description</label>
+                  <textarea
+                    rows={4}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  />
+                </div>
+                <div className="form-actions form-group-full">
+                  <button className="btn btn-primary" onClick={handleSaveEdit}>
+                    Save
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setEditing(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="header-display">
+                <h1 className="detail-title">{listing.title || "Untitled Tree"}</h1>
+                <div className="header-meta">
+                  {listing.location && (
+                    <p className="detail-location">📍 {listing.location}</p>
+                  )}
+                  {(listing.latitude || listing.longitude) && (
+                    <p className="detail-coords">
+                      🧭 {listing.latitude ?? "—"}, {listing.longitude ?? "—"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
 
-      {/* Winner Badge */}
-      {winnerPhoto && (
-        <div className="detail-winner">
-          <div className="winner-badge">⭐ Photo Contest Winner</div>
-          <img src={winnerPhoto.url} alt="Winner" />
-          {winnerPhoto.photographer && (
-            <p className="photo-credit">📸 {winnerPhoto.photographer}</p>
-          )}
-        </div>
-      )}
-
-      {/* Description */}
-      {listing.description && (
-        <div className="detail-description">
-          <h3>About This Tree</h3>
-          <p>{listing.description}</p>
-        </div>
-      )}
-
-      {/* Staff Actions */}
-      {isStaff && !editing && (
-        <div className="staff-actions">
-          <button className="btn btn-secondary" onClick={() => setEditing(true)}>
-            ✏️ Edit Details
-          </button>
-          <button className="btn btn-danger" onClick={handleDelete}>
-            🗑️ Delete Tree
-          </button>
-        </div>
-      )}
-        {listing.qr_url && (
-        <div className="qr-section">
-            <h3>QR Code</h3>
-            <img 
-            src={listing.qr_url} 
-            alt="Tree QR Code" 
-            className="qr-image"
-            />
-        </div>
-        )}
-
-      {/* Photo Gallery */}
-      {photos.length > 1 && (
-        <div className="detail-gallery">
-          <h3>Photo Gallery</h3>
-          <div className="gallery-grid">
-            {photos.map((photo) => (
-              <div key={photo.id} className="gallery-card">
-                <img src={photo.url} alt="Gallery" />
-                {photo.photographer && (
-                  <p className="photo-credit">📸 {photo.photographer}</p>
+          {/* Main photo + winner */}
+          <section className="card section-photos">
+            <div className="section-header-row">
+              <h2>Main Photo</h2>
+              {mainPhoto && mainPhoto.photographer && (
+                <span className="photo-credit">📸 {mainPhoto.photographer}</span>
+              )}
+            </div>
+            {mainPhoto ? (
+              <div className="main-photo-wrapper">
+                <img src={mainPhoto.url} alt={listing.title} className="main-photo" />
+              </div>
+            ) : (
+              <div className="detail-no-photo">
+                <span>🌿</span>
+                <p>No photos available yet</p>
+              </div>
+            )}
+            {winnerPhoto && (
+              <div className="winner-block">
+                <div className="winner-badge">⭐ Photo Contest Winner</div>
+                <div className="winner-photo-wrapper">
+                  <img src={winnerPhoto.url} alt="Winner" className="winner-photo" />
+                </div>
+                {winnerPhoto.photographer && (
+                  <p className="photo-credit">📸 {winnerPhoto.photographer}</p>
                 )}
-                {photo.is_main && <span className="badge">Main Photo</span>}
-                {photo.winner && <span className="badge badge-warn">⭐ Winner</span>}
+              </div>
+            )}
+          </section>
 
-                {isStaff && (
-                  <div className="gallery-card-actions">
-                    {!photo.is_main && (
-                      <button className="btn btn-sm btn-secondary" onClick={() => handleSetMain(photo.id)}>
-                        Set Main
-                      </button>
+          {/* Description */}
+          {listing.description && (
+            <section className="card section-description">
+              <h2>About This Tree</h2>
+              <p>{listing.description}</p>
+            </section>
+          )}
+
+          {/* Coordinates (main column) */}
+          {(listing.latitude || listing.longitude) && (
+            <section className="card section-coordinates">
+              <h2>Location Coordinates</h2>
+
+              <div className="coord-row">
+                {listing.latitude && (
+                  <p><strong>Latitude:</strong> {listing.latitude}</p>
+                )}
+                {listing.longitude && (
+                  <p><strong>Longitude:</strong> {listing.longitude}</p>
+                )}
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  window.open(
+                    `https://www.google.com/maps?q=${listing.latitude},${listing.longitude}`,
+                    "_blank"
+                  )
+                }
+              >
+                View on Map
+              </button>
+            </section>
+          )}
+
+          {/* Gallery */}
+          {photos.length > 1 && (
+            <section className="card section-gallery">
+              <div className="section-header-row">
+                <h2>Photo Gallery</h2>
+                <span className="gallery-count">{photos.length} photos</span>
+              </div>
+              <div className="gallery-grid">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="gallery-card">
+                    <img src={photo.url} alt="Gallery" className="gallery-image" />
+                    <div className="gallery-meta">
+                      {photo.photographer && (
+                        <p className="photo-credit">📸 {photo.photographer}</p>
+                      )}
+                      <div className="badge-row">
+                        {photo.is_main && <span className="badge">Main</span>}
+                        {photo.winner && <span className="badge badge-warn">⭐ Winner</span>}
+                      </div>
+                    </div>
+                    {isStaff && (
+                      <div className="gallery-card-actions">
+                        {!photo.is_main && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleSetMain(photo.id)}
+                          >
+                            Set Main
+                          </button>
+                        )}
+                        {!photo.winner && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleSetWinner(photo.id)}
+                          >
+                            Set Winner
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     )}
-                    {!photo.winner && (
-                      <button className="btn btn-sm btn-secondary" onClick={() => handleSetWinner(photo.id)}>
-                        Set Winner
-                      </button>
-                    )}
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDeletePhoto(photo.id)}>
-                      Delete
-                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* Right column: QR, AI, staff info */}
+        <div className="tree-detail-sidebar">
+          {/* QR section */}
+          {listing.qr_url && (
+            <section className="card section-qr">
+              <h2>QR Code</h2>
+              <p className="qr-hint">
+                Scan this code on-site to open this tree’s page in ArborTag.
+              </p>
+              <div className="qr-wrapper">
+                <img
+                  src={listing.qr_url}
+                  alt="Tree QR Code"
+                  className="qr-image"
+                />
+              </div>
+            </section>
+          )}
+
+          {/* Sidebar coordinates (quick view) */}
+          <section className="card section-coordinates">
+            <h2>Location Coordinates</h2>
+
+            <p><strong>Latitude:</strong> {listing?.latitude}</p>
+            <p><strong>Longitude:</strong> {listing?.longitude}</p>
+
+            <button
+              className="btn btn-primary"
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/maps?q=${listing?.latitude},${listing?.longitude}`,
+                  "_blank"
+                )
+              }
+            >
+              View on Map
+            </button>
+          </section>
+
+          {/* AI Assistant */}
+          <section className="card section-ai">
+            <h2>ArborAI Assistant</h2>
+            <p className="ai-subtitle">
+              Ask questions about this tree’s health, environment, or care.  
+              (This chat is specific to this tree and its photos.)
+            </p>
+            <div className="ai-chat-window">
+              {aiMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={
+                    msg.role === "user"
+                      ? "ai-message ai-message-user"
+                      : msg.role === "assistant"
+                      ? "ai-message ai-message-assistant"
+                      : "ai-message ai-message-system"
+                  }
+                >
+                  <div className="ai-message-label">
+                    {msg.role === "user"
+                      ? "You"
+                      : msg.role === "assistant"
+                      ? "ArborAI"
+                      : "Info"}
+                  </div>
+                  <div className="ai-message-text">{msg.text}</div>
+                </div>
+              ))}
+              {aiLoading && (
+                <div className="ai-message ai-message-assistant">
+                  <div className="ai-message-label">ArborAI</div>
+                  <div className="ai-message-text">Thinking…</div>
+                </div>
+              )}
+            </div>
+            <form className="ai-input-row" onSubmit={handleAskAi}>
+              <input
+                type="text"
+                placeholder="Ask ArborAI about this tree..."
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+              />
+              <button className="btn btn-primary" type="submit" disabled={aiLoading}>
+                Send
+              </button>
+            </form>
+          </section>
+
+          {/* Staff info */}
+          {isStaff && (
+            <section className="card section-staff">
+              <h2>Staff Info</h2>
+              <div className="staff-info-grid">
+                <div>
+                  <span className="label">Listing ID</span>
+                  <span className="value mono">{listing.id}</span>
+                </div>
+                <div>
+                  <span className="label">Total Photos</span>
+                  <span className="value">{photos.length}</span>
+                </div>
+                {listing.latitude && (
+                  <div>
+                    <span className="label">Latitude</span>
+                    <span className="value">{listing.latitude}</span>
+                  </div>
+                )}
+                {listing.longitude && (
+                  <div>
+                    <span className="label">Longitude</span>
+                    <span className="value">{listing.longitude}</span>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            </section>
+          )}
         </div>
-      )}
-
-      {/* Staff Info Panel */}
-      {isStaff && (
-        <div className="staff-info">
-          <h4>Staff Info</h4>
-          <p><strong>Listing ID:</strong> {listing.id}</p>
-          <p><strong>Total Photos:</strong> {photos.length}</p>
-          {listing.latitude && <p><strong>Lat:</strong> {listing.latitude}</p>}
-          {listing.longitude && <p><strong>Lng:</strong> {listing.longitude}</p>}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
+

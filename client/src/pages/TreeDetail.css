@@ -1,255 +1,459 @@
-/* ===========================
-   TREE DETAIL PAGE
-   =========================== */
-
 .tree-detail-page {
-  max-width: 900px;
+  padding: 1.5rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.back-btn {
-  margin-bottom: 1.25rem;
+.tree-detail-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
 }
 
-/* — Header — */
-.detail-header {
-  text-align: center;
-  margin-bottom: 1.5rem;
+.topbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tree-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.tree-detail-main,
+.tree-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card {
+  background: #9fe59c;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
+}
+
+.section-header h1,
+.section-header h2,
+.section-photos h2,
+.section-description h2,
+.section-gallery h2,
+.section-qr h2,
+.section-ai h2,
+.section-staff h2 {
+  margin: 0 0 0.5rem;
+}
+
+/* Header / edit */
+
+.header-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .detail-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #2e5e2e;
-  margin-bottom: 0.3rem;
+  font-size: 1.6rem;
+  margin: 0;
+}
+
+.header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.95rem;
+  color: #555;
 }
 
 .detail-location {
-  color: #5a7a5a;
-  font-size: 1rem;
-  margin-top: 0.25rem;
+  margin: 0;
 }
 
 .detail-coords {
-  color: #7a9a7a;
-  font-size: 0.85rem;
-  margin-top: 0.15rem;
+  margin: 0;
   font-family: monospace;
 }
 
-.empty-hint {
-  color: #7a9a7a;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-  margin-bottom: 1rem;
-}
+/* Edit form */
 
-/* — Edit Form — */
-.edit-form {
+.edit-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  text-align: left;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
 }
 
-.edit-form .full-width {
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-group-full {
   grid-column: 1 / -1;
 }
 
-/* — Main Photo — */
-.detail-main-photo {
-  text-align: center;
-  margin-bottom: 1.5rem;
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
 }
 
-.detail-main-photo img {
-  width: 100%;
-  max-height: 450px;
-  object-fit: cover;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+.form-group input,
+.form-group textarea {
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.95rem;
 }
 
-.photo-credit {
-  font-style: italic;
-  color: #6a896a;
-  font-size: 0.9rem;
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Photos */
+
+.section-photos .section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.main-photo-wrapper {
   margin-top: 0.5rem;
 }
 
-/* — No Photo Placeholder — */
+.main-photo {
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  max-height: 360px;
+}
+
 .detail-no-photo {
-  text-align: center;
-  padding: 3rem;
-  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
-  border-radius: 10px;
-  margin-bottom: 1.5rem;
-  color: #4a6a4a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0.5rem;
+  color: #777;
+  gap: 0.5rem;
 }
 
 .detail-no-photo span {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 0.5rem;
+  font-size: 2rem;
 }
 
-/* — Winner Section — */
-.detail-winner {
-  text-align: center;
-  background: #f1f8e9;
-  padding: 1.25rem;
-  border-radius: 10px;
-  margin-bottom: 1.5rem;
-  border: 1px solid #c8e6c9;
+.photo-credit {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.winner-block {
+  margin-top: 1rem;
+  border-top: 1px dashed #ddd;
+  padding-top: 0.75rem;
 }
 
 .winner-badge {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: #2e5e2e;
-  margin-bottom: 0.75rem;
-}
-
-.detail-winner img {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-
-/* — Description — */
-.detail-description {
-  margin-bottom: 1.5rem;
-}
-
-.detail-description h3 {
-  font-size: 1.15rem;
-  color: #2e5e2e;
+  display: inline-block;
+  background: #ffeb99;
+  color: #7a5a00;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
   margin-bottom: 0.5rem;
 }
 
-.detail-description p {
-  font-size: 1.05rem;
-  line-height: 1.6;
-  color: #3a5a3a;
+.winner-photo-wrapper {
+  margin-bottom: 0.25rem;
 }
 
-/* — Staff Action Buttons — */
-.staff-actions {
+.winner-photo {
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  max-height: 260px;
+}
+
+/* Description */
+
+.section-description p {
+  margin: 0.25rem 0 0;
+  line-height: 1.5;
+}
+
+/* Gallery */
+
+.section-gallery .section-header-row {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
-/* — Photo Gallery — */
-.detail-gallery {
-  margin-top: 2rem;
-}
-
-.detail-gallery h3 {
-  font-size: 1.2rem;
-  color: #2e5e2e;
-  margin-bottom: 1rem;
+.gallery-count {
+  font-size: 0.85rem;
+  color: #666;
 }
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .gallery-card {
-  background: #fff;
   border-radius: 8px;
+  border: 1px solid #eee;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  padding: 0.5rem;
+  background: #ecefec;
+  display: flex;
+  flex-direction: column;
 }
 
-.gallery-card img {
+.gallery-image {
   width: 100%;
-  height: 150px;
+  height: 120px;
   object-fit: cover;
-  border-radius: 6px;
 }
 
-.gallery-card .badge {
+.gallery-meta {
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.badge-row {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.badge {
   display: inline-block;
-  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #e0f2ff;
+  color: #0b4f7a;
+}
+
+.badge-warn {
+  background: #ffe4b5;
+  color: #7a4b00;
 }
 
 .gallery-card-actions {
   display: flex;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem 0.5rem;
+  border-top: 1px solid #eee;
 }
 
-/* — Staff Info Panel — */
-.staff-info {
-  margin-top: 2rem;
-  padding: 1rem 1.25rem;
-  border: 1px dashed #b0c4b0;
-  border-radius: 8px;
-  background: #f9fdf9;
+/* QR */
+
+.section-qr .qr-hint {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0 0 0.5rem;
 }
 
-.staff-info h4 {
-  color: #2e5e2e;
-  margin-bottom: 0.5rem;
-}
-
-.staff-info p {
-  font-size: 0.9rem;
-  color: #5a7a5a;
-  margin-bottom: 0.25rem;
-}
-
-/* ===========================
-   MOBILE
-   =========================== */
-@media (max-width: 600px) {
-  .detail-title {
-    font-size: 1.5rem;
-  }
-
-  .detail-main-photo img {
-    max-height: 300px;
-  }
-
-  .edit-form {
-    grid-template-columns: 1fr;
-  }
-
-  .staff-actions {
-    flex-direction: column;
-  }
-
-  .staff-actions .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .gallery-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .detail-winner img {
-    width: 150px;
-    height: 150px;
-  }
-}
-.qr-section {
-  margin-top: 20px;
-  text-align: center;
+.qr-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
 }
 
 .qr-image {
-  width: 200px;
-  height: 200px;
+  width: 160px;
+  height: 160px;
   object-fit: contain;
-  border: 1px solid #ddd;
-  padding: 10px;
-  border-radius: 8px;
-  background: white;
 }
+
+/* AI Assistant */
+
+.section-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ai-subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+}
+
+.ai-chat-window {
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  padding: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ai-message {
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.ai-message-system {
+  background: #eef2ff;
+  color: #333;
+}
+
+.ai-message-user {
+  background: #e0f7ff;
+  align-self: flex-end;
+}
+
+.ai-message-assistant {
+  background: #f1f1f1;
+  align-self: flex-start;
+}
+
+.ai-message-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.ai-message-text {
+  white-space: pre-wrap;
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.ai-input-row input {
+  flex: 1;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Staff info */
+
+.section-staff .staff-info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.section-staff .label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #777;
+}
+
+.section-staff .value {
+  font-weight: 600;
+}
+
+.section-staff .mono {
+  font-family: monospace;
+}
+
+/* Buttons (assuming global .btn styles exist; just small tweaks) */
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+}
+
+/* Empty state */
+
+.empty-state {
+  max-width: 420px;
+  margin: 3rem auto;
+  text-align: center;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.empty-state .icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-hint {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Loading */
+
+.loading {
+  text-align: center;
+  padding: 3rem 1rem;
+  font-size: 1rem;
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+  .tree-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tree-detail-page {
+    padding: 1rem;
+  }
+
+  .tree-detail-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .edit-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.section-coordinates {
+  margin-top: 1rem;
+}
+
+.coord-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.section-coordinates button {
+  margin-top: 0.75rem;
+  width: fit-content;
+}
+.coord-input {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: monospace;
+}
+

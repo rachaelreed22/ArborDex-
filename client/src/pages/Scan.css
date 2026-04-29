@@ -1,400 +1,192 @@
-
-/* ===========================
-   SCAN PAGE LAYOUT
-   =========================== */
-
-.scan-page {
-  max-width: 600px;
+ .scan-page {
+  max-width: 700px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 1.5rem;
 }
 
-.scan-page h2 {
+.scan-title {
   text-align: center;
-  margin-bottom: 20px;
-  color: #e0ffe0;
-  font-weight: 600;
+  margin-bottom: 1.5rem;
 }
 
-/* ===========================
-   TOP BUTTONS
-   =========================== */
-
-.top-buttons {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 25px;
-}
-
-.top-buttons button {
-  flex: 1;
-  padding: 12px;
-  background: #080617;
-  border: 2px solid #00ff88;
-  color: #00ff88;
+/* ------------------------------
+   GLOBAL BUTTON STYLING FOR SCAN
+   ------------------------------ */
+.scan-page button,
+.scan-page .btn {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: none;
   font-weight: 600;
   cursor: pointer;
-  transition: 0.2s ease;
-  border-radius: 8px;
+  transition: 0.15s ease;
 }
 
-.top-buttons button:hover {
-  background: #00ff88;
-  color: #111;
+/* Primary = Green */
+.btn-primary {
+  background: #e8e9a5;
+  color: rgb(7, 54, 10);
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4);
+}
+.btn-primary:hover {
+  background: #43a047;
 }
 
-/* ===========================
-   QR SCANNER BOX
-   =========================== */
+/* Secondary = Yellow */
+.btn-secondary {
+  background: #f4ef94;
+  color: #5a5a00;
+  box-shadow: 0 2px 4px rgba(244, 239, 148, 0.4);
+}
+.btn-secondary:hover {
+  background: #43a047;
+}
 
+/* Warning = Orange */
+.btn-warning {
+  background: #ffb74d;
+  color: #5a3a00;
+  box-shadow: 0 2px 4px rgba(255, 183, 77, 0.4);
+}
+.btn-warning:hover {
+  background: #ffa726;
+}
+
+/* Danger = Red */
+.btn-danger {
+  background: #ff6666;
+  color: rgb(5, 45, 17);
+  box-shadow: 0 2px 4px rgba(255, 102, 102, 0.4);
+}
+.btn-danger:hover {
+  background: #ff4d4d;
+}
+
+/* Small buttons */
+.btn-sm {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* ------------------------------
+   CARDS
+   ------------------------------ */
+.scan-card {
+  background: #a3e495;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 6px rgb(232, 239, 137);
+}
+
+.scan-card h2 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+/* Scan Actions */
+.scan-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Camera */
 .scanner-box {
-  position: relative;
   width: 100%;
-  background: #000;
-  border: 2px solid #00ff88;
-  margin-bottom: 20px;
-  border-radius: 8px;
+  background: #f4ef94;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
 }
 
-.scan-video,
-.scan-canvas {
+.scan-video {
   width: 100%;
   display: block;
 }
 
-/* ===========================
-   PHOTO GALLERY — TOOLBAR
-   =========================== */
-
-.photo-gallery-section h3 {
-  margin-top: 20px;
-  color: #e0ffe0;
-}
-
-.gallery-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  margin-bottom: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid #2a2a2a;
-}
-
-.gallery-toolbar .select-all-btn {
-  background: none;
-  border: 1px solid #444;
-  color: #aaa;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.gallery-toolbar .select-all-btn:hover {
-  border-color: #00ff88;
-  color: #00ff88;
-}
-
-.gallery-toolbar .select-count {
-  font-size: 0.8rem;
-  color: #ee4747;
-}
-
-.gallery-toolbar .select-count span {
-  color: #00ff88;
+/* Message */
+.scan-message {
+  text-align: center;
+  margin-bottom: 1rem;
   font-weight: 600;
 }
 
-/* ===========================
-   PHOTO GALLERY — CARD GRID
-   =========================== */
-
+/* Photo Gallery */
 .photo-gallery {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
-/* ===========================
-   PHOTO CARD
-   =========================== */
-
-.photo-card {
-  position: relative;
-  background: #11d742;
-  border: 2px solid #259627;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
-}
-
-.photo-card:hover {
-  border-color: #555;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.photo-card.selected {
-  border-color: #00ff88;
-  box-shadow: 0 0 12px rgba(0, 255, 136, 0.25);
-}
-
-/* — Thumbnail — */
 .photo-thumb-wrapper {
   position: relative;
-  max-width: 180px;
-  transition: transform 0.2s ease;
-}
-
-.photo-thumb-wrapper:hover {
-  transform: scale(1.08);
 }
 
 .photo-thumb {
-  width: 100%;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   object-fit: cover;
-  display: block;
-  border-radius: 6px;
-}
-
-.photo-card:hover .photo-thumb {
-  opacity: 0.85;
-}
-
-/* — Selection checkmark — */
-.photo-card .select-indicator {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  color: transparent;
-  transition: 0.2s ease;
-}
-
-.photo-card.selected .select-indicator {
-  border-color: #00ff88;
-  background: #00ff88;
-  color: #111;
-}
-
-/* — Card info bar — */
-.photo-card .photo-card-info {
-  padding: 6px 8px;
-  background: #1a1a1a;
-  border-top: 1px solid #2a2a2a;
-}
-
-.photo-card .photo-card-info .photo-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #ccc;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.photo-card .photo-card-info .photo-date {
-  font-size: 0.65rem;
-  color: #666;
-  margin-top: 2px;
-}
-
-/* ===========================
-   GALLERY EMPTY STATE
-   =========================== */
-
-.gallery-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 30px 15px;
-  color: #555;
-}
-
-.gallery-empty .empty-icon {
-  font-size: 2.5rem;
-  margin-bottom: 8px;
-}
-
-.gallery-empty p {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-/* ===========================
-   UPLOAD BUTTON
-   =========================== */
-
-.upload-btn {
-  width: 100%;
-  padding: 14px;
-  margin-top: 25px;
-  background: #00ff88;
-  color: #111;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  transition: 0.2s ease;
   border-radius: 8px;
-}
-
-.upload-btn:disabled {
-  background: #333;
-  color: #777;
-  cursor: not-allowed;
-}
-
-.upload-btn:not(:disabled):hover {
-  box-shadow: 0 0 10px #00ff88;
-}
-
-/* ===========================
-   MODAL POPUP
-   =========================== */
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
-
-.modal-box {
-  background: #1a1a1a;
-  padding: 25px;
-  width: 90%;
-  max-width: 400px;
-  border: 2px solid #00ff88;
-  text-align: center;
-  border-radius: 10px;
-}
-
-.modal-box h3 {
-  color: #00ff88;
-  margin-bottom: 10px;
-}
-
-.modal-box input {
-  width: 100%;
-  padding: 10px;
-  margin: 8px 0;
-  background: #111;
-  border: 1px solid #444;
-  color: #fff;
-  border-radius: 6px;
-}
-
-.modal-box button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 15px;
-  background: #00ff88;
-  color: #111;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  border-radius: 8px;
-}
-
-.modal-box button:hover {
-  box-shadow: 0 0 10px #00ff88;
-}
-
-/* ===========================
-   RESPONSIVE — 2 COLUMNS
-   =========================== */
-
-@media (max-width: 400px) {
-  .photo-gallery {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .photo-card .photo-thumb {
-    height: 90px;
-  }
-}
-/* ===========================
-   PHOTO REMOVE CONTROLS
-   =========================== */
-
-.photo-thumb-wrapper {
-  position: relative;
 }
 
 .photo-remove-btn {
   position: absolute;
   top: 4px;
   right: 4px;
+  border-radius: 50%;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: #864f01;
-  color: #fff;
-  border: none;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.8rem;
   cursor: pointer;
+}
+
+/* Photographer Info */
+.photographer-info {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.photo-thumb-wrapper:hover .photo-remove-btn {
-  opacity: 1;
+.photographer-info input {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #f5f1b3;
 }
 
-.clear-all-btn {
-  display: inline-block;
-  margin-top: 10px;
-  margin-bottom: 5px;
-  padding: 6px 14px;
-  background: none;
-  border: 1px solid #5e2913;
-  color: #c68728;
-  border-radius: 4px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.clear-all-btn:hover {
-  background: #c62828;
-  color: #fff;
-}
-.stop-camera-btn {
+/* Upload */
+.upload-btn {
+  margin-top: 1rem;
   width: 100%;
-  padding: 10px;
-  background: #28c67c;
-  color: #fff;
-  border: none;
-  border-radius: 0 0 8px 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s ease;
 }
 
-.stop-camera-btn:hover {
-  background: #1cb75d;
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(152, 238, 130, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-card {
+  background: #9fe59c;
+  padding: 1.5rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.modal-card input {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #deed9c;
+}
+.file-btn input[type="file"] {
+  display: none !important;
 }
