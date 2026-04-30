@@ -18,6 +18,41 @@
   flex-wrap: wrap;
 }
 
+.diagnostics-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.diagnostics-chip-idle {
+  background: #f2f2f2;
+  color: #4b4b4b;
+  border-color: #d8d8d8;
+}
+
+.diagnostics-chip-loading {
+  background: #fff3cd;
+  color: #7a5a00;
+  border-color: #f0d47a;
+}
+
+.diagnostics-chip-success {
+  background: #d7f9df;
+  color: #0e6b2f;
+  border-color: #7dd89a;
+}
+
+.diagnostics-chip-error {
+  background: #ffdede;
+  color: #9a0f0f;
+  border-color: #e88181;
+}
+
 .tree-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
@@ -32,11 +67,13 @@
   gap: 1rem;
 }
 
+/* Mint green cards with bright yellow lining + soft shadow */
 .card {
   background: #9fe59c;
   border-radius: 10px;
   padding: 1rem 1.25rem;
   box-shadow: 0 2px 6px rgb(222, 245, 120);
+  border: 2px solid rgb(222, 245, 120); /* bright yellow lining */
 }
 
 .section-header h1,
@@ -137,12 +174,14 @@
   max-height: 360px;
 }
 
+/* No-photo block */
+
 .detail-no-photo {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 1.5rem 0.5rem;
-  color: #777;
+  color: #555;
   gap: 0.5rem;
 }
 
@@ -150,27 +189,32 @@
   font-size: 2rem;
 }
 
+/* Photo credit */
+
 .photo-credit {
   font-size: 0.85rem;
-  color: #666;
+  color: #444;
   margin-top: 0.25rem;
 }
 
+/* Winner block */
+
 .winner-block {
   margin-top: 1rem;
-  border-top: 1px dashed #ddd;
+  border-top: 1px dashed #d8f5a2;
   padding-top: 0.75rem;
 }
 
 .winner-badge {
   display: inline-block;
-  background: #ffeb99;
+  background: #fff7b3;
   color: #7a5a00;
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
   margin-bottom: 0.5rem;
+  border: 2px solid rgb(222, 245, 120);
 }
 
 .winner-photo-wrapper {
@@ -182,6 +226,7 @@
   border-radius: 8px;
   object-fit: cover;
   max-height: 260px;
+  border: 2px solid rgb(222, 245, 120);
 }
 
 /* Description */
@@ -189,6 +234,29 @@
 .section-description p {
   margin: 0.25rem 0 0;
   line-height: 1.5;
+}
+
+.photo-summary-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.photo-summary-item {
+  background: #b6edb3;
+  border: 1px solid rgb(222, 245, 120);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+}
+
+.photo-summary-item h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+.photo-summary-item p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 /* Gallery */
@@ -202,7 +270,7 @@
 
 .gallery-count {
   font-size: 0.85rem;
-  color: #666;
+  color: #444;
 }
 
 .gallery-grid {
@@ -212,11 +280,14 @@
   margin-top: 0.75rem;
 }
 
+/* Gallery card — updated to match mint-green card style */
+
 .gallery-card {
-  border-radius: 8px;
-  border: 1px solid #eee;
+  background: #9fe59c;
+  border-radius: 10px;
+  border: 2px solid rgb(222, 245, 120);
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
   overflow: hidden;
-  background: #ecefec;
   display: flex;
   flex-direction: column;
 }
@@ -234,6 +305,27 @@
   gap: 0.25rem;
 }
 
+.gallery-ai-summary {
+  margin-top: 0.25rem;
+  border-top: 1px dashed rgb(222, 245, 120);
+  padding-top: 0.25rem;
+}
+
+.gallery-ai-summary summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #205b2a;
+}
+
+.gallery-ai-summary p {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+/* Badges */
+
 .badge-row {
   display: flex;
   gap: 0.25rem;
@@ -247,25 +339,27 @@
   border-radius: 999px;
   background: #e0f2ff;
   color: #0b4f7a;
+  border: 1px solid rgb(222, 245, 120);
 }
 
 .badge-warn {
   background: #ffe4b5;
   color: #7a4b00;
+  border: 1px solid rgb(222, 245, 120);
 }
 
 .gallery-card-actions {
   display: flex;
   gap: 0.25rem;
   padding: 0.4rem 0.5rem 0.5rem;
-  border-top: 1px solid #eee;
+  border-top: 2px solid rgb(222, 245, 120);
 }
 
 /* QR */
 
 .section-qr .qr-hint {
   font-size: 0.85rem;
-  color: #666;
+  color: #444;
   margin: 0 0 0.5rem;
 }
 
@@ -279,6 +373,10 @@
   width: 160px;
   height: 160px;
   object-fit: contain;
+  border: 2px solid rgb(222, 245, 120);
+  border-radius: 10px;
+  background: #9fe59c;
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
 }
 
 /* AI Assistant */
@@ -291,20 +389,21 @@
 
 .ai-subtitle {
   font-size: 0.85rem;
-  color: #666;
+  color: #444;
   margin: 0;
 }
 
 .ai-chat-window {
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  background: #fafafa;
+  border-radius: 10px;
+  border: 2px solid rgb(222, 245, 120);
+  background: #9fe59c;
   padding: 0.5rem;
   max-height: 260px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
 }
 
 .ai-message {
@@ -312,20 +411,24 @@
   border-radius: 6px;
   font-size: 0.85rem;
   line-height: 1.4;
+  border: 1px solid rgb(222, 245, 120);
 }
 
+/* System messages */
 .ai-message-system {
-  background: #eef2ff;
+  background: #e8f3ff;
   color: #333;
 }
 
+/* User messages */
 .ai-message-user {
-  background: #e0f7ff;
+  background: #d4f7ff;
   align-self: flex-end;
 }
 
+/* Assistant messages */
 .ai-message-assistant {
-  background: #f1f1f1;
+  background: #f4fff4;
   align-self: flex-start;
 }
 
@@ -350,9 +453,10 @@
 .ai-input-row input {
   flex: 1;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: 2px solid rgb(222, 245, 120);
   padding: 0.4rem 0.5rem;
   font-size: 0.9rem;
+  background: #fafffa;
 }
 
 /* Staff info */
@@ -368,7 +472,7 @@
   display: block;
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #777;
+  color: #555;
 }
 
 .section-staff .value {
@@ -379,11 +483,35 @@
   font-family: monospace;
 }
 
-/* Buttons (assuming global .btn styles exist; just small tweaks) */
+/* Buttons */
 
 .btn-sm {
   font-size: 0.75rem;
   padding: 0.2rem 0.4rem;
+}
+
+/* Global button theme match */
+.btn,
+button {
+  background: #9fe59c;
+  border: 2px solid rgb(222, 245, 120);
+  color: #1a3d1a;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
+  transition: 0.15s ease-in-out;
+}
+
+.btn:hover,
+button:hover {
+  background: #8ddc8a;
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  color: #7a0000;
 }
 
 /* Empty state */
@@ -392,10 +520,11 @@
   max-width: 420px;
   margin: 3rem auto;
   text-align: center;
-  background: #ffffff;
+  background: #9fe59c;
   border-radius: 12px;
   padding: 1.5rem 1.75rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 2px solid rgb(222, 245, 120);
+  box-shadow: 0 2px 8px rgb(222, 245, 120);
 }
 
 .empty-state .icon {
@@ -405,7 +534,7 @@
 
 .empty-hint {
   font-size: 0.9rem;
-  color: #666;
+  color: #444;
 }
 
 /* Loading */
@@ -414,6 +543,7 @@
   text-align: center;
   padding: 3rem 1rem;
   font-size: 1rem;
+  color: #333;
 }
 
 /* Responsive */
@@ -436,8 +566,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Coordinates section */
+
 .section-coordinates {
   margin-top: 1rem;
+  background: #9fe59c;
+  border-radius: 10px;
+  padding: 1rem;
+  border: 2px solid rgb(222, 245, 120);
+  box-shadow: 0 2px 6px rgb(222, 245, 120);
 }
 
 .coord-row {
@@ -450,10 +588,19 @@
   margin-top: 0.75rem;
   width: fit-content;
 }
+
 .coord-input {
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: 2px solid rgb(222, 245, 120);
+  background: #fafffa;
   font-family: monospace;
+}
+
+.needs-attention {
+  border: 3px solid #d10f0f !important;
+  background: #ffdede;
+  box-shadow: 0 0 0 2px rgba(209, 15, 15, 0.35), 0 8px 16px rgba(209, 15, 15, 0.24);
+  border-radius: 8px;
 }
 

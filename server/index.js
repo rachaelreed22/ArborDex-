@@ -24,6 +24,7 @@ const upload = multer({
 });
 
 const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
+const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || 'photos';
 const PORT = process.env.PORT || 5000;
 
 // ===========================
@@ -311,6 +312,376 @@ api.patch('/photos/:id/main', async (req, res) => {
   } catch (err) {
     console.error('Unexpected error setting main photo:', err);
     res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+// ===========================
+// AI ROUTE — Analyze Tree (Dex mode diagnostics)
+// ===========================
+api.get('/ai/analyze-tree/:id', async (req, res) => {
+  try {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: "OPENAI_API_KEY is not set" });
+    }
+
+    const id = req.params.id;
+    console.log(`[AI Diagnostics] analyze-tree hit for listing ${id}`);
+
+    const { data: listing, error } = await supabase
+      .from('listings')
+      .select('id, title, description, location, latitude, longitude')
+      .eq('id', id)
+      .single();
+
+    if (error || !listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    const { data: photoRows, error: photoError } = await supabase
+      .from('photos')
+      .select('id, url, is_main, created_at')
+      .eq('listing_id', id)
+      .order('is_main', { ascending: false })
+      .order('created_at', { ascending: true });
+
+    if (photoError) {
+      console.error('Error fetching photos for diagnostics:', photoError);
+      return res.status(500).json({ error: 'Failed to fetch photos for diagnostics' });
+    }
+
+    const photos = Array.isArray(photoRows) ? photoRows.filter((p) => p?.url) : [];
+    const uniquePhotos = Array.from(new Map(photos.map((p) => [p.url, p])).values());
+
+    if (uniquePhotos.length === 0) {
+      return res.json({
+        species: 'Unknown',
+        environment: null,
+        summary: 'No photos available for diagnostics.',
+        recommendations: ['Upload at least one clear tree photo.'],
+        public_about: 'This tree is waiting for its first photo and identification. Once photos are uploaded, ArborAI will add a friendly public description here.',
+        photo_summaries: [],
+        alerts: ['No photos available'],
+        health_score: '0/10',
+        confidence: 'Low',
+        risk_flags: []
+      });
+    }
+
+    // Analyze all photos when fewer than 3 exist, else analyze at least 3 (up to 5).
+    const photosToAnalyzeCount = uniquePhotos.length >= 3
+      ? Math.min(uniquePhotos.length, 5)
+      : uniquePhotos.length;
+    const photosToAnalyze = uniquePhotos.slice(0, photosToAnalyzeCount);
+
+    const treeSummary = `
+Tree ID: ${listing.id}
+Title: ${listing.title || "Untitled"}
+Location: ${listing.location || "Unknown"}
+Latitude: ${listing.latitude ?? "Unknown"}
+Longitude: ${listing.longitude ?? "Unknown"}
+Description: ${listing.description || "No description provided."}
+Total Photos: ${photos.length}
+Photos Sent For AI Analysis: ${photosToAnalyze.length}
+    `.trim();
+
+    const hasExistingDescription = typeof listing.description === 'string' && listing.description.trim().length > 0;
+    const speciesGuess = listing.title && listing.title !== 'Untitled Tree' && listing.title !== 'Untitled'
+      ? listing.title
+      : 'This tree';
+
+    function buildFallbackDiagnostics(reasonText) {
+      const publicAbout = `${speciesGuess} is a wonderful part of this landscape. While ArborAI is temporarily busy, this tree appears to be a healthy and valuable part of the local environment. Fun fact: mature trees help cool surrounding areas and support local wildlife.`;
+
+      return {
+        species: speciesGuess,
+        environment: listing.location || 'a maintained landscape setting',
+        summary: `Automated diagnostics are temporarily limited. ${reasonText}`,
+        recommendations: [
+          'Continue routine watering and seasonal tree care.',
+          'Inspect leaves and branches regularly for visible stress.',
+          'Re-run diagnostics shortly for detailed species and health insights.'
+        ],
+        public_about: publicAbout,
+        photo_summaries: photosToAnalyze.map((_, index) => `Photo ${index + 1}: AI photo insight is temporarily unavailable due to service limits.`),
+        alerts: ['Diagnostics temporarily unavailable'],
+        health_score: 'Pending',
+        confidence: 'Low',
+        risk_flags: []
+      };
+    }
+
+    async function persistPublicAboutIfMissing(publicAboutText) {
+      if (hasExistingDescription || !publicAboutText) return;
+      const { error: updateDescriptionError } = await supabase
+        .from('listings')
+        .update({ description: publicAboutText })
+        .eq('id', id);
+
+      if (updateDescriptionError) {
+        console.error('Failed to persist public about text:', updateDescriptionError);
+      }
+    }
+
+    const systemPrompt = `You are ArborAI, an expert arborist assistant. Analyze the provided tree data and photos and respond ONLY with a valid JSON object (no markdown, no explanation) with these exact keys:
+- species: string (identified species or best guess)
+- environment: string (description of the surrounding environment)
+- summary: string (overall assessment of the tree)
+- recommendations: array of strings (actionable care steps)
+- public_about: string (friendly, upbeat, non-technical public-facing description with one fun fact)
+- photo_summaries: array of strings (one brief observation per photo)
+- alerts: array of strings (urgent issues, empty array if none)
+- health_score: string (e.g. "Good", "Fair", "Poor", or a score like "7/10")
+- confidence: string (e.g. "High", "Medium", "Low")
+  - risk_flags: array of strings (potential hazards, empty array if none)
+  IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-empty items, in the same order as the provided photos.`;
+
+    const userContent = [
+      {
+        type: "text",
+        text: `Analyze this tree:\n\n${treeSummary}\n\nProvide one short summary for each photo in order.`
+      },
+      ...photosToAnalyze.map((p, index) => ({
+        type: "text",
+        text: `Photo ${index + 1}`
+      })),
+      ...photosToAnalyze.map(p => ({
+        type: "image_url",
+        image_url: { url: p.url }
+      }))
+    ];
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("OpenAI error:", errText);
+
+      const isRateLimit = errText.includes('rate_limit_exceeded');
+      const fallbackDiagnostics = buildFallbackDiagnostics(
+        isRateLimit
+          ? 'OpenAI rate limits were reached during this request.'
+          : 'The AI provider returned an error during analysis.'
+      );
+
+      await persistPublicAboutIfMissing(fallbackDiagnostics.public_about);
+      return res.status(200).json(fallbackDiagnostics);
+    }
+
+    const aiData = await response.json();
+    const raw = aiData.choices?.[0]?.message?.content || "{}";
+
+    let diagnostics;
+    try {
+      diagnostics = JSON.parse(raw);
+    } catch {
+      console.error("Failed to parse AI JSON:", raw);
+      const fallbackDiagnostics = buildFallbackDiagnostics('The AI response format was invalid for this request.');
+      await persistPublicAboutIfMissing(fallbackDiagnostics.public_about);
+      return res.status(200).json(fallbackDiagnostics);
+    }
+
+    const rawPhotoSummaries = Array.isArray(diagnostics.photo_summaries)
+      ? diagnostics.photo_summaries
+      : [];
+
+    const normalizedPhotoSummaries = rawPhotoSummaries
+      .slice(0, photosToAnalyze.length)
+      .map((item, index) => {
+        if (typeof item === 'string') {
+          const text = item.trim();
+          return text || `Photo ${index + 1}: No summary returned.`;
+        }
+
+        if (item && typeof item === 'object') {
+          const text = (item.summary || item.text || item.description || '').toString().trim();
+          return text || `Photo ${index + 1}: No summary returned.`;
+        }
+
+        return `Photo ${index + 1}: No summary returned.`;
+      });
+
+    while (normalizedPhotoSummaries.length < photosToAnalyze.length) {
+      normalizedPhotoSummaries.push(`Photo ${normalizedPhotoSummaries.length + 1}: No summary returned.`);
+    }
+
+    diagnostics.photo_summaries = normalizedPhotoSummaries;
+
+    const speciesName = diagnostics?.species && diagnostics.species !== 'Unknown'
+      ? diagnostics.species
+      : (listing.title || 'this tree');
+
+    const summaryText = (diagnostics?.summary || '').toString().trim();
+    const environmentText = (diagnostics?.environment || '').toString().trim();
+    const firstRecommendation = Array.isArray(diagnostics?.recommendations)
+      ? (diagnostics.recommendations.find((r) => typeof r === 'string' && r.trim()) || '')
+      : '';
+
+    let publicAbout = (diagnostics?.public_about || '').toString().trim();
+    if (!publicAbout) {
+      const summarySentence = summaryText || `${speciesName} appears healthy and is a great example of local tree life.`;
+      const environmentSentence = environmentText
+        ? `It is growing in ${environmentText.toLowerCase()}.`
+        : 'It is a valuable part of its local ecosystem.';
+      const careSentence = firstRecommendation
+        ? `A simple care tip: ${firstRecommendation}`
+        : 'With regular seasonal care, this tree can continue to thrive for years.';
+      publicAbout = `${speciesName} is an amazing tree to have in this area. ${summarySentence} ${environmentSentence} ${careSentence}`;
+    }
+
+    diagnostics.public_about = publicAbout;
+
+    await persistPublicAboutIfMissing(publicAbout);
+
+    res.json(diagnostics);
+
+  } catch (err) {
+    console.error("Unexpected error in analyze-tree:", err);
+    res.status(500).json({ error: "Unexpected error" });
+  }
+});
+
+// ===========================
+// AI ROUTE — Ask ArborAI (Public scanner + chat)
+// ===========================
+api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
+  try {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    const question = (req.body?.question || '').toString().trim();
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    const uploadedPhotoUrls = [];
+    for (const file of files) {
+      const safeName = (file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `ask-arborai/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(ASK_ARBORAI_BUCKET)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Ask ArborAI storage upload error:', uploadError);
+        continue;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from(ASK_ARBORAI_BUCKET)
+        .getPublicUrl(filePath);
+
+      if (publicData?.publicUrl) {
+        uploadedPhotoUrls.push(publicData.publicUrl);
+      }
+    }
+
+    if (!question && uploadedPhotoUrls.length === 0) {
+      return res.status(400).json({ error: 'Provide a question or at least one photo.' });
+    }
+
+    const systemPrompt = `You are ArborAI, an expert arborist assistant. Respond ONLY as valid JSON with these exact keys:
+- species: string
+- confidence: string
+- health_score: number (0-100)
+- summary: string
+- risks: array of strings
+- recommendations: array of strings
+- photo_summaries: array of strings
+- raw_ai_message: string (friendly conversational chat response)
+If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.`;
+
+    const userContent = [
+      {
+        type: 'text',
+        text: `User question: ${question || 'Please analyze these tree photos and provide identification and diagnostics.'}`,
+      },
+      ...uploadedPhotoUrls.map((url, index) => ({
+        type: 'text',
+        text: `Photo ${index + 1}`,
+      })),
+      ...uploadedPhotoUrls.map((url) => ({
+        type: 'image_url',
+        image_url: { url },
+      })),
+    ];
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 900,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Ask ArborAI OpenAI error:', errText);
+      return res.status(502).json({ error: 'AI request failed' });
+    }
+
+    const openAiData = await response.json();
+    const rawContent = openAiData?.choices?.[0]?.message?.content || '{}';
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch {
+      parsed = {};
+    }
+
+    const payload = {
+      species: (parsed.species || 'Unknown').toString(),
+      confidence: (parsed.confidence || 'Low').toString(),
+      health_score: Number.isFinite(Number(parsed.health_score))
+        ? Math.max(0, Math.min(100, Number(parsed.health_score)))
+        : 0,
+      summary: (parsed.summary || 'ArborAI could not produce a detailed summary for this scan.').toString(),
+      risks: Array.isArray(parsed.risks)
+        ? parsed.risks.map((item) => item.toString()).filter(Boolean)
+        : [],
+      recommendations: Array.isArray(parsed.recommendations)
+        ? parsed.recommendations.map((item) => item.toString()).filter(Boolean)
+        : [],
+      photo_summaries: Array.isArray(parsed.photo_summaries)
+        ? parsed.photo_summaries.map((item) => item.toString()).filter(Boolean)
+        : [],
+      raw_ai_message: (parsed.raw_ai_message || 'Here is your scan summary from ArborAI.').toString(),
+      photo_urls: uploadedPhotoUrls,
+    };
+
+    res.json(payload);
+  } catch (err) {
+    console.error('Unexpected Ask ArborAI error:', err);
+    res.status(500).json({ error: 'Unexpected Ask ArborAI error' });
   }
 });
 

@@ -53,6 +53,10 @@ export default function Navbar() {
           Scan QR
         </button>
 
+        <NavLink to="/ask-arborai" onClick={() => setMenuOpen(false)}>
+          Ask ArborAI
+        </NavLink>
+
         <button className="mode-toggle" onClick={() => { toggleMode(); setMenuOpen(false); }}>
           {toggleLabel}
         </button>

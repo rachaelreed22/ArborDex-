@@ -15,6 +15,7 @@ import TreeList from './pages/TreeList';
 import AddTree from './pages/AddTree';
 import TreeDetail from './pages/TreeDetail';
 import Scan from './pages/Scan';
+import AskArborAI from './pages/AskArborAI';
 
 function Layout() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/listing/:id" element={<TreeDetail />} />
             <Route path="/tag/:id" element={<TreeDetail />} />
             <Route path="/scan" element={<Scan />} />
+            <Route path="/ask-arborai" element={<AskArborAI />} />
           </Route>
 
           {/* Catch-all */}
