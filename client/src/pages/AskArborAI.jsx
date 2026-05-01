@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './AskArborAI.css';
 
-function createMessage({ role, text = '', photos = [], diagnostics = null, showActions = false }) {
+function createMessage({
+  role,
+  text = '',
+  photos = [],
+  diagnostics = null,
+  showActions = false,
+  scanPayload = null,
+  actionCompleted = false,
+}) {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     role,
@@ -9,11 +18,14 @@ function createMessage({ role, text = '', photos = [], diagnostics = null, showA
     photos,
     diagnostics,
     showActions,
+    scanPayload,
+    actionCompleted,
     createdAt: Date.now(),
   };
 }
 
 export default function AskArborAI() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([
     createMessage({
       role: 'assistant',
@@ -23,7 +35,29 @@ export default function AskArborAI() {
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [listings, setListings] = useState([]);
+  const [isListingsLoading, setIsListingsLoading] = useState(false);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [selectedListingId, setSelectedListingId] = useState('');
+  const [attachMessageId, setAttachMessageId] = useState('');
   const bottomRef = useRef(null);
+
+  const resetConversation = () => {
+    setMessages([
+      createMessage({
+        role: 'assistant',
+        text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
+      }),
+    ]);
+    setQuestion('');
+    setUploadedPhotos([]);
+    setActionError('');
+    setAttachDialogOpen(false);
+    setSelectedListingId('');
+    setAttachMessageId('');
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,6 +88,20 @@ export default function AskArborAI() {
   const resetComposer = () => {
     setQuestion('');
     setUploadedPhotos([]);
+  };
+
+  const markActionCompleted = (messageId) => {
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId
+          ? { ...message, actionCompleted: true, showActions: false }
+          : message
+      )
+    );
+  };
+
+  const appendAssistantMessage = (text) => {
+    setMessages((prev) => [...prev, createMessage({ role: 'assistant', text })]);
   };
 
   const sendMessage = async () => {
@@ -115,11 +163,23 @@ export default function AskArborAI() {
             recommendations,
             photoSummaries,
           },
+          scanPayload: {
+            species,
+            confidence,
+            health_score: healthScore,
+            summary,
+            risks,
+            recommendations,
+            photo_summaries: photoSummaries,
+            raw_ai_message: assistantText,
+            photo_urls: Array.isArray(data.photo_urls) ? data.photo_urls : [],
+          },
           showActions: true,
         }),
       ]);
 
       resetComposer();
+      setActionError('');
     } catch (error) {
       setMessages((prev) => [
         ...prev,
@@ -137,6 +197,119 @@ export default function AskArborAI() {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       sendMessage();
+    }
+  };
+
+  const createTreeFromScan = async (message) => {
+    if (!message?.scanPayload) {
+      appendAssistantMessage('This scan is missing payload data. Run a new scan and try again.');
+      return;
+    }
+
+    setIsActionLoading(true);
+    setActionError('');
+
+    try {
+      const response = await fetch('/api/ai/create-tree-from-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message.scanPayload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not create tree from scan');
+      }
+
+      markActionCompleted(message.id);
+      appendAssistantMessage(`Tree created successfully. Opening the new listing now.`);
+      navigate(`/listing/${data.listing_id}`);
+    } catch (error) {
+      setActionError(error.message);
+      appendAssistantMessage(`Create tree failed: ${error.message}`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const openAttachDialog = async (message) => {
+    if (!message?.scanPayload) {
+      appendAssistantMessage('This scan is missing payload data. Run a new scan and try again.');
+      return;
+    }
+
+    setAttachMessageId(message.id);
+    setAttachDialogOpen(true);
+    setActionError('');
+
+    if (listings.length > 0) {
+      if (!selectedListingId) {
+        setSelectedListingId(listings[0].id);
+      }
+      return;
+    }
+
+    setIsListingsLoading(true);
+    try {
+      const response = await fetch('/api/listings');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to load trees');
+      }
+
+      const normalized = Array.isArray(data) ? data : [];
+      setListings(normalized);
+      if (normalized[0]?.id) {
+        setSelectedListingId(normalized[0].id);
+      }
+    } catch (error) {
+      setActionError(error.message);
+      appendAssistantMessage(`Could not load trees for attach: ${error.message}`);
+    } finally {
+      setIsListingsLoading(false);
+    }
+  };
+
+  const attachScanToExistingTree = async () => {
+    if (!attachMessageId) return;
+    if (!selectedListingId) {
+      setActionError('Select a tree before attaching this scan.');
+      return;
+    }
+
+    const sourceMessage = messages.find((message) => message.id === attachMessageId);
+    if (!sourceMessage?.scanPayload) {
+      setActionError('This scan payload is no longer available.');
+      return;
+    }
+
+    setIsActionLoading(true);
+    setActionError('');
+
+    try {
+      const response = await fetch('/api/ai/attach-scan-to-tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: selectedListingId,
+          ...sourceMessage.scanPayload,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to attach scan to tree');
+      }
+
+      markActionCompleted(sourceMessage.id);
+      setAttachDialogOpen(false);
+      appendAssistantMessage(`Attached ${data.added_photos} photo(s) to tree ${data.listing_id}.`);
+      navigate(`/listing/${data.listing_id}`);
+    } catch (error) {
+      setActionError(error.message);
+      appendAssistantMessage(`Attach scan failed: ${error.message}`);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -228,15 +401,23 @@ export default function AskArborAI() {
 
                 {renderDiagnostics(message.diagnostics)}
 
-                {message.showActions && (
+                {message.showActions && !message.actionCompleted && (
                   <div className="ask-action-row">
-                    <button type="button" onClick={() => window.alert('Stub: create tree from scan')}>
+                    <button
+                      type="button"
+                      onClick={() => createTreeFromScan(message)}
+                      disabled={isActionLoading}
+                    >
                       Create Tree From This Scan
                     </button>
-                    <button type="button" onClick={() => window.alert('Stub: attach to existing tree')}>
+                    <button
+                      type="button"
+                      onClick={() => openAttachDialog(message)}
+                      disabled={isActionLoading}
+                    >
                       Attach to Existing Tree
                     </button>
-                    <button type="button" onClick={() => window.alert('Stub: start over')}>
+                    <button type="button" onClick={resetConversation} disabled={isActionLoading}>
                       Start Over
                     </button>
                   </div>
@@ -258,6 +439,8 @@ export default function AskArborAI() {
         </section>
 
         <section className="ask-composer">
+          {actionError && <p className="ask-error">{actionError}</p>}
+
           {photoPreviews.length > 0 && (
             <div className="ask-selected-photos">
               {photoPreviews.map((item, index) => (
@@ -311,6 +494,55 @@ export default function AskArborAI() {
             </div>
           </div>
         </section>
+
+        {attachDialogOpen && (
+          <div className="ask-modal-overlay" role="dialog" aria-modal="true" aria-label="Attach scan dialog">
+            <div className="ask-modal-card">
+              <h2>Attach Scan To Existing Tree</h2>
+
+              {isListingsLoading && <p>Loading tree list...</p>}
+
+              {!isListingsLoading && listings.length === 0 && (
+                <p>No trees found. Add a tree first or use Create Tree From This Scan.</p>
+              )}
+
+              {!isListingsLoading && listings.length > 0 && (
+                <label className="ask-modal-field">
+                  Select tree
+                  <select
+                    value={selectedListingId}
+                    onChange={(event) => setSelectedListingId(event.target.value)}
+                  >
+                    {listings.map((listing) => (
+                      <option key={listing.id} value={listing.id}>
+                        {listing.title || 'Untitled Tree'} ({listing.id})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="ask-modal-actions">
+                <button
+                  type="button"
+                  className="ask-send-btn"
+                  onClick={attachScanToExistingTree}
+                  disabled={isActionLoading || isListingsLoading || listings.length === 0}
+                >
+                  Attach Scan
+                </button>
+                <button
+                  type="button"
+                  className="ask-tool-btn"
+                  onClick={() => setAttachDialogOpen(false)}
+                  disabled={isActionLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

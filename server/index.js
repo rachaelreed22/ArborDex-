@@ -8,6 +8,7 @@ require('dotenv').config();
 const supabase = require('./db');
 const multer = require('multer');
 const fetch = require('node-fetch');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
@@ -27,6 +28,30 @@ const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
 const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || 'photos';
 const PORT = process.env.PORT || 5000;
 
+const ARBORAI_REGIONAL_SCOPE = `You are ArborAI, a diagnostic and identification assistant specialized in trees and woody plants found in the Southwestern region of Missouri, USA. All identifications, health assessments, care recommendations, and species suggestions must be grounded in the ecology, climate, soil types, and native or commonly planted species of this region.
+
+When identifying a tree:
+- Prioritize species native or naturalized in Southwestern Missouri.
+- Only consider out-of-region species if the photos strongly support it.
+- Use local climate patterns, pests, diseases, and soil conditions in all reasoning.
+- If a species is unlikely for this region, state that clearly and provide the closest regional match.
+
+When giving care recommendations:
+- Use Missouri-specific timing for pruning, fertilization, watering, and disease management.
+- Reference pests and diseases common to Missouri (for example: emerald ash borer, oak wilt, cedar-apple rust).
+- Avoid recommending treatments or species that do not apply to this region.
+
+If more information is needed:
+- Ask for additional photos (bark, leaves, buds, branching pattern, full tree silhouette).
+- Suggest angles that are most useful for Missouri species differentiation.
+
+Your knowledge base is restricted to the trees, shrubs, and woody plants found in Southwestern Missouri.`;
+
+const writeSupabase =
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    : supabase;
+
 // ===========================
 // API ROUTER
 // ===========================
@@ -44,11 +69,15 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
   try {
     const { title, description, location, latitude, longitude } = req.body;
 
-    const { data: listing, error: insertError } = await supabase
+    if (!title || !title.toString().trim()) {
+      return res.status(400).json({ error: "Tree name is required" });
+    }
+
+    const { data: listing, error: insertError } = await writeSupabase
       .from("listings")
       .insert([
         {
-          title,
+          title: title.toString().trim(),
           description,
           location,
           latitude: latitude ? Number(latitude) : null,
@@ -60,13 +89,16 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
 
     if (insertError) {
       console.error("Insert error:", insertError);
-      return res.status(500).json({ error: "Failed to create listing" });
+      return res.status(500).json({
+        error: insertError.message || "Failed to create listing",
+        hint: "Check Supabase write permissions and server env keys.",
+      });
     }
 
     const generateQrForTree = require("./utils/generateQrForTree");
     const qrUrl = await generateQrForTree(listing.id);
 
-    await supabase
+    await writeSupabase
       .from("listings")
       .update({ qr_url: qrUrl })
       .eq("id", listing.id);
@@ -76,7 +108,7 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
         const file = req.files[i];
         const filePath = `${listing.id}/${file.originalname}`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await writeSupabase.storage
           .from(PHOTO_BUCKET)
           .upload(filePath, file.buffer, {
             contentType: file.mimetype,
@@ -84,11 +116,11 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
           });
 
         if (!uploadError) {
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = writeSupabase.storage
             .from(PHOTO_BUCKET)
             .getPublicUrl(filePath);
 
-          await supabase.from("photos").insert([
+          await writeSupabase.from("photos").insert([
             {
               listing_id: listing.id,
               url: publicUrlData.publicUrl,
@@ -423,7 +455,9 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
       }
     }
 
-    const systemPrompt = `You are ArborAI, an expert arborist assistant. Analyze the provided tree data and photos and respond ONLY with a valid JSON object (no markdown, no explanation) with these exact keys:
+    const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
+
+  Analyze the provided tree data and photos and respond ONLY with a valid JSON object (no markdown, no explanation) with these exact keys:
 - species: string (identified species or best guess)
 - environment: string (description of the surrounding environment)
 - summary: string (overall assessment of the tree)
@@ -599,7 +633,9 @@ api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
       return res.status(400).json({ error: 'Provide a question or at least one photo.' });
     }
 
-    const systemPrompt = `You are ArborAI, an expert arborist assistant. Respond ONLY as valid JSON with these exact keys:
+    const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
+
+  Respond ONLY as valid JSON with these exact keys:
 - species: string
 - confidence: string
 - health_score: number (0-100)
@@ -686,6 +722,179 @@ If information is uncertain, state best estimate and keep raw_ai_message support
 });
 
 // ===========================
+// AI ROUTE — Create Tree From Ask ArborAI Scan
+// ===========================
+api.post('/ai/create-tree-from-scan', async (req, res) => {
+  try {
+    const {
+      species,
+      summary,
+      raw_ai_message,
+      photo_urls,
+      confidence,
+      health_score,
+      recommendations,
+    } = req.body || {};
+
+    const normalizedSpecies = (species || 'Untitled Tree').toString().trim();
+    const title = normalizedSpecies || 'Untitled Tree';
+
+    const descriptionParts = [
+      typeof summary === 'string' ? summary.trim() : '',
+      typeof raw_ai_message === 'string' ? raw_ai_message.trim() : '',
+      confidence ? `Confidence: ${confidence}` : '',
+      health_score !== undefined && health_score !== null ? `Health score: ${health_score}` : '',
+      Array.isArray(recommendations) && recommendations.length > 0
+        ? `Care tips: ${recommendations.slice(0, 2).join(' ')}`
+        : '',
+    ].filter(Boolean);
+
+    const description = descriptionParts.join('\n\n') || 'Created from Ask ArborAI scan.';
+
+    const { data: listing, error: insertError } = await supabase
+      .from('listings')
+      .insert([
+        {
+          title,
+          description,
+          location: null,
+          latitude: null,
+          longitude: null,
+        },
+      ])
+      .select('id, title, description')
+      .single();
+
+    if (insertError || !listing) {
+      console.error('Create from scan listing insert error:', insertError);
+      return res.status(500).json({ error: 'Failed to create listing from scan' });
+    }
+
+    const generateQrForTree = require('./utils/generateQrForTree');
+    const qrUrl = await generateQrForTree(listing.id);
+    await supabase.from('listings').update({ qr_url: qrUrl }).eq('id', listing.id);
+
+    const normalizedUrls = Array.from(
+      new Set(
+        (Array.isArray(photo_urls) ? photo_urls : [])
+          .map((url) => (typeof url === 'string' ? url.trim() : ''))
+          .filter((url) => /^https?:\/\//i.test(url))
+      )
+    );
+
+    if (normalizedUrls.length > 0) {
+      const photoRows = normalizedUrls.map((url, index) => ({
+        listing_id: listing.id,
+        url,
+        is_main: index === 0,
+        staff_uploaded: true,
+        photographer: 'Ask ArborAI',
+      }));
+
+      const { error: photoInsertError } = await supabase.from('photos').insert(photoRows);
+      if (photoInsertError) {
+        console.error('Create from scan photo insert error:', photoInsertError);
+      }
+    }
+
+    return res.status(201).json({
+      listing_id: listing.id,
+      qr_url: qrUrl,
+      added_photos: normalizedUrls.length,
+    });
+  } catch (err) {
+    console.error('Unexpected create-tree-from-scan error:', err);
+    return res.status(500).json({ error: 'Unexpected create-tree-from-scan error' });
+  }
+});
+
+// ===========================
+// AI ROUTE — Attach Ask ArborAI Scan To Existing Tree
+// ===========================
+api.post('/ai/attach-scan-to-tree', async (req, res) => {
+  try {
+    const { listing_id, photo_urls, summary, raw_ai_message } = req.body || {};
+
+    if (!listing_id) {
+      return res.status(400).json({ error: 'listing_id is required' });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, description')
+      .eq('id', listing_id)
+      .single();
+
+    if (listingError || !listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
+    const incomingUrls = Array.from(
+      new Set(
+        (Array.isArray(photo_urls) ? photo_urls : [])
+          .map((url) => (typeof url === 'string' ? url.trim() : ''))
+          .filter((url) => /^https?:\/\//i.test(url))
+      )
+    );
+
+    if (incomingUrls.length === 0) {
+      return res.status(400).json({ error: 'No valid photo_urls provided for attach.' });
+    }
+
+    const { data: existingPhotos, error: existingPhotosError } = await supabase
+      .from('photos')
+      .select('id, url')
+      .eq('listing_id', listing_id);
+
+    if (existingPhotosError) {
+      console.error('Attach scan existing photo lookup error:', existingPhotosError);
+      return res.status(500).json({ error: 'Failed to check existing photos' });
+    }
+
+    const existingUrlSet = new Set((existingPhotos || []).map((photo) => photo.url));
+    const urlsToInsert = incomingUrls.filter((url) => !existingUrlSet.has(url));
+
+    if (urlsToInsert.length > 0) {
+      const hasAnyExistingPhotos = Array.isArray(existingPhotos) && existingPhotos.length > 0;
+
+      const insertRows = urlsToInsert.map((url, index) => ({
+        listing_id,
+        url,
+        is_main: !hasAnyExistingPhotos && index === 0,
+        staff_uploaded: true,
+        photographer: 'Ask ArborAI',
+      }));
+
+      const { error: insertPhotoError } = await supabase.from('photos').insert(insertRows);
+      if (insertPhotoError) {
+        console.error('Attach scan insert photo error:', insertPhotoError);
+        return res.status(500).json({ error: 'Failed to attach photos to listing' });
+      }
+    }
+
+    const hasDescription = typeof listing.description === 'string' && listing.description.trim().length > 0;
+    if (!hasDescription) {
+      const attachDescription =
+        (typeof raw_ai_message === 'string' && raw_ai_message.trim()) ||
+        (typeof summary === 'string' && summary.trim()) ||
+        '';
+
+      if (attachDescription) {
+        await supabase.from('listings').update({ description: attachDescription }).eq('id', listing_id);
+      }
+    }
+
+    return res.json({
+      listing_id,
+      added_photos: urlsToInsert.length,
+    });
+  } catch (err) {
+    console.error('Unexpected attach-scan-to-tree error:', err);
+    return res.status(500).json({ error: 'Unexpected attach-scan-to-tree error' });
+  }
+});
+
+// ===========================
 // AI ROUTE — OpenAI Vision (CORRECT FORMAT)
 // ===========================
 api.post('/ai/tree', async (req, res) => {
@@ -714,9 +923,7 @@ Total Photos: ${photos.length}
     `.trim();
 
     const prompt = `
-You are ArborAI, a tree-focused assistant.
-
-Analyze the provided tree photos and answer the user's question.
+  Analyze the provided tree photos and answer the user's question.
 
 Tree data:
 ${treeSummary}
@@ -729,7 +936,7 @@ ${question}
     const messages = [
       {
         role: "system",
-        content: "You are ArborAI, a helpful assistant that analyzes trees and photos."
+        content: `${ARBORAI_REGIONAL_SCOPE}\n\nYou are a helpful assistant that analyzes trees and photos.`
       },
       {
         role: "user",

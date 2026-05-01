@@ -86,11 +86,20 @@ export default function AddTree() {
         body: formData,
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to create listing");
+      const contentType = res.headers.get("content-type") || "";
+      let data = {};
+      let rawText = "";
+
+      if (contentType.includes("application/json")) {
+        data = await res.json().catch(() => ({}));
+      } else {
+        rawText = await res.text().catch(() => "");
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        const serverError = data?.error || rawText || res.statusText || "Failed to create listing";
+        throw new Error(`Add Tree failed (${res.status}): ${serverError}`);
+      }
 
       // Navigate to the new listing page
       if (data?.id) {
@@ -100,7 +109,8 @@ export default function AddTree() {
       }
     } catch (err) {
       console.error("Error creating listing:", err);
-      setError("Something went wrong. Please try again.");
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || "Something went wrong. Please try again.");
     }
 
     setSubmitting(false);
