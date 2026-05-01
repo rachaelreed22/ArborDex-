@@ -6,6 +6,7 @@ function createMessage({
   role,
   text = '',
   photos = [],
+  photoFiles = [],
   diagnostics = null,
   showActions = false,
   scanPayload = null,
@@ -16,6 +17,7 @@ function createMessage({
     role,
     text,
     photos,
+    photoFiles,
     diagnostics,
     showActions,
     scanPayload,
@@ -43,6 +45,20 @@ export default function AskArborAI() {
   const [selectedListingId, setSelectedListingId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
   const bottomRef = useRef(null);
+
+  const buildPrefillDescription = ({ summary, confidence, healthScore, recommendations, assistantText }) => {
+    const parts = [
+      typeof summary === 'string' ? summary.trim() : '',
+      confidence ? `Confidence: ${confidence}` : '',
+      healthScore !== undefined && healthScore !== null ? `Health score: ${healthScore}` : '',
+      Array.isArray(recommendations) && recommendations.length > 0
+        ? `Care tips: ${recommendations.slice(0, 2).join(' ')}`
+        : '',
+      typeof assistantText === 'string' ? assistantText.trim() : '',
+    ].filter(Boolean);
+
+    return parts.join('\n\n');
+  };
 
   const resetConversation = () => {
     setMessages([
@@ -154,6 +170,7 @@ export default function AskArborAI() {
         createMessage({
           role: 'assistant',
           text: assistantText,
+          photoFiles: [...uploadedPhotos],
           diagnostics: {
             species,
             confidence,
@@ -206,30 +223,26 @@ export default function AskArborAI() {
       return;
     }
 
-    setIsActionLoading(true);
-    setActionError('');
+    const species = (message.scanPayload.species || '').toString().trim();
+    const title = species || 'Untitled Tree';
+    const description = buildPrefillDescription({
+      summary: message.scanPayload.summary,
+      confidence: message.scanPayload.confidence,
+      healthScore: message.scanPayload.health_score,
+      recommendations: message.scanPayload.recommendations,
+      assistantText: message.text,
+    });
 
-    try {
-      const response = await fetch('/api/ai/create-tree-from-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(message.scanPayload),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Could not create tree from scan');
-      }
-
-      markActionCompleted(message.id);
-      appendAssistantMessage(`Tree created successfully. Opening the new listing now.`);
-      navigate(`/listing/${data.listing_id}`);
-    } catch (error) {
-      setActionError(error.message);
-      appendAssistantMessage(`Create tree failed: ${error.message}`);
-    } finally {
-      setIsActionLoading(false);
-    }
+    markActionCompleted(message.id);
+    navigate('/add', {
+      state: {
+        fromScan: {
+          title,
+          description,
+          photos: Array.isArray(message.photoFiles) ? message.photoFiles : [],
+        },
+      },
+    });
   };
 
   const openAttachDialog = async (message) => {

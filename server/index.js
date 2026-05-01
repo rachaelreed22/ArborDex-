@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const supabase = require('./db');
 const multer = require('multer');
@@ -25,8 +25,20 @@ const upload = multer({
 });
 
 const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
-const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || 'photos';
+const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || PHOTO_BUCKET;
 const PORT = process.env.PORT || 5000;
+
+const ASK_ARBORAI_BUCKET_CANDIDATES = Array.from(
+  new Set(
+    [
+      ASK_ARBORAI_BUCKET,
+      PHOTO_BUCKET,
+      process.env.SUPABASE_BUCKET,
+      'tree-photos',
+      'photos',
+    ].filter(Boolean)
+  )
+);
 
 const ARBORAI_REGIONAL_SCOPE = `You are ArborAI, a diagnostic and identification assistant specialized in trees and woody plants found in the Southwestern region of Missouri, USA. All identifications, health assessments, care recommendations, and species suggestions must be grounded in the ecology, climate, soil types, and native or commonly planted species of this region.
 
@@ -145,7 +157,7 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
 // ===========================
 api.get('/listings', async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await writeSupabase
       .from('listings')
       .select(`
         id,
@@ -178,7 +190,7 @@ api.get('/listings/:id', async (req, res) => {
   try {
     const id = req.params.id;
 
-    const { data, error } = await supabase
+    const { data, error } = await writeSupabase
       .from('listings')
       .select(`
         id,
@@ -191,10 +203,14 @@ api.get('/listings/:id', async (req, res) => {
         photos(*)
       `)
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Error fetching listing:", error);
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (!data) {
       return res.status(404).json({ error: "Listing not found" });
     }
 
@@ -221,7 +237,7 @@ api.patch('/listings/:id', async (req, res) => {
       longitude: longitude ? Number(longitude) : null,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await writeSupabase
       .from('listings')
       .update(updateData)
       .eq('id', id)
@@ -256,12 +272,12 @@ api.delete('/listings/:id', async (req, res) => {
   try {
     const id = req.params.id;
 
-    await supabase
+    await writeSupabase
       .from('photos')
       .delete()
       .eq('listing_id', id);
 
-    const { error } = await supabase
+    const { error } = await writeSupabase
       .from('listings')
       .delete()
       .eq('id', id);
@@ -360,7 +376,7 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
     const id = req.params.id;
     console.log(`[AI Diagnostics] analyze-tree hit for listing ${id}`);
 
-    const { data: listing, error } = await supabase
+    const { data: listing, error } = await writeSupabase
       .from('listings')
       .select('id, title, description, location, latitude, longitude')
       .eq('id', id)
@@ -370,7 +386,7 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
       return res.status(404).json({ error: "Listing not found" });
     }
 
-    const { data: photoRows, error: photoError } = await supabase
+    const { data: photoRows, error: photoError } = await writeSupabase
       .from('photos')
       .select('id, url, is_main, created_at')
       .eq('listing_id', id)
@@ -445,7 +461,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 
     async function persistPublicAboutIfMissing(publicAboutText) {
       if (hasExistingDescription || !publicAboutText) return;
-      const { error: updateDescriptionError } = await supabase
+      const { error: updateDescriptionError } = await writeSupabase
         .from('listings')
         .update({ description: publicAboutText })
         .eq('id', id);
@@ -604,32 +620,49 @@ api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
     const files = Array.isArray(req.files) ? req.files : [];
 
     const uploadedPhotoUrls = [];
+    const aiImageUrls = [];
     for (const file of files) {
       const safeName = (file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
       const filePath = `ask-arborai/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from(ASK_ARBORAI_BUCKET)
-        .upload(filePath, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false,
-        });
+      let uploadedBucket = null;
+      for (const bucketName of ASK_ARBORAI_BUCKET_CANDIDATES) {
+        const { error: uploadError } = await writeSupabase.storage
+          .from(bucketName)
+          .upload(filePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: false,
+          });
 
-      if (uploadError) {
-        console.error('Ask ArborAI storage upload error:', uploadError);
+        if (!uploadError) {
+          uploadedBucket = bucketName;
+          break;
+        }
+
+        if (uploadError?.statusCode !== '404') {
+          console.error(`Ask ArborAI storage upload error (${bucketName}):`, uploadError);
+        }
+      }
+
+      if (!uploadedBucket) {
+        console.error('Ask ArborAI storage upload failed for all candidate buckets.');
+        // Fallback: still send the image to the vision model as inline data URL.
+        const base64 = file.buffer.toString('base64');
+        aiImageUrls.push(`data:${file.mimetype || 'image/jpeg'};base64,${base64}`);
         continue;
       }
 
-      const { data: publicData } = supabase.storage
-        .from(ASK_ARBORAI_BUCKET)
+      const { data: publicData } = writeSupabase.storage
+        .from(uploadedBucket)
         .getPublicUrl(filePath);
 
       if (publicData?.publicUrl) {
         uploadedPhotoUrls.push(publicData.publicUrl);
+        aiImageUrls.push(publicData.publicUrl);
       }
     }
 
-    if (!question && uploadedPhotoUrls.length === 0) {
+    if (!question && aiImageUrls.length === 0) {
       return res.status(400).json({ error: 'Provide a question or at least one photo.' });
     }
 
@@ -651,11 +684,11 @@ If information is uncertain, state best estimate and keep raw_ai_message support
         type: 'text',
         text: `User question: ${question || 'Please analyze these tree photos and provide identification and diagnostics.'}`,
       },
-      ...uploadedPhotoUrls.map((url, index) => ({
+      ...aiImageUrls.map((url, index) => ({
         type: 'text',
         text: `Photo ${index + 1}`,
       })),
-      ...uploadedPhotoUrls.map((url) => ({
+      ...aiImageUrls.map((url) => ({
         type: 'image_url',
         image_url: { url },
       })),
@@ -751,7 +784,7 @@ api.post('/ai/create-tree-from-scan', async (req, res) => {
 
     const description = descriptionParts.join('\n\n') || 'Created from Ask ArborAI scan.';
 
-    const { data: listing, error: insertError } = await supabase
+    const { data: listing, error: insertError } = await writeSupabase
       .from('listings')
       .insert([
         {
@@ -772,7 +805,7 @@ api.post('/ai/create-tree-from-scan', async (req, res) => {
 
     const generateQrForTree = require('./utils/generateQrForTree');
     const qrUrl = await generateQrForTree(listing.id);
-    await supabase.from('listings').update({ qr_url: qrUrl }).eq('id', listing.id);
+    await writeSupabase.from('listings').update({ qr_url: qrUrl }).eq('id', listing.id);
 
     const normalizedUrls = Array.from(
       new Set(
@@ -791,7 +824,7 @@ api.post('/ai/create-tree-from-scan', async (req, res) => {
         photographer: 'Ask ArborAI',
       }));
 
-      const { error: photoInsertError } = await supabase.from('photos').insert(photoRows);
+      const { error: photoInsertError } = await writeSupabase.from('photos').insert(photoRows);
       if (photoInsertError) {
         console.error('Create from scan photo insert error:', photoInsertError);
       }

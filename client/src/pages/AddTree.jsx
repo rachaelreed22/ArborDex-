@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import "./AddTree.css";
 
 export default function AddTree() {
   const { mode } = useMode();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -19,6 +20,27 @@ export default function AddTree() {
   const [previews, setPreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const scanPrefill = location.state?.fromScan;
+    if (!scanPrefill) return;
+
+    setForm((prev) => ({
+      ...prev,
+      title: scanPrefill.title || prev.title,
+      description: scanPrefill.description || prev.description,
+    }));
+
+    if (Array.isArray(scanPrefill.photos) && scanPrefill.photos.length > 0) {
+      setPhotos(scanPrefill.photos);
+      setPreviews(
+        scanPrefill.photos.map((file) => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+        }))
+      );
+    }
+  }, [location.state]);
 
   const isStaff = mode === "dex";
 
