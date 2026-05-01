@@ -1026,13 +1026,28 @@ app.use('/api', api);
 // ===========================
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 const distIndexPath = path.join(distPath, 'index.html');
+const distAssetsPath = path.join(distPath, 'assets');
 
 if (fs.existsSync(distPath)) {
+  if (fs.existsSync(distAssetsPath)) {
+    app.use(
+      '/assets',
+      express.static(distAssetsPath, {
+        maxAge: '1y',
+        immutable: true,
+      })
+    );
+  }
+
   app.use(
     express.static(distPath, {
       index: false,
-      maxAge: '1y',
-      immutable: true,
+      maxAge: 0,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-store');
+        }
+      },
     })
   );
 
