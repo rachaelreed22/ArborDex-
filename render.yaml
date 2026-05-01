@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: arbordex
+    env: node
+    buildCommand: npm install --prefix server && npm install --prefix client && npm run build --prefix client
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
