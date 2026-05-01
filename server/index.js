@@ -1025,12 +1025,28 @@ app.use('/api', api);
 // STATIC FILES + SPA FALLBACK
 // ===========================
 const distPath = path.join(__dirname, '..', 'client', 'dist');
+const distIndexPath = path.join(distPath, 'index.html');
 
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      index: false,
+      maxAge: '1y',
+      immutable: true,
+    })
+  );
 
-  app.use((req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+
+    // Do not serve SPA shell for asset/file requests.
+    if (path.extname(req.path)) {
+      return res.status(404).end();
+    }
+
+    // Keep HTML uncached so new deploys pick up new hashed asset filenames.
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(distIndexPath);
   });
 } else {
   console.warn('Frontend build not found at ' + distPath);
