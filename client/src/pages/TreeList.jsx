@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
-import { apiUrl } from "../utils/apiUrl";
+import { API_BASE_URL, apiUrl } from "../utils/apiUrl";
 import "./TreeList.css";
 
 export default function TreeList() {
@@ -41,23 +41,39 @@ export default function TreeList() {
     event.stopPropagation();
     if (!window.confirm("Delete this tree? This cannot be undone.")) return;
 
-    setDeletingId(id);
+    const normalizedId = (id ?? "").toString().trim();
+    if (!normalizedId) {
+      alert("Delete failed: invalid listing id");
+      return;
+    }
+
+    setDeletingId(normalizedId);
 
     try {
-      const res = await fetch(apiUrl(`/api/listings/${id}`), {
+      const res = await fetch(apiUrl(`/api/listings/${encodeURIComponent(normalizedId)}`), {
         method: "DELETE",
         headers: { Accept: "application/json" },
       });
 
       if (!res.ok) {
-        const errorText = await res.text().catch(() => "");
-        throw new Error(errorText || `Delete failed (${res.status})`);
+        const contentType = res.headers.get("content-type") || "";
+        let serverMessage = "";
+
+        if (contentType.includes("application/json")) {
+          const data = await res.json().catch(() => ({}));
+          serverMessage = data?.error || JSON.stringify(data);
+        } else {
+          serverMessage = await res.text().catch(() => "");
+        }
+
+        throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      setListings((prev) => prev.filter((listing) => listing.id !== id));
+      setListings((prev) => prev.filter((listing) => listing.id !== normalizedId));
     } catch (err) {
       console.error("Error deleting listing:", err);
-      alert(`Delete failed: ${err.message || "Unknown error"}`);
+      const backendLabel = API_BASE_URL || "(same-origin /api)";
+      alert(`Delete failed for listing ${normalizedId}: ${err.message || "Unknown error"}\nBackend: ${backendLabel}`);
     } finally {
       setDeletingId(null);
     }

@@ -270,7 +270,11 @@ api.patch('/listings/:id', async (req, res) => {
 // ===========================
 api.delete('/listings/:id', async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = decodeURIComponent((req.params.id || '').toString()).trim();
+
+    if (!id) {
+      return res.status(400).json({ error: 'Listing id is required' });
+    }
 
     await writeSupabase
       .from('photos')
