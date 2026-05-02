@@ -3,6 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import "./AddTree.css";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? '' : 'https://arbordex.onrender.com');
+
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
+
 export default function AddTree() {
   const { mode } = useMode();
   const location = useLocation();
@@ -103,7 +108,7 @@ export default function AddTree() {
         formData.append("photos", photo);
       });
 
-      const res = await fetch("/api/listings", {
+      const res = await fetch(apiUrl("/api/listings"), {
         method: "POST",
         body: formData,
       });
