@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import { getNeedsAttention } from "../utils/attentionRules";
 import { apiUrl } from "../utils/apiUrl";
+import { getStaffHeaders } from "../utils/staffAuth";
 import "./TreeDetail.css";
 
 export default function TreeDetail() {
@@ -160,7 +161,10 @@ export default function TreeDetail() {
 
   const handleSetMain = async (photoId) => {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/main`), { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/main`), {
+        method: "PATCH",
+        headers: getStaffHeaders(),
+      });
       fetchListing();
     } catch (err) {
       console.error("Error setting main photo:", err);
@@ -169,7 +173,10 @@ export default function TreeDetail() {
 
   const handleSetWinner = async (photoId) => {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/winner`), { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/winner`), {
+        method: "PATCH",
+        headers: getStaffHeaders(),
+      });
       fetchListing();
     } catch (err) {
       console.error("Error setting winner:", err);
@@ -179,7 +186,10 @@ export default function TreeDetail() {
   const handleDeletePhoto = async (photoId) => {
     if (!window.confirm("Delete this photo?")) return;
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}`), { method: "DELETE" });
+      await fetch(apiUrl(`/api/photos/${photoId}`), {
+        method: "DELETE",
+        headers: getStaffHeaders(),
+      });
       fetchListing();
     } catch (err) {
       console.error("Error deleting photo:", err);
@@ -188,7 +198,10 @@ export default function TreeDetail() {
 
   const handleApprovePhoto = async (photoId) => {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/approve`), { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/approve`), {
+        method: "PATCH",
+        headers: getStaffHeaders(),
+      });
       fetchListing();
     } catch (err) {
       console.error("Error approving photo:", err);

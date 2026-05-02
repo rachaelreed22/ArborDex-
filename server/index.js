@@ -8,6 +8,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const supabase = require('./db');
 const multer = require('multer');
 const fetch = require('node-fetch');
+const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -63,6 +64,97 @@ const HAS_SERVICE_ROLE = Boolean(
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const STAFF_API_KEY = (process.env.STAFF_API_KEY || '').toString().trim();
+
+function requireStaffAction(req, res, next) {
+  if (!STAFF_API_KEY) return next();
+
+  const incomingKey = (req.headers['x-staff-key'] || '').toString().trim();
+  if (!incomingKey || incomingKey !== STAFF_API_KEY) {
+    return res.status(403).json({ error: 'Forbidden: staff authorization required' });
+  }
+
+  return next();
+}
+
+const SMTP_HOST = (process.env.SMTP_HOST || '').toString().trim();
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = (process.env.SMTP_USER || '').toString().trim();
+const SMTP_PASS = (process.env.SMTP_PASS || '').toString().trim();
+const SMTP_FROM = (process.env.SMTP_FROM || SMTP_USER || '').toString().trim();
+
+const hasEmailConfig = Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS && SMTP_FROM);
+const mailTransporter = hasEmailConfig
+  ? nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    })
+  : null;
+
+function extractLikelyEmail(photo) {
+  const direct = [
+    photo?.photographer_email,
+    photo?.email,
+  ].find((value) => typeof value === 'string' && value.includes('@'));
+
+  if (direct) return direct.trim();
+
+  const photographer = (photo?.photographer || '').toString().trim();
+  if (photographer.includes('@')) {
+    const angleMatch = photographer.match(/<([^>]+@[^>]+)>/);
+    if (angleMatch?.[1]) return angleMatch[1].trim();
+    return photographer;
+  }
+
+  return '';
+}
+
+function stripOptionalPhotographerFields(row) {
+  const {
+    photographer_first,
+    photographer_last,
+    photographer_email,
+    ...legacyRow
+  } = row;
+
+  return legacyRow;
+}
+
+async function sendWinnerNotificationEmail({ toEmail, listingTitle, listingId }) {
+  if (!mailTransporter) {
+    console.warn('Winner email not sent: SMTP configuration is missing.');
+    return { sent: false, reason: 'smtp_not_configured' };
+  }
+
+  if (!toEmail) {
+    return { sent: false, reason: 'missing_recipient' };
+  }
+
+  const subject = `You won the ArborTag seasonal photo challenge for ${listingTitle || 'a tree'}!`;
+  const text = [
+    'Congratulations from ArborTag!',
+    '',
+    `Your photo was selected as the seasonal winner for ${listingTitle || 'a tree'} (${listingId}).`,
+    'Your winning photo is now featured as the main display image.',
+    '',
+    'Thank you for participating in the community challenge.',
+  ].join('\n');
+
+  await mailTransporter.sendMail({
+    from: SMTP_FROM,
+    to: toEmail,
+    subject,
+    text,
+  });
+
+  return { sent: true };
+}
+
 const writeSupabase =
   HAS_SERVICE_ROLE
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -79,6 +171,8 @@ api.get('/', (req, res) => {
     status: 'ok',
     service: 'ArborDex API',
     has_service_role: HAS_SERVICE_ROLE,
+    staff_guard_enabled: Boolean(STAFF_API_KEY),
+    winner_email_enabled: Boolean(mailTransporter),
   });
 });
 
@@ -392,7 +486,10 @@ api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
     const firstName = (req.body?.firstName || '').toString().trim();
     const lastName = (req.body?.lastName || '').toString().trim();
     const email = (req.body?.email || '').toString().trim();
-    const photographer = [firstName, lastName].filter(Boolean).join(' ') || email || null;
+    const photographerName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    const photographer = photographerName && email
+      ? `${photographerName} <${email}>`
+      : (photographerName || email || null);
 
     const insertRows = [];
 
@@ -423,13 +520,27 @@ api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
         is_main: !hasMainPhoto && i === 0,
         staff_uploaded: staffUploaded,
         photographer,
+        photographer_first: firstName || null,
+        photographer_last: lastName || null,
+        photographer_email: email || null,
       });
     }
 
-    const { data: savedPhotos, error: insertError } = await writeSupabase
+    let { data: savedPhotos, error: insertError } = await writeSupabase
       .from('photos')
       .insert(insertRows)
       .select('*');
+
+    if (insertError && /photographer_(first|last|email)/i.test(insertError.message || '')) {
+      const legacyRows = insertRows.map(stripOptionalPhotographerFields);
+      const retryResult = await writeSupabase
+        .from('photos')
+        .insert(legacyRows)
+        .select('*');
+
+      savedPhotos = retryResult.data;
+      insertError = retryResult.error;
+    }
 
     if (insertError) {
       console.error('Photo DB insert error:', insertError);
@@ -445,22 +556,46 @@ api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
 
 api.post('/photos', async (req, res) => {
   try {
-    const { listingId, url, photographer, staffUploaded } = req.body;
+    const {
+      listingId,
+      url,
+      photographer,
+      staffUploaded,
+      firstName,
+      lastName,
+      email,
+    } = req.body;
 
     if (!listingId || !url) {
       return res.status(400).json({ error: 'listingId and url are required' });
     }
 
-    const { data, error } = await writeSupabase
+    const insertPayload = {
+      listing_id: listingId,
+      url,
+      photographer: photographer || null,
+      staff_uploaded: staffUploaded === true || staffUploaded === 'true',
+      photographer_first: firstName || null,
+      photographer_last: lastName || null,
+      photographer_email: email || null,
+    };
+
+    let { data, error } = await writeSupabase
       .from('photos')
-      .insert([{
-        listing_id: listingId,
-        url,
-        photographer: photographer || null,
-        staff_uploaded: staffUploaded === true || staffUploaded === 'true',
-      }])
+      .insert([insertPayload])
       .select()
       .single();
+
+    if (error && /photographer_(first|last|email)/i.test(error.message || '')) {
+      const retry = await writeSupabase
+        .from('photos')
+        .insert([stripOptionalPhotographerFields(insertPayload)])
+        .select()
+        .single();
+
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Error creating photo:', error);
@@ -474,7 +609,7 @@ api.post('/photos', async (req, res) => {
   }
 });
 
-api.patch('/photos/:id/main', async (req, res) => {
+api.patch('/photos/:id/main', requireStaffAction, async (req, res) => {
   try {
     const id = req.params.id;
 
@@ -510,13 +645,13 @@ api.patch('/photos/:id/main', async (req, res) => {
   }
 });
 
-api.patch('/photos/:id/winner', async (req, res) => {
+api.patch('/photos/:id/winner', requireStaffAction, async (req, res) => {
   try {
     const id = req.params.id;
 
     const { data: photo, error: photoError } = await writeSupabase
       .from('photos')
-      .select('id, listing_id')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -527,10 +662,11 @@ api.patch('/photos/:id/winner', async (req, res) => {
     const listingId = photo.listing_id;
 
     await writeSupabase.from('photos').update({ winner: false }).eq('listing_id', listingId);
+    await writeSupabase.from('photos').update({ is_main: false }).eq('listing_id', listingId);
 
     const { data: updated, error: setError } = await writeSupabase
       .from('photos')
-      .update({ winner: true })
+      .update({ winner: true, is_main: true })
       .eq('id', id)
       .select()
       .single();
@@ -539,14 +675,34 @@ api.patch('/photos/:id/winner', async (req, res) => {
       return res.status(500).json({ error: 'Failed to set winner photo' });
     }
 
-    res.json(updated);
+    const { data: listingInfo } = await writeSupabase
+      .from('listings')
+      .select('id, title')
+      .eq('id', listingId)
+      .maybeSingle();
+
+    const toEmail = extractLikelyEmail(photo);
+    let emailResult = { sent: false, reason: 'not_attempted' };
+
+    try {
+      emailResult = await sendWinnerNotificationEmail({
+        toEmail,
+        listingTitle: listingInfo?.title || '',
+        listingId,
+      });
+    } catch (mailErr) {
+      console.error('Winner notification email failed:', mailErr);
+      emailResult = { sent: false, reason: 'send_failed' };
+    }
+
+    res.json({ ...updated, winner_email: emailResult });
   } catch (err) {
     console.error('Unexpected error setting winner photo:', err);
     res.status(500).json({ error: 'Unexpected error' });
   }
 });
 
-api.patch('/photos/:id/approve', async (req, res) => {
+api.patch('/photos/:id/approve', requireStaffAction, async (req, res) => {
   try {
     const id = req.params.id;
 
@@ -568,7 +724,7 @@ api.patch('/photos/:id/approve', async (req, res) => {
   }
 });
 
-api.delete('/photos/:id', async (req, res) => {
+api.delete('/photos/:id', requireStaffAction, async (req, res) => {
   try {
     const id = req.params.id;
 

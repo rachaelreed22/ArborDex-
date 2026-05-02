@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
+import { getStaffHeaders } from "../utils/staffAuth";
 
 export default function PendingPhotos() {
   const navigate = useNavigate();
@@ -39,7 +40,10 @@ export default function PendingPhotos() {
 
   async function approvePhoto(photoId) {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/approve`), { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/approve`), {
+        method: "PATCH",
+        headers: getStaffHeaders(),
+      });
       loadPendingPhotos();
     } catch (err) {
       console.error("Failed to approve photo:", err);
@@ -49,7 +53,10 @@ export default function PendingPhotos() {
   async function rejectPhoto(photoId) {
     if (!window.confirm("Delete this pending photo?")) return;
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}`), { method: "DELETE" });
+      await fetch(apiUrl(`/api/photos/${photoId}`), {
+        method: "DELETE",
+        headers: getStaffHeaders(),
+      });
       loadPendingPhotos();
     } catch (err) {
       console.error("Failed to delete pending photo:", err);
