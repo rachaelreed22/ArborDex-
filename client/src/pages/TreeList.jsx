@@ -20,7 +20,10 @@ export default function TreeList() {
 
   async function fetchListings() {
     try {
-      const res = await fetch(apiUrl("/api/listings"));
+      const res = await fetch(apiUrl("/api/listings"), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
       const data = await res.json();
       setListings(data || []);
     } catch (err) {
@@ -69,7 +72,18 @@ export default function TreeList() {
         throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      setListings((prev) => prev.filter((listing) => listing.id !== normalizedId));
+      const verifyRes = await fetch(apiUrl("/api/listings"), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const verifyData = await verifyRes.json().catch(() => []);
+      const nextListings = Array.isArray(verifyData) ? verifyData : [];
+
+      setListings(nextListings);
+
+      if (nextListings.some((listing) => listing.id === normalizedId)) {
+        throw new Error("Delete completed but listing still exists in backend response");
+      }
     } catch (err) {
       console.error("Error deleting listing:", err);
       const backendLabel = API_BASE_URL || "(same-origin /api)";

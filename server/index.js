@@ -306,6 +306,21 @@ api.delete('/listings/:id', async (req, res) => {
       return res.status(500).json({ error: "Failed to delete listing" });
     }
 
+    const { data: postDeleteCheck, error: postDeleteError } = await writeSupabase
+      .from('listings')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (postDeleteError) {
+      console.error('Error verifying delete:', postDeleteError);
+      return res.status(500).json({ error: 'Delete verification failed' });
+    }
+
+    if (postDeleteCheck) {
+      return res.status(500).json({ error: 'Delete reported success but listing still exists' });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("Unexpected error deleting listing:", err);
