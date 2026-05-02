@@ -299,18 +299,19 @@ api.delete('/listings/:id', async (req, res) => {
 // ===========================
 api.post('/photos', async (req, res) => {
   try {
-    const { listingId, url, photographer } = req.body;
+    const { listingId, url, photographer, staffUploaded } = req.body;
 
     if (!listingId || !url) {
       return res.status(400).json({ error: 'listingId and url are required' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await writeSupabase
       .from('photos')
       .insert([{
         listing_id: listingId,
         url,
         photographer: photographer || null,
+        staff_uploaded: staffUploaded === true || staffUploaded === 'true',
       }])
       .select()
       .single();
@@ -331,7 +332,7 @@ api.patch('/photos/:id/main', async (req, res) => {
   try {
     const id = req.params.id;
 
-    const { data: photo, error: photoError } = await supabase
+    const { data: photo, error: photoError } = await writeSupabase
       .from('photos')
       .select('id, listing_id')
       .eq('id', id)
@@ -343,9 +344,9 @@ api.patch('/photos/:id/main', async (req, res) => {
 
     const listingId = photo.listing_id;
 
-    await supabase.from('photos').update({ is_main: false }).eq('listing_id', listingId);
+    await writeSupabase.from('photos').update({ is_main: false }).eq('listing_id', listingId);
 
-    const { data: updated, error: setError } = await supabase
+    const { data: updated, error: setError } = await writeSupabase
       .from('photos')
       .update({ is_main: true })
       .eq('id', id)
@@ -359,6 +360,84 @@ api.patch('/photos/:id/main', async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error('Unexpected error setting main photo:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+api.patch('/photos/:id/winner', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const { data: photo, error: photoError } = await writeSupabase
+      .from('photos')
+      .select('id, listing_id')
+      .eq('id', id)
+      .single();
+
+    if (photoError || !photo) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    const listingId = photo.listing_id;
+
+    await writeSupabase.from('photos').update({ winner: false }).eq('listing_id', listingId);
+
+    const { data: updated, error: setError } = await writeSupabase
+      .from('photos')
+      .update({ winner: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (setError) {
+      return res.status(500).json({ error: 'Failed to set winner photo' });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Unexpected error setting winner photo:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+api.patch('/photos/:id/approve', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const { data: updated, error } = await writeSupabase
+      .from('photos')
+      .update({ staff_uploaded: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !updated) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Unexpected error approving photo:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
+api.delete('/photos/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const { error } = await writeSupabase
+      .from('photos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete photo' });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Unexpected error deleting photo:', err);
     res.status(500).json({ error: 'Unexpected error' });
   }
 });

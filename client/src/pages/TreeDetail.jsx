@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import { getNeedsAttention } from "../utils/attentionRules";
+import { apiUrl } from "../utils/apiUrl";
 import "./TreeDetail.css";
 
 export default function TreeDetail() {
@@ -74,7 +75,7 @@ export default function TreeDetail() {
 
   async function fetchListing() {
     try {
-      const res = await fetch(`/api/listings/${id}`);
+      const res = await fetch(apiUrl(`/api/listings/${id}`));
       if (!res.ok) {
         setListing(null);
         return null;
@@ -103,7 +104,7 @@ export default function TreeDetail() {
       setDiagnosticsStatus("loading");
       setDiagnosticsError("");
       console.log("[TreeDetail] fetching diagnostics for tree", id);
-      const res = await fetch(`/api/ai/analyze-tree/${id}`);
+      const res = await fetch(apiUrl(`/api/ai/analyze-tree/${id}`));
       if (!res.ok) {
         setDiagnostics(null);
         setDiagnosticsStatus("error");
@@ -125,7 +126,7 @@ export default function TreeDetail() {
 
   const handleSaveEdit = async () => {
     try {
-      await fetch(`/api/listings/${id}`, {
+      await fetch(apiUrl(`/api/listings/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editForm),
@@ -140,7 +141,7 @@ export default function TreeDetail() {
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this tree? This cannot be undone.")) return;
     try {
-      await fetch(`/api/listings/${id}`, { method: "DELETE" });
+      await fetch(apiUrl(`/api/listings/${id}`), { method: "DELETE" });
       navigate("/");
     } catch (err) {
       console.error("Error deleting listing:", err);
@@ -149,7 +150,7 @@ export default function TreeDetail() {
 
   const handleSetMain = async (photoId) => {
     try {
-      await fetch(`/api/photos/${photoId}/main`, { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/main`), { method: "PATCH" });
       fetchListing();
     } catch (err) {
       console.error("Error setting main photo:", err);
@@ -158,7 +159,7 @@ export default function TreeDetail() {
 
   const handleSetWinner = async (photoId) => {
     try {
-      await fetch(`/api/photos/${photoId}/winner`, { method: "PATCH" });
+      await fetch(apiUrl(`/api/photos/${photoId}/winner`), { method: "PATCH" });
       fetchListing();
     } catch (err) {
       console.error("Error setting winner:", err);
@@ -168,10 +169,19 @@ export default function TreeDetail() {
   const handleDeletePhoto = async (photoId) => {
     if (!window.confirm("Delete this photo?")) return;
     try {
-      await fetch(`/api/photos/${photoId}`, { method: "DELETE" });
+      await fetch(apiUrl(`/api/photos/${photoId}`), { method: "DELETE" });
       fetchListing();
     } catch (err) {
       console.error("Error deleting photo:", err);
+    }
+  };
+
+  const handleApprovePhoto = async (photoId) => {
+    try {
+      await fetch(apiUrl(`/api/photos/${photoId}/approve`), { method: "PATCH" });
+      fetchListing();
+    } catch (err) {
+      console.error("Error approving photo:", err);
     }
   };
 
@@ -187,7 +197,7 @@ export default function TreeDetail() {
     setAiLoading(true);
 
     try {
-      const res = await fetch("/api/ai/tree", {
+      const res = await fetch(apiUrl("/api/ai/tree"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -514,6 +524,7 @@ return (
             <div className="badge-row">
               {photo.is_main && <span className="badge">Main</span>}
               {photo.winner && <span className="badge badge-warn">⭐ Winner</span>}
+              {photo.staff_uploaded === false && <span className="badge badge-warn">Pending</span>}
             </div>
             {photoSummaries[idx] && (
               <details className="gallery-ai-summary">
@@ -538,6 +549,14 @@ return (
                   onClick={() => handleSetWinner(photo.id)}
                 >
                   Set Winner
+                </button>
+              )}
+              {photo.staff_uploaded === false && (
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => handleApprovePhoto(photo.id)}
+                >
+                  Approve
                 </button>
               )}
               <button

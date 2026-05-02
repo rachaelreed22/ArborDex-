@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
+import { apiUrl } from "../utils/apiUrl";
 import "./AddTree.css";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-  || (import.meta.env.DEV ? '' : 'https://arbordex.onrender.com');
-
-const apiUrl = (path) => `${API_BASE_URL}${path}`;
 
 export default function AddTree() {
   const { mode } = useMode();

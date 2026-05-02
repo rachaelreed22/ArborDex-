@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl } from '../utils/apiUrl';
 import './AskArborAI.css';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-  || (import.meta.env.DEV ? '' : 'https://arbordex.onrender.com');
-
-const apiUrl = (path) => `${API_BASE_URL}${path}`;
 
 function createMessage({
   role,

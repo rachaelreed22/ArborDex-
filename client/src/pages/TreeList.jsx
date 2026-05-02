@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
+import { apiUrl } from "../utils/apiUrl";
 import "./TreeList.css";
 
 export default function TreeList() {
@@ -18,7 +19,7 @@ export default function TreeList() {
 
   async function fetchListings() {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/listings`);
+      const res = await fetch(apiUrl("/api/listings"));
       const data = await res.json();
       setListings(data || []);
     } catch (err) {
@@ -38,7 +39,7 @@ export default function TreeList() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this tree? This cannot be undone.")) return;
     try {
-      await fetch(`/api/listings/${id}`, { method: "DELETE" });
+      await fetch(apiUrl(`/api/listings/${id}`), { method: "DELETE" });
       fetchListings();
     } catch (err) {
       console.error("Error deleting listing:", err);
