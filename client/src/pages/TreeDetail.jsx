@@ -141,10 +141,20 @@ export default function TreeDetail() {
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this tree? This cannot be undone.")) return;
     try {
-      await fetch(apiUrl(`/api/listings/${id}`), { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/listings/${id}`), {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "");
+        throw new Error(errorText || `Delete failed (${res.status})`);
+      }
+
       navigate("/");
     } catch (err) {
       console.error("Error deleting listing:", err);
+      alert(`Delete failed: ${err.message || "Unknown error"}`);
     }
   };
 

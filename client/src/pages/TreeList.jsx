@@ -12,6 +12,7 @@ export default function TreeList() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchListings();
@@ -36,13 +37,29 @@ export default function TreeList() {
     );
   });
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (event, id) => {
+    event.stopPropagation();
     if (!window.confirm("Delete this tree? This cannot be undone.")) return;
+
+    setDeletingId(id);
+
     try {
-      await fetch(apiUrl(`/api/listings/${id}`), { method: "DELETE" });
-      fetchListings();
+      const res = await fetch(apiUrl(`/api/listings/${id}`), {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "");
+        throw new Error(errorText || `Delete failed (${res.status})`);
+      }
+
+      setListings((prev) => prev.filter((listing) => listing.id !== id));
     } catch (err) {
       console.error("Error deleting listing:", err);
+      alert(`Delete failed: ${err.message || "Unknown error"}`);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -154,9 +171,10 @@ export default function TreeList() {
 
                   <button
                     className="btn btn-sm btn-danger"
-                    onClick={() => handleDelete(tree.id)}
+                    disabled={deletingId === tree.id}
+                    onClick={(event) => handleDelete(event, tree.id)}
                   >
-                    Delete
+                    {deletingId === tree.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
               )}

@@ -277,14 +277,19 @@ api.delete('/listings/:id', async (req, res) => {
       .delete()
       .eq('listing_id', id);
 
-    const { error } = await writeSupabase
+    const { data: deletedRows, error } = await writeSupabase
       .from('listings')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
 
     if (error) {
       console.error("Error deleting listing:", error);
       return res.status(500).json({ error: "Failed to delete listing" });
+    }
+
+    if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
+      return res.status(404).json({ error: "Listing not found" });
     }
 
     res.json({ success: true });
