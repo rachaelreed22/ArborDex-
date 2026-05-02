@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AskArborAI.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? '' : 'https://arbordex.onrender.com');
+
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
+
 function createMessage({
   role,
   text = '',
@@ -143,7 +148,7 @@ export default function AskArborAI() {
       formData.append('question', trimmedQuestion);
       uploadedPhotos.forEach((file) => formData.append('photos', file));
 
-      const response = await fetch('/api/ai/ask-arborai', {
+      const response = await fetch(apiUrl('/api/ai/ask-arborai'), {
         method: 'POST',
         body: formData,
       });
@@ -264,7 +269,7 @@ export default function AskArborAI() {
 
     setIsListingsLoading(true);
     try {
-      const response = await fetch('/api/listings');
+      const response = await fetch(apiUrl('/api/listings'));
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to load trees');
@@ -300,7 +305,7 @@ export default function AskArborAI() {
     setActionError('');
 
     try {
-      const response = await fetch('/api/ai/attach-scan-to-tree', {
+      const response = await fetch(apiUrl('/api/ai/attach-scan-to-tree'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
