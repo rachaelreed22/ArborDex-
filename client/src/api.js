@@ -8,7 +8,7 @@ export const getTrees = () => api.get('/trees').then(r => r.data);
 export const getTree = (id) => api.get(`/trees/${id}`).then(r => r.data);
 export const createTree = (data) => api.post('/trees', data).then(r => r.data);
 export const updateTree = (id, data) => api.put(`/trees/${id}`, data).then(r => r.data);
-export const deleteTree = (id) => api.delete(`/trees/${id}`).then(r => r.data);
+export const deleteTree = (id) => api.delete(`/listings/${id}`).then(r => r.data);
 export const getQRCode = (id) => api.get(`/trees/${id}/qrcode`).then(r => r.data);
 
 export const getPhotos = (treeId) => api.get(`/trees/${treeId}/photos`).then(r => r.data);
