@@ -59,8 +59,12 @@ If more information is needed:
 
 Your knowledge base is restricted to the trees, shrubs, and woody plants found in Southwestern Missouri.`;
 
-const writeSupabase =
+const HAS_SERVICE_ROLE = Boolean(
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const writeSupabase =
+  HAS_SERVICE_ROLE
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     : supabase;
 
@@ -71,7 +75,11 @@ const api = express.Router();
 
 // Health check
 api.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'ArborDex API' });
+  res.json({
+    status: 'ok',
+    service: 'ArborDex API',
+    has_service_role: HAS_SERVICE_ROLE,
+  });
 });
 
 // ===========================
@@ -270,6 +278,12 @@ api.patch('/listings/:id', async (req, res) => {
 // ===========================
 api.delete('/listings/:id', async (req, res) => {
   try {
+    if (!HAS_SERVICE_ROLE) {
+      return res.status(500).json({
+        error: 'SUPABASE_SERVICE_ROLE_KEY is missing on backend; delete is disabled.',
+      });
+    }
+
     const id = decodeURIComponent((req.params.id || '').toString()).trim();
 
     if (!id) {
@@ -318,7 +332,9 @@ api.delete('/listings/:id', async (req, res) => {
     }
 
     if (postDeleteCheck) {
-      return res.status(500).json({ error: 'Delete reported success but listing still exists' });
+      return res.status(500).json({
+        error: 'Delete reported success but listing still exists. Verify Supabase RLS and service-role key configuration.',
+      });
     }
 
     res.json({ success: true });
