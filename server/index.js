@@ -276,24 +276,34 @@ api.delete('/listings/:id', async (req, res) => {
       return res.status(400).json({ error: 'Listing id is required' });
     }
 
+    const { data: existingListing, error: readError } = await writeSupabase
+      .from('listings')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (readError) {
+      console.error('Error checking listing before delete:', readError);
+      return res.status(500).json({ error: 'Failed to verify listing before delete' });
+    }
+
+    if (!existingListing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
     await writeSupabase
       .from('photos')
       .delete()
       .eq('listing_id', id);
 
-    const { data: deletedRows, error } = await writeSupabase
+    const { error } = await writeSupabase
       .from('listings')
       .delete()
-      .eq('id', id)
-      .select('id');
+      .eq('id', id);
 
     if (error) {
       console.error("Error deleting listing:", error);
       return res.status(500).json({ error: "Failed to delete listing" });
-    }
-
-    if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
-      return res.status(404).json({ error: "Listing not found" });
     }
 
     res.json({ success: true });
