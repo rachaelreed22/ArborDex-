@@ -18,7 +18,7 @@ export default function TreeList() {
 
   async function fetchListings() {
     try {
-      const res = await fetch("/api/listings");
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/listings`);
       const data = await res.json();
       setListings(data || []);
     } catch (err) {
