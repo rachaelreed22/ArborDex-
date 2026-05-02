@@ -347,6 +347,102 @@ api.delete('/listings/:id', async (req, res) => {
 // ===========================
 // PHOTO ROUTES
 // ===========================
+api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
+  try {
+    const listingId = decodeURIComponent((req.body?.listingId || '').toString()).trim();
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (!listingId) {
+      return res.status(400).json({ error: 'listingId is required' });
+    }
+
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'At least one photo is required' });
+    }
+
+    const { data: listing, error: listingError } = await writeSupabase
+      .from('listings')
+      .select('id')
+      .eq('id', listingId)
+      .maybeSingle();
+
+    if (listingError) {
+      console.error('Error verifying listing for upload:', listingError);
+      return res.status(500).json({ error: 'Failed to verify listing' });
+    }
+
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
+    const { data: existingMain, error: existingMainError } = await writeSupabase
+      .from('photos')
+      .select('id')
+      .eq('listing_id', listingId)
+      .eq('is_main', true)
+      .limit(1);
+
+    if (existingMainError) {
+      console.error('Error checking existing main photo:', existingMainError);
+      return res.status(500).json({ error: 'Failed to validate existing photos' });
+    }
+
+    const hasMainPhoto = Array.isArray(existingMain) && existingMain.length > 0;
+    const staffUploaded = req.body?.staffUploaded === true || req.body?.staffUploaded === 'true';
+    const firstName = (req.body?.firstName || '').toString().trim();
+    const lastName = (req.body?.lastName || '').toString().trim();
+    const email = (req.body?.email || '').toString().trim();
+    const photographer = [firstName, lastName].filter(Boolean).join(' ') || email || null;
+
+    const insertRows = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const safeName = (file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${listingId}/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeName}`;
+
+      const { error: uploadError } = await writeSupabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype || 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('Photo storage upload error:', uploadError);
+        return res.status(500).json({ error: 'Failed to upload photo to storage' });
+      }
+
+      const { data: publicUrlData } = writeSupabase.storage
+        .from(PHOTO_BUCKET)
+        .getPublicUrl(filePath);
+
+      insertRows.push({
+        listing_id: listingId,
+        url: publicUrlData?.publicUrl,
+        is_main: !hasMainPhoto && i === 0,
+        staff_uploaded: staffUploaded,
+        photographer,
+      });
+    }
+
+    const { data: savedPhotos, error: insertError } = await writeSupabase
+      .from('photos')
+      .insert(insertRows)
+      .select('*');
+
+    if (insertError) {
+      console.error('Photo DB insert error:', insertError);
+      return res.status(500).json({ error: 'Failed to save photo records' });
+    }
+
+    return res.status(201).json({ uploaded: savedPhotos?.length || 0, photos: savedPhotos || [] });
+  } catch (err) {
+    console.error('Unexpected photos/upload error:', err);
+    return res.status(500).json({ error: 'Unexpected upload error' });
+  }
+});
+
 api.post('/photos', async (req, res) => {
   try {
     const { listingId, url, photographer, staffUploaded } = req.body;

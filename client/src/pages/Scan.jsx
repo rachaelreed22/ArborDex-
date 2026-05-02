@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import jsQR from "jsqr";
 import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
+import { apiUrl } from "../utils/apiUrl";
 import "./Scan.css";
 
 export default function Scan() {
@@ -90,7 +91,7 @@ export default function Scan() {
 
       if (code) {
         const scanned = code.data.trim();
-        const match = scanned.match(/\/tree\/(\d+)/);
+        const match = scanned.match(/\/(?:tag|tree)\/([A-Za-z0-9-]+)/);
 
         if (match) {
           const id = match[1];
@@ -183,13 +184,14 @@ export default function Scan() {
     });
 
     try {
-      const res = await fetch("http://localhost:5000/photos/upload", {
+      const res = await fetch(apiUrl("/api/photos/upload"), {
         method: "POST",
         body: formData,
       });
 
       if (!res.ok) {
-        alert("Upload failed.");
+        const err = await res.json().catch(() => null);
+        alert(err?.error || "Upload failed.");
         return;
       }
 
