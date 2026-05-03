@@ -13,14 +13,29 @@
   padding: 0;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html,
+body {
+  background: linear-gradient(135deg, #31bb4a, #b1b53b);
+}
+
 /* ===========================
    GLOBAL TYPOGRAPHY
    =========================== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #31bb4a, #b1b53b);
   color: #5e381a;
-  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
 }
 
 a {

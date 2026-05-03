@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
@@ -30,6 +30,16 @@ export default function Scan() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("");
+
+  useEffect(() => {
+    if (!modalOpen || modalType !== "qr") return undefined;
+
+    const timer = setTimeout(() => {
+      setModalOpen(false);
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [modalOpen, modalType]);
 
   /* CAMERA + QR LOGIC */
   const startCamera = async (callback) => {
@@ -208,12 +218,12 @@ export default function Scan() {
     if (!modalOpen) return null;
 
     return (
-      <div className="modal-overlay">
-        <div className="modal-card">
+      <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
           {modalType === "qr" && (
             <>
-              <h3>Scan Required</h3>
-              <p>Please scan the tree’s QR code before uploading photos.</p>
+              <h3>Identify This Tree</h3>
+              <p>Scan my QR code.</p>
               <button className="btn btn-primary" onClick={() => setModalOpen(false)}>
                 OK
               </button>
@@ -377,7 +387,6 @@ export default function Scan() {
 
         <button
           className="btn btn-primary upload-btn"
-          disabled={selectedPhotos.length === 0}
           onClick={handleUploadClick}
         >
           Upload Photos
