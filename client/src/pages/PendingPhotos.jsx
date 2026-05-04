@@ -72,7 +72,7 @@ export default function PendingPhotos() {
       <div className="tree-list-topbar">
         <h1>Pending Photos</h1>
         <div className="topbar-actions">
-          <button className="btn btn-secondary" onClick={() => navigate("/")}>
+          <button className="btn btn-secondary" onClick={() => navigate("/database")}>
             Back to Database
           </button>
         </div>

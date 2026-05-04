@@ -169,7 +169,7 @@ export default function TreeDetail() {
         throw new Error(errorText || `Delete failed (${res.status})`);
       }
 
-      navigate("/");
+      navigate("/database");
     } catch (err) {
       console.error("Error deleting listing:", err);
       alert(`Delete failed: ${err.message || "Unknown error"}`);
@@ -299,6 +299,9 @@ export default function TreeDetail() {
             <p className="empty-hint">Check back soon — a staff member can register it.</p>
           )}
           <button className="btn btn-secondary" onClick={() => navigate("/")}>
+            Home
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate("/database")}>
             Back to Database
           </button>
         </div>
@@ -331,6 +334,9 @@ return (
     {/* Top bar */}
     <div className="tree-detail-topbar">
       <button className="btn btn-secondary" onClick={() => navigate("/")}>
+        Home
+      </button>
+      <button className="btn btn-secondary" onClick={() => navigate("/database")}>
         ← Back to Database
       </button>
       {isStaff && !editing && (

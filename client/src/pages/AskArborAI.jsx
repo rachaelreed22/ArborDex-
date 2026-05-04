@@ -401,7 +401,12 @@ export default function AskArborAI() {
     <main className="ask-page">
       <section className="ask-shell">
         <header className="ask-header">
-          <h1>Ask ArborAI</h1>
+          <div className="ask-header-row">
+            <h1>Ask ArborAI</h1>
+            <button className="btn btn-secondary" onClick={() => navigate("/")}>
+              Home
+            </button>
+          </div>
           <p>Snap, upload, ask, and get species plus health diagnostics instantly.</p>
         </header>
 

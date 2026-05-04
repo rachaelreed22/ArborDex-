@@ -116,7 +116,7 @@ export default function AddTree() {
         <div className="empty-state">
           <div className="icon">🔒</div>
           <p>Staff access required to add trees.</p>
-          <button className="btn btn-primary" onClick={() => navigate("/")}>
+          <button className="btn btn-primary" onClick={() => navigate("/database")}>
             Back to Database
           </button>
         </div>
@@ -386,7 +386,7 @@ export default function AddTree() {
         await appendDiagnosticsLog(data.id);
         navigate(`/listing/${data.id}`);
       } else {
-        navigate("/");
+        navigate("/database");
       }
     } catch (err) {
       setError(err?.message || "Something went wrong. Please try again.");
@@ -448,7 +448,7 @@ export default function AddTree() {
       if (data?.id) {
         navigate(`/listing/${data.id}`);
       } else {
-        navigate("/");
+        navigate("/database");
       }
     } catch (err) {
       console.error("Error creating listing:", err);
@@ -461,7 +461,7 @@ export default function AddTree() {
 
   return (
     <div className="page addtree-page">
-      <button className="btn btn-secondary back-btn" onClick={() => navigate("/")}>
+      <button className="btn btn-secondary back-btn" onClick={() => navigate("/database")}>
         ← Back to Database
       </button>
 
@@ -591,7 +591,7 @@ export default function AddTree() {
               ? "Add to Database"
               : "🌳 Add Tree"}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate("/")}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate("/database")}>
             Cancel
           </button>
         </div>

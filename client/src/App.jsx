@@ -17,6 +17,7 @@ import TreeDetail from './pages/TreeDetail';
 import Scan from './pages/Scan';
 import AskArborAI from './pages/AskArborAI';
 import PendingPhotos from './pages/PendingPhotos';
+import Home from './pages/Home';
 
 function Layout() {
   return (
@@ -33,7 +34,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<TreeList />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/database" element={<TreeList />} />
             <Route path="/add" element={<AddTree />} />
             <Route path="/listing/:id" element={<TreeDetail />} />
             <Route path="/tag/:id" element={<TreeDetail />} />

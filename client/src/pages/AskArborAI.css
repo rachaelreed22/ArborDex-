@@ -22,6 +22,13 @@
   color: #f6fff1;
 }
 
+.ask-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .ask-header h1 {
   margin: 0;
   font-size: 1.4rem;
@@ -323,6 +330,11 @@
 @media (max-width: 800px) {
   .ask-page {
     padding: 0.6rem;
+  }
+
+  .ask-header-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .ask-chat {

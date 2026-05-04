@@ -108,6 +108,13 @@ export default function TreeList() {
         />
 
         <div className="topbar-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate("/")}
+          >
+            Home
+          </button>
+
           {isStaff && (
             <>
               <button

@@ -37,6 +37,10 @@ export default function Navbar() {
 
       <nav className={menuOpen ? 'nav-open' : ''}>
         <NavLink to="/" end onClick={() => setMenuOpen(false)}>
+          Home
+        </NavLink>
+
+        <NavLink to="/database" onClick={() => setMenuOpen(false)}>
           Tree Database
         </NavLink>
 
