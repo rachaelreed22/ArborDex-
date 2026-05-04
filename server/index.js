@@ -181,23 +181,40 @@ api.get('/', (req, res) => {
 // ===========================
 api.post("/listings", upload.array("photos"), async (req, res) => {
   try {
-    const { title, description, location, latitude, longitude } = req.body;
+    const {
+      title,
+      description,
+      location,
+      latitude,
+      longitude,
+      qr_mode,
+      scanned_qr_url,
+      custom_id,
+    } = req.body;
+
+    const qrMode = qr_mode === 'scanned' ? 'scanned' : 'generate';
+    const customId = (custom_id || '').toString().trim();
+    const scannedQrUrl = (scanned_qr_url || '').toString().trim();
 
     if (!title || !title.toString().trim()) {
       return res.status(400).json({ error: "Tree name is required" });
     }
 
+    const listingInsert = {
+      title: title.toString().trim(),
+      description,
+      location,
+      latitude: latitude ? Number(latitude) : null,
+      longitude: longitude ? Number(longitude) : null,
+    };
+
+    if (qrMode === 'scanned' && customId) {
+      listingInsert.id = customId;
+    }
+
     const { data: listing, error: insertError } = await writeSupabase
       .from("listings")
-      .insert([
-        {
-          title: title.toString().trim(),
-          description,
-          location,
-          latitude: latitude ? Number(latitude) : null,
-          longitude: longitude ? Number(longitude) : null,
-        }
-      ])
+      .insert([listingInsert])
       .select()
       .single();
 
@@ -209,13 +226,31 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
       });
     }
 
-    const generateQrForTree = require("./utils/generateQrForTree");
-    const qrUrl = await generateQrForTree(listing.id);
+    let qrUrl = null;
+    if (qrMode === 'generate') {
+      const generateQrForTree = require("./utils/generateQrForTree");
+      qrUrl = await generateQrForTree(listing.id);
 
-    await writeSupabase
-      .from("listings")
-      .update({ qr_url: qrUrl })
-      .eq("id", listing.id);
+      await writeSupabase
+        .from("listings")
+        .update({ qr_url: qrUrl })
+        .eq("id", listing.id);
+    } else {
+      qrUrl = scannedQrUrl || null;
+      if (!qrUrl) {
+        const appBaseUrl = (process.env.APP_BASE_URL || '').toString().trim();
+        if (appBaseUrl) {
+          qrUrl = `${appBaseUrl.replace(/\/$/, '')}/tag/${listing.id}`;
+        }
+      }
+
+      if (qrUrl) {
+        await writeSupabase
+          .from("listings")
+          .update({ qr_url: qrUrl })
+          .eq("id", listing.id);
+      }
+    }
 
     if (req.files && req.files.length > 0) {
       for (let i = 0; i < req.files.length; i++) {
@@ -251,6 +286,68 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
   } catch (err) {
     console.error("Unexpected error:", err);
     res.status(500).json({ error: "Unexpected error" });
+  }
+});
+
+// ===========================
+// DIAGNOSTICS LOGS
+// ===========================
+api.get('/listings/:id/diagnostics-logs', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const { data, error } = await writeSupabase
+      .from('tree_diagnostics_logs')
+      .select('id, listing_id, run_at, source, diagnostics, notes, created_at')
+      .eq('listing_id', id)
+      .order('run_at', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Diagnostics log fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch diagnostics logs' });
+    }
+
+    return res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error('Unexpected diagnostics log fetch error:', err);
+    return res.status(500).json({ error: 'Unexpected diagnostics log fetch error' });
+  }
+});
+
+api.post('/listings/:id/diagnostics-log', requireStaffAction, async (req, res) => {
+  try {
+    const listingId = req.params.id;
+    const {
+      run_at,
+      source,
+      diagnostics,
+      notes,
+    } = req.body || {};
+
+    const payload = {
+      listing_id: listingId,
+      run_at: run_at || new Date().toISOString(),
+      source: (source || 'manual').toString(),
+      diagnostics: diagnostics || {},
+      notes: notes || null,
+    };
+
+    const { data, error } = await writeSupabase
+      .from('tree_diagnostics_logs')
+      .insert([payload])
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Diagnostics log insert error:', error);
+      return res.status(500).json({ error: 'Failed to store diagnostics log' });
+    }
+
+    return res.status(201).json(data);
+  } catch (err) {
+    console.error('Unexpected diagnostics log insert error:', err);
+    return res.status(500).json({ error: 'Unexpected diagnostics log insert error' });
   }
 });
 

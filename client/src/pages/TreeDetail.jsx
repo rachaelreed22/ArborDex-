@@ -35,6 +35,7 @@ export default function TreeDetail() {
   const [diagnostics, setDiagnostics] = useState(null);
   const [diagnosticsStatus, setDiagnosticsStatus] = useState("idle");
   const [diagnosticsError, setDiagnosticsError] = useState("");
+  const [diagnosticsLogs, setDiagnosticsLogs] = useState([]);
 
   const isStaff = mode === "dex";
   console.log("LISTING DATA:", listing);
@@ -46,6 +47,8 @@ export default function TreeDetail() {
     async function loadTreeData() {
       const data = await fetchListing();
       if (!data || cancelled) return;
+
+      await fetchDiagnosticsLogs();
 
       const hasDescription = typeof data.description === "string" && data.description.trim().length > 0;
       const shouldRunDiagnostics = mode === "dex" || !hasDescription;
@@ -96,6 +99,20 @@ export default function TreeDetail() {
       return null;
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchDiagnosticsLogs() {
+    try {
+      const res = await fetch(apiUrl(`/api/listings/${id}/diagnostics-logs`));
+      if (!res.ok) {
+        setDiagnosticsLogs([]);
+        return;
+      }
+      const data = await res.json();
+      setDiagnosticsLogs(Array.isArray(data) ? data : []);
+    } catch {
+      setDiagnosticsLogs([]);
     }
   }
 
@@ -498,6 +515,26 @@ return (
   <section className="card section-description">
     <h2>About This Tree</h2>
     <p>{aboutThisTreeText}</p>
+  </section>
+)}
+
+{diagnosticsLogs.length > 0 && (
+  <section className="card section-description">
+    <h2>Diagnostics Log</h2>
+    {diagnosticsLogs.map((entry) => (
+      <div key={entry.id} style={{ marginBottom: "0.9rem" }}>
+        <p>
+          <strong>Run At:</strong>{" "}
+          {entry.run_at ? new Date(entry.run_at).toLocaleString() : "Unknown"}
+        </p>
+        {entry.source && (
+          <p>
+            <strong>Source:</strong> {entry.source}
+          </p>
+        )}
+        {entry.notes && <p>{entry.notes}</p>}
+      </div>
+    ))}
   </section>
 )}
 

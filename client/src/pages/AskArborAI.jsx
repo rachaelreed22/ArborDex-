@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMode } from '../context/ModeContext';
 import { apiUrl } from '../utils/apiUrl';
 import './AskArborAI.css';
 
@@ -28,6 +29,8 @@ function createMessage({
 }
 
 export default function AskArborAI() {
+  const { mode } = useMode();
+  const isStaff = mode === 'dex';
   const navigate = useNavigate();
   const [messages, setMessages] = useState([
     createMessage({
@@ -71,6 +74,10 @@ export default function AskArborAI() {
     setQuestion('');
     setUploadedPhotos([]);
     setActionError('');
+    setListings([]);
+    setIsListingsLoading(false);
+    setIsActionLoading(false);
+    setIsLoading(false);
     setAttachDialogOpen(false);
     setSelectedListingId('');
     setAttachMessageId('');
@@ -241,6 +248,8 @@ export default function AskArborAI() {
           title,
           description,
           photos: Array.isArray(message.photoFiles) ? message.photoFiles : [],
+          scanPayload: message.scanPayload,
+          assistantText: message.text,
         },
       },
     });
@@ -417,20 +426,24 @@ export default function AskArborAI() {
 
                 {message.showActions && !message.actionCompleted && (
                   <div className="ask-action-row">
-                    <button
-                      type="button"
-                      onClick={() => createTreeFromScan(message)}
-                      disabled={isActionLoading}
-                    >
-                      Create Tree From This Scan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openAttachDialog(message)}
-                      disabled={isActionLoading}
-                    >
-                      Attach to Existing Tree
-                    </button>
+                    {isStaff && (
+                      <button
+                        type="button"
+                        onClick={() => createTreeFromScan(message)}
+                        disabled={isActionLoading}
+                      >
+                        Create Tree From This Scan
+                      </button>
+                    )}
+                    {isStaff && (
+                      <button
+                        type="button"
+                        onClick={() => openAttachDialog(message)}
+                        disabled={isActionLoading}
+                      >
+                        Attach to Existing Tree
+                      </button>
+                    )}
                     <button type="button" onClick={resetConversation} disabled={isActionLoading}>
                       Start Over
                     </button>
