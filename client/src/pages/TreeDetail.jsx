@@ -14,6 +14,7 @@ export default function TreeDetail() {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [regeneratingQr, setRegeneratingQr] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -225,6 +226,26 @@ export default function TreeDetail() {
     }
   };
 
+  const handleRegenerateQr = async () => {
+    setRegeneratingQr(true);
+
+    try {
+      const res = await fetch(apiUrl(`/qr/generate/${id}`));
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error || `QR regeneration failed (${res.status})`);
+      }
+
+      await fetchListing();
+    } catch (err) {
+      console.error("Error regenerating QR:", err);
+      alert(`QR regeneration failed: ${err.message || "Unknown error"}`);
+    } finally {
+      setRegeneratingQr(false);
+    }
+  };
+
   // Real AI handler: calls /api/ai/tree with listing + question
   const handleAskAi = async (e) => {
     e.preventDefault();
@@ -347,6 +368,13 @@ return (
           >
             {diagnosticsChipLabel}
           </span>
+          <button
+            className="btn btn-secondary"
+            onClick={handleRegenerateQr}
+            disabled={regeneratingQr}
+          >
+            {regeneratingQr ? "Regenerating QR..." : "Regenerate QR"}
+          </button>
           <button className="btn btn-secondary" onClick={() => setEditing(true)}>
             ✏️ Edit Details
           </button>

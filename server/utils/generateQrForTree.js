@@ -9,10 +9,15 @@ const writeSupabase =
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     : supabase;
 
+function buildFallbackQrUrl(qrData) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(qrData)}`;
+}
+
 async function generateQrForTree(id) {
   try {
     const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
     const qrData = `${appBaseUrl.replace(/\/$/, "")}/tag/${id}`;
+    const fallbackQrUrl = buildFallbackQrUrl(qrData);
 
     const qrBuffer = await QRCode.toBuffer(qrData, {
       type: "png",
@@ -30,8 +35,18 @@ async function generateQrForTree(id) {
       });
 
     if (uploadError) {
-      console.error("QR upload error:", uploadError);
-      return null;
+      console.error("QR upload error, using fallback URL:", uploadError);
+      const { error: fallbackUpdateError } = await writeSupabase
+        .from("listings")
+        .update({ qr_url: fallbackQrUrl })
+        .eq("id", id);
+
+      if (fallbackUpdateError) {
+        console.error("Fallback QR DB update error:", fallbackUpdateError);
+        return null;
+      }
+
+      return fallbackQrUrl;
     }
 
     const { data: publicUrlData } = writeSupabase.storage
@@ -46,8 +61,19 @@ async function generateQrForTree(id) {
       .eq("id", id);
 
     if (updateError) {
-      console.error("QR DB update error:", updateError);
-      return null;
+      console.error("QR DB update error, using fallback URL:", updateError);
+
+      const { error: fallbackUpdateError } = await writeSupabase
+        .from("listings")
+        .update({ qr_url: fallbackQrUrl })
+        .eq("id", id);
+
+      if (fallbackUpdateError) {
+        console.error("Fallback QR DB update error:", fallbackUpdateError);
+        return null;
+      }
+
+      return fallbackQrUrl;
     }
 
     return qrUrl;
