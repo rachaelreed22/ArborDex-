@@ -42,6 +42,11 @@ export default function Home() {
             <button className="btn btn-secondary" onClick={openStaffTools}>
               Staff Tools
             </button>
+            {isStaff && (
+              <button className="btn btn-secondary" onClick={() => navigate("/park-report")}>
+                Pilot Report
+              </button>
+            )}
           </div>
         </section>
       </section>

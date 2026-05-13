@@ -18,6 +18,7 @@ import Scan from './pages/Scan';
 import AskArborAI from './pages/AskArborAI';
 import PendingPhotos from './pages/PendingPhotos';
 import Home from './pages/Home';
+import ParkReport from './pages/ParkReport';
 
 function Layout() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/tag/:id" element={<TreeDetail />} />
             <Route path="/scan" element={<Scan />} />
             <Route path="/ask-arborai" element={<AskArborAI />} />
+            <Route path="/park-report" element={<ParkReport />} />
             <Route path="/pending-photos" element={<PendingPhotos />} />
           </Route>
 

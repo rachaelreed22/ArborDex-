@@ -6,6 +6,27 @@ import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
 import "./TreeDetail.css";
 
+function extractHistoricalUsesFromLogs(logs) {
+  if (!Array.isArray(logs)) return "";
+
+  for (const entry of logs) {
+    let diagnosticsObj = entry?.diagnostics;
+
+    if (typeof diagnosticsObj === "string") {
+      try {
+        diagnosticsObj = JSON.parse(diagnosticsObj);
+      } catch {
+        diagnosticsObj = null;
+      }
+    }
+
+    const text = (diagnosticsObj?.uses_throughout_history || "").toString().trim();
+    if (text) return text;
+  }
+
+  return "";
+}
+
 export default function TreeDetail() {
   const { id } = useParams();
   const { mode } = useMode();
@@ -49,10 +70,11 @@ export default function TreeDetail() {
       const data = await fetchListing();
       if (!data || cancelled) return;
 
-      await fetchDiagnosticsLogs();
+      const logs = await fetchDiagnosticsLogs();
 
       const hasDescription = typeof data.description === "string" && data.description.trim().length > 0;
-      const shouldRunDiagnostics = mode === "dex" || !hasDescription;
+      const hasHistoricalUses = Boolean(extractHistoricalUsesFromLogs(logs));
+      const shouldRunDiagnostics = mode === "dex" || !hasDescription || !hasHistoricalUses;
 
       if (!shouldRunDiagnostics) {
         setDiagnostics(null);
@@ -108,12 +130,15 @@ export default function TreeDetail() {
       const res = await fetch(apiUrl(`/api/listings/${id}/diagnostics-logs`));
       if (!res.ok) {
         setDiagnosticsLogs([]);
-        return;
+        return [];
       }
       const data = await res.json();
-      setDiagnosticsLogs(Array.isArray(data) ? data : []);
+      const logs = Array.isArray(data) ? data : [];
+      setDiagnosticsLogs(logs);
+      return logs;
     } catch {
       setDiagnosticsLogs([]);
+      return [];
     }
   }
 
@@ -338,6 +363,10 @@ export default function TreeDetail() {
     (typeof listing.description === "string" && listing.description.trim()) ||
     (typeof diagnostics?.public_about === "string" && diagnostics.public_about.trim()) ||
     "";
+  const usesThroughoutHistoryText =
+    (typeof diagnostics?.uses_throughout_history === "string" && diagnostics.uses_throughout_history.trim()) ||
+    extractHistoricalUsesFromLogs(diagnosticsLogs) ||
+    "";
   const diagnosticsChipLabel = !isStaff
     ? "Public mode"
     : diagnosticsStatus === "loading"
@@ -549,6 +578,13 @@ return (
   <section className="card section-description">
     <h2>About This Tree</h2>
     <p>{aboutThisTreeText}</p>
+  </section>
+)}
+
+{usesThroughoutHistoryText && (
+  <section className="card section-history">
+    <h2>Uses Throughout History</h2>
+    <p>{usesThroughoutHistoryText}</p>
   </section>
 )}
 

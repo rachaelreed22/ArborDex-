@@ -61,6 +61,12 @@ export default function Navbar() {
           Ask ArborAI
         </NavLink>
 
+        {isStaff && (
+          <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
+            Park Report
+          </NavLink>
+        )}
+
         <button className="mode-toggle" onClick={() => { toggleMode(); setMenuOpen(false); }}>
           {toggleLabel}
         </button>

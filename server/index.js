@@ -125,6 +125,20 @@ function stripOptionalPhotographerFields(row) {
   return legacyRow;
 }
 
+function parseDateBoundary(value, endOfDay = false) {
+  const raw = (value || '').toString().trim();
+  if (!raw) return null;
+
+  const maybeDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+  const isoText = maybeDateOnly
+    ? `${raw}${endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z'}`
+    : raw;
+
+  const parsed = new Date(isoText);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
 async function sendWinnerNotificationEmail({ toEmail, listingTitle, listingId }) {
   if (!mailTransporter) {
     console.warn('Winner email not sent: SMTP configuration is missing.');
@@ -842,6 +856,183 @@ api.delete('/photos/:id', requireStaffAction, async (req, res) => {
 });
 
 // ===========================
+// AI ROUTE - Park Impact Report (Dex only)
+// ===========================
+api.post('/ai/park-report', requireStaffAction, async (req, res) => {
+  try {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    const park = (req.body?.park || '').toString().trim();
+    const startDateInput = (req.body?.startDate || req.body?.start_date || '').toString().trim();
+    const endDateInput = (req.body?.endDate || req.body?.end_date || '').toString().trim();
+    const adminGoal = (req.body?.adminGoal || '').toString().trim();
+
+    const startIso = parseDateBoundary(startDateInput, false);
+    const endIso = parseDateBoundary(endDateInput, true);
+
+    if ((startDateInput && !startIso) || (endDateInput && !endIso)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD or a valid ISO date.' });
+    }
+
+    if (startIso && endIso && new Date(startIso) > new Date(endIso)) {
+      return res.status(400).json({ error: 'startDate must be on or before endDate.' });
+    }
+
+    let listingsQuery = writeSupabase
+      .from('listings')
+      .select(`
+        id,
+        title,
+        description,
+        location,
+        latitude,
+        longitude,
+        qr_url,
+        created_at,
+        photos(id, winner, staff_uploaded, created_at)
+      `)
+      .order('created_at', { ascending: true });
+
+    if (park) {
+      listingsQuery = listingsQuery.ilike('location', `%${park}%`);
+    }
+    if (startIso) {
+      listingsQuery = listingsQuery.gte('created_at', startIso);
+    }
+    if (endIso) {
+      listingsQuery = listingsQuery.lte('created_at', endIso);
+    }
+
+    const { data: listings, error: listingsError } = await listingsQuery;
+    if (listingsError) {
+      console.error('Park report listing query error:', listingsError);
+      return res.status(500).json({ error: 'Failed to fetch listings for report' });
+    }
+
+    const rows = Array.isArray(listings) ? listings : [];
+    const photoRows = rows.flatMap((row) => (Array.isArray(row.photos) ? row.photos : []));
+
+    const metrics = {
+      total_trees: rows.length,
+      trees_with_qr: rows.filter((row) => Boolean(row.qr_url)).length,
+      trees_with_photos: rows.filter((row) => Array.isArray(row.photos) && row.photos.length > 0).length,
+      total_photos: photoRows.length,
+      pending_photo_submissions: photoRows.filter((photo) => photo?.staff_uploaded === false).length,
+      winner_photos: photoRows.filter((photo) => Boolean(photo?.winner)).length,
+      geotagged_trees: rows.filter((row) => row?.latitude !== null || row?.longitude !== null).length,
+      trees_missing_location: rows.filter((row) => !(row?.location || '').toString().trim()).length,
+    };
+
+    const treeSnapshot = rows.slice(0, 150).map((row) => ({
+      id: row.id,
+      title: row.title || 'Untitled Tree',
+      location: row.location || 'Unknown',
+      created_at: row.created_at || null,
+      has_qr: Boolean(row.qr_url),
+      photo_count: Array.isArray(row.photos) ? row.photos.length : 0,
+      has_winner_photo: Array.isArray(row.photos) ? row.photos.some((photo) => Boolean(photo?.winner)) : false,
+      pending_photos: Array.isArray(row.photos)
+        ? row.photos.filter((photo) => photo?.staff_uploaded === false).length
+        : 0,
+    }));
+
+    const scopeLabel = park || 'All tracked locations';
+    const dateLabel = startDateInput || endDateInput
+      ? `${startDateInput || 'beginning'} to ${endDateInput || 'present'}`
+      : 'All-time records';
+
+    const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
+
+You are generating a municipal-grade performance report for ArborTag/ArborDex pilot evaluation.
+Return ONLY valid JSON (no markdown) with these exact keys:
+- title: string
+- executive_summary: string
+- kpi_snapshot: array of objects with keys metric, value, why_it_matters
+- public_impact: array of strings
+- operational_impact: array of strings
+- budget_justification: array of strings
+- arborist_service_value: array of strings
+- pilot_period_findings: array of strings
+- next_period_recommendations: array of strings
+- cautionary_notes: array of strings
+
+The output should help a mayor or city administrator justify park expenses and contracted arbor services using the supplied data only.`;
+
+    const reportContext = {
+      scope: scopeLabel,
+      timeframe: dateLabel,
+      admin_goal: adminGoal || 'Evaluate pilot period value and budget justification for parks and arbor services.',
+      metrics,
+      tree_snapshot: treeSnapshot,
+    };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: `Generate a park impact report from this JSON context:\n${JSON.stringify(reportContext)}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 1800,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Park report OpenAI error:', errText);
+      return res.status(502).json({ error: 'AI report request failed' });
+    }
+
+    const aiData = await response.json();
+    const rawContent = aiData?.choices?.[0]?.message?.content || '{}';
+
+    let parsedReport;
+    try {
+      parsedReport = JSON.parse(rawContent);
+    } catch {
+      parsedReport = {
+        title: 'ArborTag Pilot Impact Report',
+        executive_summary: 'ArborAI returned an invalid format for this request.',
+        kpi_snapshot: [],
+        public_impact: [],
+        operational_impact: [],
+        budget_justification: [],
+        arborist_service_value: [],
+        pilot_period_findings: [],
+        next_period_recommendations: [],
+        cautionary_notes: ['AI response format was invalid. Re-run report generation.'],
+      };
+    }
+
+    return res.json({
+      generated_at: new Date().toISOString(),
+      filters: {
+        park: park || null,
+        start_date: startDateInput || null,
+        end_date: endDateInput || null,
+      },
+      metrics,
+      report: parsedReport,
+    });
+  } catch (err) {
+    console.error('Unexpected park report error:', err);
+    return res.status(500).json({ error: 'Unexpected park report error' });
+  }
+});
+
+// ===========================
 // AI ROUTE — Analyze Tree (Dex mode diagnostics)
 // ===========================
 api.get('/ai/analyze-tree/:id', async (req, res) => {
@@ -929,6 +1120,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
           'Re-run diagnostics shortly for detailed species and health insights.'
         ],
         public_about: publicAbout,
+        uses_throughout_history: `${speciesGuess} has long served communities through shade, habitat support, and practical material use. Historical uses vary by species, but many trees have been valued for woodworking, fuel, and cultural gathering places.`,
         photo_summaries: photosToAnalyze.map((_, index) => `Photo ${index + 1}: AI photo insight is temporarily unavailable due to service limits.`),
         alerts: ['Diagnostics temporarily unavailable'],
         health_score: 'Pending',
@@ -957,6 +1149,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 - summary: string (overall assessment of the tree)
 - recommendations: array of strings (actionable care steps)
 - public_about: string (friendly, upbeat, non-technical public-facing description with one fun fact)
+- uses_throughout_history: string (public-facing historical or cultural uses of this species, concise and educational)
 - photo_summaries: array of strings (one brief observation per photo)
 - alerts: array of strings (urgent issues, empty array if none)
 - health_score: string (e.g. "Good", "Fair", "Poor", or a score like "7/10")
@@ -1073,6 +1266,13 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
     }
 
     diagnostics.public_about = publicAbout;
+
+    let historicalUses = (diagnostics?.uses_throughout_history || '').toString().trim();
+    if (!historicalUses) {
+      historicalUses = `${speciesName} and related tree species have historically supported communities with shade, wildlife habitat, and wood resources. In parks, they also play social and educational roles by connecting visitors to local ecology.`;
+    }
+
+    diagnostics.uses_throughout_history = historicalUses;
 
     await persistPublicAboutIfMissing(publicAbout);
 
