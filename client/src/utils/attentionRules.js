@@ -1,56 +1,45 @@
-function normalizeHealthScore(healthScore) {
-  if (typeof healthScore === "number" && Number.isFinite(healthScore)) {
-    return healthScore;
-  }
-
-  if (typeof healthScore !== "string") {
-    return null;
-  }
-
-  const value = healthScore.trim().toLowerCase();
-  if (!value) return null;
-
-  if (value.includes("poor")) return 35;
-  if (value.includes("fair")) return 60;
-  if (value.includes("good")) return 85;
-
-  const fractionMatch = value.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
-  if (fractionMatch) {
-    const numerator = Number(fractionMatch[1]);
-    const denominator = Number(fractionMatch[2]);
-    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0) {
-      return (numerator / denominator) * 100;
-    }
-  }
-
-  const percentMatch = value.match(/(\d+(?:\.\d+)?)\s*%/);
-  if (percentMatch) {
-    return Number(percentMatch[1]);
-  }
-
-  const numberMatch = value.match(/(\d+(?:\.\d+)?)/);
-  if (!numberMatch) return null;
-
-  const parsed = Number(numberMatch[1]);
-  if (!Number.isFinite(parsed)) return null;
-  return parsed <= 10 ? parsed * 10 : parsed;
-}
-
+// Returns true if the AI diagnostics indicate any issue requiring human attention.
+// Signals: non-empty alerts, non-empty risk_flags, poor/fair health, or moderate+ urgency.
 export function getNeedsAttention(diagnostics) {
   if (!diagnostics) return false;
 
-  const healthScore = normalizeHealthScore(diagnostics.health_score);
-  const confidenceRaw = (diagnostics.confidence || diagnostics.confidence_rating || "")
+  // Any alerts or risk flags from the AI → needs attention
+  if (Array.isArray(diagnostics.alerts) && diagnostics.alerts.length > 0) return true;
+
+  const riskFlags = Array.isArray(diagnostics.risk_flags)
+    ? diagnostics.risk_flags
+    : Array.isArray(diagnostics.riskFlags)
+      ? diagnostics.riskFlags
+      : Array.isArray(diagnostics.potential_risks)
+        ? diagnostics.potential_risks
+        : Array.isArray(diagnostics.potentialRisks)
+          ? diagnostics.potentialRisks
+          : [];
+  if (riskFlags.length > 0) return true;
+
+  // Urgency level of Moderate, High, or Critical → needs attention
+  const urgency = (diagnostics.urgency_level || diagnostics.urgencyLevel || "")
     .toString()
     .trim()
     .toLowerCase();
+  if (urgency.includes("moderate") || urgency.includes("high") || urgency.includes("critical")) return true;
 
-  const hasAlerts = Array.isArray(diagnostics.alerts) && diagnostics.alerts.length > 0;
-  const hasRiskFlags = Array.isArray(diagnostics.risk_flags) && diagnostics.risk_flags.length > 0;
-  const weakHealth = healthScore !== null && healthScore < 70;
-  const unknownSpecies = !diagnostics.species || diagnostics.species.toLowerCase() === "unknown";
-  const lowConfidence = !confidenceRaw || confidenceRaw.includes("low");
-  const missingEnvironment = !diagnostics.environment;
+  // Health score of Poor or Fair → needs attention
+  const health = (diagnostics.health_score || "").toString().trim().toLowerCase();
+  if (health.includes("poor") || health.includes("fair")) return true;
 
-  return hasAlerts || hasRiskFlags || weakHealth || unknownSpecies || lowConfidence || missingEnvironment;
+  // Numeric health score below 70
+  const fractionMatch = health.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+  if (fractionMatch) {
+    const score = (Number(fractionMatch[1]) / Number(fractionMatch[2])) * 100;
+    if (Number.isFinite(score) && score < 70) return true;
+  }
+  const percentMatch = health.match(/^(\d+(?:\.\d+)?)%?$/);
+  if (percentMatch) {
+    const score = Number(percentMatch[1]);
+    const normalized = score <= 10 ? score * 10 : score;
+    if (Number.isFinite(normalized) && normalized < 70) return true;
+  }
+
+  return false;
 }

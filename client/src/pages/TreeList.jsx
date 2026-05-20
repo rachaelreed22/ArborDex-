@@ -20,11 +20,11 @@ export default function TreeList() {
     fetchListings();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch attention flags when switching into Dex/staff mode
+  // Re-fetch attention flags when mode changes
   useEffect(() => {
-    if (isStaff && listings.length > 0) {
+    if (listings.length > 0) {
       fetchAttentionFlags(listings);
-    } else if (!isStaff) {
+    } else {
       setAttentionByListingId({});
     }
   }, [isStaff]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -39,7 +39,7 @@ export default function TreeList() {
       const nextListings = Array.isArray(data) ? data : [];
       setListings(nextListings);
 
-      if (isStaff && nextListings.length > 0) {
+      if (nextListings.length > 0) {
         await fetchAttentionFlags(nextListings);
       } else {
         setAttentionByListingId({});
@@ -53,38 +53,32 @@ export default function TreeList() {
 
   async function fetchAttentionFlags(listingRows) {
     try {
-      const entries = await Promise.all(
-        listingRows.map(async (listing) => {
-          try {
-            const res = await fetch(apiUrl(`/api/listings/${listing.id}/diagnostics-logs`), {
-              cache: "no-store",
-              headers: { Accept: "application/json" },
-            });
+      const listingIds = listingRows.map((l) => l.id);
+      const res = await fetch(apiUrl("/api/diagnostics-logs/bulk-latest"), {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ listingIds }),
+      });
 
-            if (!res.ok) {
-              return [listing.id, false];
-            }
+      if (!res.ok) {
+        setAttentionByListingId({});
+        return;
+      }
 
-            const logs = await res.json().catch(() => []);
-            const latest = Array.isArray(logs) ? logs[0] : null;
-            let diagnostics = latest?.diagnostics || null;
+      const latestByListing = await res.json().catch(() => ({}));
 
-            if (typeof diagnostics === "string") {
-              try {
-                diagnostics = JSON.parse(diagnostics);
-              } catch {
-                diagnostics = null;
-              }
-            }
+      const flags = {};
+      for (const listing of listingRows) {
+        const listingId = (listing?.id ?? "").toString();
+        let diagnostics = latestByListing[listingId] ?? null;
+        if (typeof diagnostics === "string") {
+          try { diagnostics = JSON.parse(diagnostics); } catch { diagnostics = null; }
+        }
+        flags[listingId] = getNeedsAttention(diagnostics);
+      }
 
-            return [listing.id, getNeedsAttention(diagnostics)];
-          } catch {
-            return [listing.id, false];
-          }
-        })
-      );
-
-      setAttentionByListingId(Object.fromEntries(entries));
+      setAttentionByListingId(flags);
     } catch (err) {
       console.error("Error fetching diagnostics attention flags:", err);
       setAttentionByListingId({});
@@ -140,7 +134,7 @@ export default function TreeList() {
 
       setListings(nextListings);
 
-      if (isStaff && nextListings.length > 0) {
+      if (nextListings.length > 0) {
         await fetchAttentionFlags(nextListings);
       } else {
         setAttentionByListingId({});
@@ -217,7 +211,8 @@ export default function TreeList() {
           const main = photos.find((p) => p.is_main) || photos[0] || null;
           const winner = photos.find((p) => p.winner);
           const hasQR = Boolean(tree.qr_url);
-          const needsAttention = isStaff && Boolean(attentionByListingId[tree.id]);
+          const treeIdKey = (tree?.id ?? "").toString();
+          const needsAttention = Boolean(attentionByListingId[treeIdKey]);
 
           return (
             <div

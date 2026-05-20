@@ -41,24 +41,55 @@ const ASK_ARBORAI_BUCKET_CANDIDATES = Array.from(
   )
 );
 
-const ARBORAI_REGIONAL_SCOPE = `You are ArborAI, a diagnostic and identification assistant specialized in trees and woody plants found in the Southwestern region of Missouri, USA. All identifications, health assessments, care recommendations, and species suggestions must be grounded in the ecology, climate, soil types, and native or commonly planted species of this region.
+const ARBORAI_REGIONAL_SCOPE = `You are ArborAI, an identification and diagnostics assistant for trees, shrubs, houseplants, and common garden plants found in Southwestern Missouri, USA. Your knowledge must reflect the ecology, climate, soils, pests, and species typical of this region.
 
-When identifying a tree:
-- Prioritize species native or naturalized in Southwestern Missouri.
-- Only consider out-of-region species if the photos strongly support it.
-- Use local climate patterns, pests, diseases, and soil conditions in all reasoning.
-- If a species is unlikely for this region, state that clearly and provide the closest regional match.
+ArborAI has two output modes depending on the user context:
 
-When giving care recommendations:
-- Use Missouri-specific timing for pruning, fertilization, watering, and disease management.
-- Reference pests and diseases common to Missouri (for example: emerald ash borer, oak wilt, cedar-apple rust).
-- Avoid recommending treatments or species that do not apply to this region.
+1. Forestry Mode (Professional / Municipal Use)
+Triggered when the user is staff, logged in, or viewing an official tree record.
 
-If more information is needed:
-- Ask for additional photos (bark, leaves, buds, branching pattern, full tree silhouette).
-- Suggest angles that are most useful for Missouri species differentiation.
+Tone:
+Professional, concise, field-ready, TRAQ-aligned.
 
-Your knowledge base is restricted to the trees, shrubs, and woody plants found in Southwestern Missouri.`;
+Required Structure:
+- Overall Condition — 1-2 sentences
+- Key Observations — bullet points
+- Potential Risks — bullet points
+- Recommended Actions — bullet points
+- Urgency Level — Low / Moderate / High / Critical
+
+Rules:
+- No speculation beyond what is visible
+- No emotional language
+- No homeowner-style advice
+- Keep under 180 words
+- Use Missouri-specific pests/diseases (EAB, oak wilt, cedar-apple rust, etc.)
+
+2. Public Mode (Visitors, Homeowners, Gardeners)
+Triggered when the user is not logged in, scans a QR code, or uploads a plant photo.
+
+Tone:
+Friendly, simple, educational, encouraging.
+
+Required Structure:
+- Likely Identification
+- Key Features Noticed
+- Care or Interesting Facts
+- Common Issues to Watch For
+
+Rules:
+- Avoid technical jargon
+- No TRAQ-style risk language
+- No municipal liability language
+- Keep under 150 words
+- Include indoor/outdoor garden plants, ornamentals, and houseplants
+- Provide Missouri-appropriate care guidance
+
+General Identification Rules (Both Modes):
+- Prioritize species native or common in SW Missouri
+- Only suggest out-of-region species if the photo strongly supports it
+- If uncertain, provide the closest likely match and ask for specific additional photos
+- Never give medical, legal, or chemical-treatment advice`;
 
 const HAS_SERVICE_ROLE = Boolean(
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -326,6 +357,44 @@ api.get('/listings/:id/diagnostics-logs', async (req, res) => {
   } catch (err) {
     console.error('Unexpected diagnostics log fetch error:', err);
     return res.status(500).json({ error: 'Unexpected diagnostics log fetch error' });
+  }
+});
+
+// Bulk endpoint: returns latest diagnostics row per listing_id for an array of ids
+// POST /api/diagnostics-logs/bulk-latest  body: { listingIds: [1, 2, ...] }
+api.post('/diagnostics-logs/bulk-latest', async (req, res) => {
+  try {
+    const { listingIds } = req.body || {};
+    if (!Array.isArray(listingIds) || listingIds.length === 0) {
+      return res.json({});
+    }
+
+    const { data, error } = await writeSupabase
+      .from('tree_diagnostics_logs')
+      .select('listing_id, diagnostics, run_at, created_at')
+      .in('listing_id', listingIds)
+      .order('run_at', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Bulk diagnostics fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch diagnostics logs' });
+    }
+
+    // Keep only the first (latest) row per listing_id
+    const latestByListing = {};
+    for (const row of (data || [])) {
+      const key = (row?.listing_id ?? '').toString();
+      if (!key) continue;
+      if (!(key in latestByListing)) {
+        latestByListing[key] = row.diagnostics;
+      }
+    }
+
+    return res.json(latestByListing);
+  } catch (err) {
+    console.error('Unexpected bulk diagnostics fetch error:', err);
+    return res.status(500).json({ error: 'Unexpected error' });
   }
 });
 
@@ -1153,6 +1222,22 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
       }
     }
 
+    async function persistDiagnosticsLog(diagnosticsPayload, notes = null) {
+      const { error: logError } = await writeSupabase
+        .from('tree_diagnostics_logs')
+        .insert([{
+          listing_id: id,
+          run_at: new Date().toISOString(),
+          source: 'ai-auto',
+          diagnostics: diagnosticsPayload || {},
+          notes,
+        }]);
+
+      if (logError) {
+        console.error('[analyze-tree] Failed to persist diagnostics log:', logError);
+      }
+    }
+
     const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
 
   Analyze the provided tree data and photos and respond ONLY with a valid JSON object (no markdown, no explanation) with these exact keys:
@@ -1163,11 +1248,12 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 - public_about: string (friendly, upbeat, non-technical public-facing description with one fun fact)
 - uses_throughout_history: string (public-facing historical or cultural uses of this species, concise and educational)
 - photo_summaries: array of strings (one brief observation per photo)
-- alerts: array of strings (urgent issues, empty array if none)
+- alerts: array of strings (urgent issues requiring human attention, empty array if none)
 - health_score: string (e.g. "Good", "Fair", "Poor", or a score like "7/10")
 - confidence: string (e.g. "High", "Medium", "Low")
-  - risk_flags: array of strings (potential hazards, empty array if none)
-  IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-empty items, in the same order as the provided photos.`;
+- risk_flags: array of strings (potential hazards or structural concerns, empty array if none)
+- urgency_level: string (one of: "Low", "Moderate", "High", "Critical" — overall urgency for human follow-up)
+IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-empty items, in the same order as the provided photos.`;
 
     const userContent = [
       {
@@ -1213,6 +1299,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
       );
 
       await persistPublicAboutIfMissing(fallbackDiagnostics.public_about);
+      await persistDiagnosticsLog(fallbackDiagnostics, isRateLimit ? 'OpenAI rate limit fallback' : 'OpenAI provider error fallback');
       return res.status(200).json(fallbackDiagnostics);
     }
 
@@ -1226,6 +1313,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
       console.error("Failed to parse AI JSON:", raw);
       const fallbackDiagnostics = buildFallbackDiagnostics('The AI response format was invalid for this request.');
       await persistPublicAboutIfMissing(fallbackDiagnostics.public_about);
+      await persistDiagnosticsLog(fallbackDiagnostics, 'AI JSON parse fallback');
       return res.status(200).json(fallbackDiagnostics);
     }
 
@@ -1290,16 +1378,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 
     // Persist diagnostics to logs so the tree list can read attention flags
     // Must await so the record exists before the client navigates back to tree list
-    const { error: logError } = await writeSupabase
-      .from('tree_diagnostics_logs')
-      .insert([{
-        listing_id: id,
-        run_at: new Date().toISOString(),
-        source: 'ai-auto',
-        diagnostics: diagnostics,
-        notes: null,
-      }]);
-    if (logError) console.error('[analyze-tree] Failed to persist diagnostics log:', logError);
+    await persistDiagnosticsLog(diagnostics, null);
 
     res.json(diagnostics);
 
