@@ -60,7 +60,6 @@ export default function TreeDetail() {
   const [diagnosticsLogs, setDiagnosticsLogs] = useState([]);
 
   const isStaff = mode === "dex";
-  console.log("LISTING DATA:", listing);
   const needsAttention = isStaff && getNeedsAttention(diagnostics);
 
   useEffect(() => {
@@ -147,7 +146,6 @@ export default function TreeDetail() {
     try {
       setDiagnosticsStatus("loading");
       setDiagnosticsError("");
-      console.log("[TreeDetail] fetching diagnostics for tree", id);
       const res = await fetch(apiUrl(`/api/ai/analyze-tree/${id}`));
       if (!res.ok) {
         setDiagnostics(null);
@@ -157,7 +155,6 @@ export default function TreeDetail() {
         return;
       }
       const data = await res.json();
-      console.log("[TreeDetail] diagnostics loaded", data);
       setDiagnostics(data);
       setDiagnosticsStatus("success");
     } catch (err) {

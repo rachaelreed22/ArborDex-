@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
+import { useAuth } from '../context/AuthContext';
 import logo from '../assets/ArborTag-Logo.png';
 import './Navbar.css';
 
 export default function Navbar() {
   const { mode, toggleMode } = useMode();
+  const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -16,6 +18,11 @@ export default function Navbar() {
   const handleNav = (path) => {
     navigate(path);
     setMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    handleNav('/');
   };
 
   return (
@@ -61,10 +68,15 @@ export default function Navbar() {
           Ask ArborAI
         </NavLink>
 
-        {isStaff && (
-          <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
-            Park Report
-          </NavLink>
+        {isAuthenticated && (
+          <>
+            <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
+              Park Report
+            </NavLink>
+            <button className="logout-btn" onClick={handleLogout}>
+              Sign Out
+            </button>
+          </>
         )}
 
         <button className="mode-toggle" onClick={() => { toggleMode(); setMenuOpen(false); }}>

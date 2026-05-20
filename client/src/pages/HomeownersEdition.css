@@ -1,0 +1,52 @@
+.homeowners-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 2rem 1rem;
+}
+
+.homeowners-container {
+  width: 100%;
+  max-width: 600px;
+}
+
+.coming-soon-card {
+  background: linear-gradient(135deg, #f0f8f0 0%, #e8f2e8 100%);
+  border: 2px solid #c8dcc8;
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  box-shadow: 0 16px 30px rgba(29, 65, 29, 0.1);
+}
+
+.coming-soon-card h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  color: #1d411d;
+}
+
+.coming-soon-text {
+  margin: 0 0 1.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  color: #2e5e2e;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.coming-soon-description {
+  margin: 0;
+  font-size: 1rem;
+  color: #4f694f;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .homeowners-page {
+    min-height: calc(100vh - 60px);
+  }
+
+  .coming-soon-card {
+    padding: 2rem 1.5rem;
+  }
+}

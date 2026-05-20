@@ -54,9 +54,10 @@
   color: #fff;
 }
 
-/* — Nav Buttons (Scan QR, Mode Toggle) — */
+/* — Nav Buttons (Scan QR, Mode Toggle, Logout) — */
 .navbar .scan-qr-btn,
-.navbar .mode-toggle {
+.navbar .mode-toggle,
+.navbar .logout-btn {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #c8e6c9;
@@ -69,9 +70,20 @@
 }
 
 .navbar .scan-qr-btn:hover,
-.navbar .mode-toggle:hover {
+.navbar .mode-toggle:hover,
+.navbar .logout-btn:hover {
   background: rgba(255, 255, 255, 0.25);
   color: #fff;
+}
+
+.navbar .logout-btn {
+  background: rgba(204, 68, 68, 0.15);
+  border-color: rgba(204, 68, 68, 0.3);
+}
+
+.navbar .logout-btn:hover {
+  background: rgba(204, 68, 68, 0.3);
+  color: #ffcccc;
 }
 
 /* — Hamburger (hidden on desktop) — */
@@ -134,7 +146,8 @@
 
   .navbar nav a,
   .navbar .scan-qr-btn,
-  .navbar .mode-toggle {
+  .navbar .mode-toggle,
+  .navbar .logout-btn {
     width: 100%;
     text-align: left;
     padding: 0.7rem 1rem;
@@ -145,7 +158,8 @@
   .navbar nav a:hover,
   .navbar nav a.active,
   .navbar .scan-qr-btn:hover,
-  .navbar .mode-toggle:hover {
+  .navbar .mode-toggle:hover,
+  .navbar .logout-btn:hover {
     background: rgba(255, 255, 255, 0.15);
   }
 

@@ -1043,7 +1043,6 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
     }
 
     const id = req.params.id;
-    console.log(`[AI Diagnostics] analyze-tree hit for listing ${id}`);
 
     const { data: listing, error } = await writeSupabase
       .from('listings')
@@ -1071,7 +1070,7 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
     const uniquePhotos = Array.from(new Map(photos.map((p) => [p.url, p])).values());
 
     if (uniquePhotos.length === 0) {
-      return res.json({
+      const noPhotoDiagnostics = {
         species: 'Unknown',
         environment: null,
         summary: 'No photos available for diagnostics.',
@@ -1082,7 +1081,20 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
         health_score: '0/10',
         confidence: 'Low',
         risk_flags: []
-      });
+      };
+
+      const { error: noPhotoLogError } = await writeSupabase
+        .from('tree_diagnostics_logs')
+        .insert([{
+          listing_id: id,
+          run_at: new Date().toISOString(),
+          source: 'ai-auto',
+          diagnostics: noPhotoDiagnostics,
+          notes: 'No photos available',
+        }]);
+      if (noPhotoLogError) console.error('[analyze-tree] Failed to persist no-photo diagnostics log:', noPhotoLogError);
+
+      return res.json(noPhotoDiagnostics);
     }
 
     // Analyze all photos when fewer than 3 exist, else analyze at least 3 (up to 5).
@@ -1275,6 +1287,19 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
     diagnostics.uses_throughout_history = historicalUses;
 
     await persistPublicAboutIfMissing(publicAbout);
+
+    // Persist diagnostics to logs so the tree list can read attention flags
+    // Must await so the record exists before the client navigates back to tree list
+    const { error: logError } = await writeSupabase
+      .from('tree_diagnostics_logs')
+      .insert([{
+        listing_id: id,
+        run_at: new Date().toISOString(),
+        source: 'ai-auto',
+        diagnostics: diagnostics,
+        notes: null,
+      }]);
+    if (logError) console.error('[analyze-tree] Failed to persist diagnostics log:', logError);
 
     res.json(diagnostics);
 

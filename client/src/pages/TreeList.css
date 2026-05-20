@@ -70,6 +70,15 @@
   transform: translateY(-3px);
 }
 
+.tree-card-needs-attention {
+  border: 2px solid #b62e2e;
+  box-shadow: 0 0 0 2px rgba(182, 46, 46, 0.2), 0 8px 18px rgba(120, 20, 20, 0.2);
+}
+
+.tree-card-needs-attention .tree-card-title {
+  color: #7b1f1f;
+}
+
 .tree-card-photo-wrapper {
   position: relative;
   height: 160px;
@@ -136,6 +145,19 @@
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
   color: #555;
+}
+
+.attention-pill {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.45rem 0 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fde4e4;
+  color: #8f1d1d;
+  border: 1px solid #e7a6a6;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .tree-card-meta {

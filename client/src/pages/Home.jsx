@@ -1,55 +1,75 @@
 import { useNavigate } from "react-router-dom";
-import { useMode } from "../context/ModeContext";
 import "./Home.css";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { mode, toggleMode } = useMode();
-  const isStaff = mode === "dex";
-
-  const openStaffTools = () => {
-    if (!isStaff) {
-      toggleMode();
-    }
-    navigate("/database");
-  };
 
   return (
     <main className="home-page">
-      <section className="home-hero" role="img" aria-label="Forest path in autumn">
-        <div className="home-hero-overlay">
-          <h1 className="home-hero-title">Welcome to ArborTag</h1>
-        </div>
-      </section>
+      <div className="home-background">
+        <div className="home-overlay"></div>
+        
+        <div className="home-container">
+          <div className="home-content-box">
+            <h1 className="home-title">Welcome to ArborTag</h1>
+            <p className="home-subheading">Choose your path</p>
 
-      <section className="home-content">
-        <p className="home-subheading">Scan a tree and get to know its story.</p>
-
-        <section className="home-action-card" aria-label="Quick actions">
-          <h2 className="home-card-title">Start With a Simple Action</h2>
-          <p className="home-card-subtitle">Choose what you want to do.</p>
-
-          <div className="home-actions">
-            <button className="btn btn-primary" onClick={() => navigate("/scan")}>
-              Scan a Tree
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate("/ask-arborai")}>
-              Ask ArborAI
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate("/database")}>
-              View Tree Database
-            </button>
-            <button className="btn btn-secondary" onClick={openStaffTools}>
-              Staff Tools
-            </button>
-            {isStaff && (
-              <button className="btn btn-secondary" onClick={() => navigate("/park-report")}>
-                Pilot Report
+            {/* Visit Your Park - Section 1 */}
+            <section className="home-section">
+              <h2 className="section-title">🌳 Visit Your Park</h2>
+              <button 
+                className="btn btn-park"
+                onClick={() => navigate("/parks")}
+                aria-label="Visit Your Park"
+              >
+                View Tree Database
               </button>
-            )}
+            </section>
+
+            {/* Ask ArborAI and Scan A Tree - Horizontal */}
+            <section className="home-section home-section-duo">
+              <button 
+                className="btn btn-arborai"
+                onClick={() => navigate("/ask-arborai")}
+                aria-label="Ask ArborAI"
+              >
+                🤖 Ask ArborAI
+              </button>
+              <button 
+                className="btn btn-scan"
+                onClick={() => navigate("/scan")}
+                aria-label="Scan a Tree"
+              >
+                📱 Scan A Tree
+              </button>
+            </section>
+
+            {/* Admin Dashboard - Section 2 */}
+            <section className="home-section">
+              <h2 className="section-title">⚙️ Admin Dashboard</h2>
+              <button 
+                className="btn btn-admin"
+                onClick={() => navigate("/admin")}
+                aria-label="Admin Dashboard"
+              >
+                Staff Access
+              </button>
+            </section>
+
+            {/* Homeowner's Edition - Section 3 */}
+            <section className="home-section">
+              <h2 className="section-title">🏡 Homeowner's Edition</h2>
+              <button 
+                className="btn btn-homeowner"
+                onClick={() => navigate("/homeowners")}
+                aria-label="Homeowner's Edition"
+              >
+                Coming Soon
+              </button>
+            </section>
           </div>
-        </section>
-      </section>
+        </div>
+      </div>
     </main>
   );
 }

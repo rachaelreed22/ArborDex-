@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import { API_BASE_URL, apiUrl } from "../utils/apiUrl";
+import { getNeedsAttention } from "../utils/attentionRules";
 import "./TreeList.css";
 
 export default function TreeList() {
@@ -13,10 +14,20 @@ export default function TreeList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [attentionByListingId, setAttentionByListingId] = useState({});
 
   useEffect(() => {
     fetchListings();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch attention flags when switching into Dex/staff mode
+  useEffect(() => {
+    if (isStaff && listings.length > 0) {
+      fetchAttentionFlags(listings);
+    } else if (!isStaff) {
+      setAttentionByListingId({});
+    }
+  }, [isStaff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchListings() {
     try {
@@ -25,11 +36,59 @@ export default function TreeList() {
         headers: { Accept: "application/json" },
       });
       const data = await res.json();
-      setListings(data || []);
+      const nextListings = Array.isArray(data) ? data : [];
+      setListings(nextListings);
+
+      if (isStaff && nextListings.length > 0) {
+        await fetchAttentionFlags(nextListings);
+      } else {
+        setAttentionByListingId({});
+      }
     } catch (err) {
       console.error("Error fetching listings:", err);
+      setAttentionByListingId({});
     }
     setLoading(false);
+  }
+
+  async function fetchAttentionFlags(listingRows) {
+    try {
+      const entries = await Promise.all(
+        listingRows.map(async (listing) => {
+          try {
+            const res = await fetch(apiUrl(`/api/listings/${listing.id}/diagnostics-logs`), {
+              cache: "no-store",
+              headers: { Accept: "application/json" },
+            });
+
+            if (!res.ok) {
+              return [listing.id, false];
+            }
+
+            const logs = await res.json().catch(() => []);
+            const latest = Array.isArray(logs) ? logs[0] : null;
+            let diagnostics = latest?.diagnostics || null;
+
+            if (typeof diagnostics === "string") {
+              try {
+                diagnostics = JSON.parse(diagnostics);
+              } catch {
+                diagnostics = null;
+              }
+            }
+
+            return [listing.id, getNeedsAttention(diagnostics)];
+          } catch {
+            return [listing.id, false];
+          }
+        })
+      );
+
+      setAttentionByListingId(Object.fromEntries(entries));
+    } catch (err) {
+      console.error("Error fetching diagnostics attention flags:", err);
+      setAttentionByListingId({});
+    }
   }
 
   const filtered = listings.filter((tree) => {
@@ -80,6 +139,12 @@ export default function TreeList() {
       const nextListings = Array.isArray(verifyData) ? verifyData : [];
 
       setListings(nextListings);
+
+      if (isStaff && nextListings.length > 0) {
+        await fetchAttentionFlags(nextListings);
+      } else {
+        setAttentionByListingId({});
+      }
 
       if (nextListings.some((listing) => listing.id === normalizedId)) {
         throw new Error("Delete completed but listing still exists in backend response");
@@ -152,11 +217,12 @@ export default function TreeList() {
           const main = photos.find((p) => p.is_main) || photos[0] || null;
           const winner = photos.find((p) => p.winner);
           const hasQR = Boolean(tree.qr_url);
+          const needsAttention = isStaff && Boolean(attentionByListingId[tree.id]);
 
           return (
             <div
               key={tree.id}
-              className="tree-card"
+              className={`tree-card ${needsAttention ? "tree-card-needs-attention" : ""}`}
               onClick={() => navigate(`/listing/${tree.id}`)}
             >
               {/* Photo */}
@@ -183,6 +249,10 @@ export default function TreeList() {
               {/* Info */}
               <div className="tree-card-info">
                 <h3 className="tree-card-title">{tree.title || "Untitled"}</h3>
+
+                {needsAttention && (
+                  <p className="attention-pill">Needs human inspection</p>
+                )}
 
                 {tree.location && (
                   <p className="tree-card-location">📍 {tree.location}</p>

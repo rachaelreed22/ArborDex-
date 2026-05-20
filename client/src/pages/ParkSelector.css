@@ -1,0 +1,126 @@
+.park-selector-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.park-selector-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 16px 30px rgba(29, 65, 29, 0.14);
+  padding: 2.5rem;
+}
+
+.park-selector-card h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  color: #1d411d;
+}
+
+.park-selector-subtitle {
+  margin: 0 0 2rem;
+  color: #4f694f;
+  font-size: 1rem;
+}
+
+.parks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.park-card {
+  background: linear-gradient(135deg, #f0f8f0 0%, #e8f2e8 100%);
+  border: 2px solid #c8dcc8;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.park-card:hover {
+  border-color: #1d411d;
+  background: linear-gradient(135deg, #e8f2e8 0%, #dceae8 100%);
+  box-shadow: 0 12px 30px rgba(29, 65, 29, 0.2);
+  transform: translateY(-4px);
+}
+
+.park-card:focus-visible {
+  outline: 3px solid #1d411d;
+  outline-offset: 2px;
+}
+
+.park-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+  color: #1d411d;
+}
+
+.park-card p {
+  margin: 0;
+  color: #4f694f;
+  font-size: 0.9rem;
+}
+
+.park-card-arrow {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 1.5rem;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.park-card:hover .park-card-arrow {
+  opacity: 1;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  border-left: 4px solid #c33;
+}
+
+.no-parks {
+  text-align: center;
+  color: #4f694f;
+  padding: 3rem 1rem;
+  font-size: 1.1rem;
+}
+
+.queen-note {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f0f8f0;
+  border-left: 4px solid #1d411d;
+  color: #1d411d;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+  color: #4f694f;
+}
+
+@media (max-width: 700px) {
+  .park-selector-card {
+    padding: 1.5rem;
+  }
+
+  .parks-grid {
+    grid-template-columns: 1fr;
+  }
+}
