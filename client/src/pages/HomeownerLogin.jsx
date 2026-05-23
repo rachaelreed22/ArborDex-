@@ -9,6 +9,7 @@ export default function HomeownerLogin() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -50,15 +51,26 @@ export default function HomeownerLogin() {
 
           <div>
             <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="password">Password</label>
-            <input
-              id="password"
-              className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <div className="relative flex items-center">
+              <input
+                id="password"
+                className="homeowner-input w-full rounded-md px-3 py-2 pr-10 outline-none"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                className="absolute right-2 text-xl text-[#1d411d] hover:opacity-70 transition disabled:opacity-50"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
 
           <label className="flex items-start gap-2 text-sm homeowner-subtext cursor-pointer">

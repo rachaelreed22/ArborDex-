@@ -18,50 +18,18 @@ export function HomeownerAuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  async function fetchHomeownerProfile(userId) {
-    if (!userId) {
-      setProfile(null);
-      return null;
-    }
-
-    const profilePromise = supabase
-      .from('homeowner_profiles')
-      .select('id, user_id, tier, stripe_customer_id')
-      .eq('user_id', userId)
-      .single();
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('homeowner_profiles query timed out')), 5000)
-    );
-
-    const { data, error: profileError } = await Promise.race([profilePromise, timeoutPromise]);
-
-    if (profileError && profileError.code !== 'PGRST116') {
-      throw profileError;
-    }
-
-    setProfile(data || null);
-    return data || null;
-  }
-
   async function ensureHomeownerProfile(userId) {
     if (!userId) return null;
 
-    let foundProfile = await fetchHomeownerProfile(userId);
-    if (foundProfile) return foundProfile;
+    const fallbackProfile = {
+      id: null,
+      user_id: userId,
+      tier: 'free',
+      stripe_customer_id: null,
+    };
 
-    const { error: upsertError } = await supabase
-      .from('homeowner_profiles')
-      .upsert(
-        [{
-          user_id: userId,
-          tier: 'free',
-        }],
-        { onConflict: 'user_id' }
-      );
-
-    if (upsertError) throw upsertError;
-    return fetchHomeownerProfile(userId);
+    setProfile(fallbackProfile);
+    return fallbackProfile;
   }
 
   useEffect(() => {
@@ -118,8 +86,10 @@ export function HomeownerAuthProvider({ children }) {
 
   async function signup({ email, password }) {
     setError('');
+    const normalizedEmail = (email || '').toString().trim().toLowerCase();
+
     const { data, error: signupError } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
@@ -128,21 +98,28 @@ export function HomeownerAuthProvider({ children }) {
       },
     });
 
-    if (signupError) throw signupError;
+    if (signupError) {
+      const normalizedMessage = (signupError.message || '').toLowerCase();
+      if (normalizedMessage.includes('already registered')) {
+        // If Auth already has this email, try logging in so returning users are not blocked.
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (signInError || !signInData?.user) {
+          throw new Error('An account with this email already exists. Try Sign in or Reset Password.');
+        }
+
+        await ensureHomeownerProfile(signInData.user.id);
+        return signInData;
+      }
+
+      throw signupError;
+    }
 
     const authUser = data?.user;
     if (authUser) {
-      const { error: upsertError } = await supabase
-        .from('homeowner_profiles')
-        .upsert(
-          [{
-            user_id: authUser.id,
-            tier: 'free',
-          }],
-          { onConflict: 'user_id' }
-        );
-      if (upsertError) throw upsertError;
-
       await ensureHomeownerProfile(authUser.id);
     }
 
@@ -151,7 +128,8 @@ export function HomeownerAuthProvider({ children }) {
 
   async function login(email, password) {
     setError('');
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = (email || '').toString().trim().toLowerCase();
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (signInError) throw signInError;
 
     return data;
@@ -197,7 +175,7 @@ export function HomeownerAuthProvider({ children }) {
     resetPassword,
     updatePassword,
     getAccessToken,
-    refreshProfile: () => fetchHomeownerProfile(user?.id),
+    refreshProfile: () => ensureHomeownerProfile(user?.id),
   }), [user, profile, loading, error]);
 
   return <HomeownerAuthContext.Provider value={value}>{children}</HomeownerAuthContext.Provider>;

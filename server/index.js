@@ -495,17 +495,18 @@ async function requireHomeownerAuth(req, res, next) {
 }
 
 async function getHomeownerTierAndCount(userId) {
-  const { data: profile, error: profileError } = await writeSupabase
+  const { data: profiles, error: profileError } = await writeSupabase
     .from('homeowner_profiles')
     .select('tier')
     .eq('user_id', userId)
-    .single();
+    .limit(1);
 
-  if (profileError || !profile) {
-    return { error: profileError || new Error('Homeowner profile not found') };
+  if (profileError) {
+    console.error('Homeowner profile lookup error, defaulting to free tier:', profileError.message || profileError);
   }
 
-  const tier = (profile.tier || 'free').toString().trim().toLowerCase();
+  const profile = Array.isArray(profiles) ? (profiles[0] || null) : null;
+  const tier = (profile?.tier || 'free').toString().trim().toLowerCase();
   const profileLimit = getHomeownerTierLimit(tier);
 
   const { count, error: countError } = await writeSupabase
@@ -514,7 +515,13 @@ async function getHomeownerTierAndCount(userId) {
     .eq('user_id', userId);
 
   if (countError) {
-    return { error: countError };
+    console.error('Homeowner plant count lookup error, defaulting to 0:', countError.message || countError);
+    return {
+      tier,
+      profileLimit,
+      activeProfiles: 0,
+      error: null,
+    };
   }
 
   return {
@@ -776,22 +783,34 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (plantsError) {
-      return res.status(500).json({ error: plantsError.message || 'Failed to load plants' });
+      console.error('Homeowner plants lookup error, returning empty list:', plantsError.message || plantsError);
     }
 
     const status = await getHomeownerTierAndCount(userId);
     if (status.error) {
-      return res.status(500).json({ error: status.error.message || 'Failed to load homeowner profile' });
+      console.error('Homeowner tier/count error, returning safe defaults:', status.error.message || status.error);
+      return res.json({
+        plants: plantsError ? [] : (plants || []),
+        tier: 'free',
+        profile_limit: getHomeownerTierLimit('free'),
+        active_profiles: Array.isArray(plants) ? plants.length : 0,
+      });
     }
 
     return res.json({
-      plants: plants || [],
+      plants: plantsError ? [] : (plants || []),
       tier: status.tier,
       profile_limit: status.profileLimit,
       active_profiles: status.activeProfiles,
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch homeowner plants' });
+    console.error('Unexpected homeowner plants error, returning safe defaults:', err?.message || err);
+    return res.json({
+      plants: [],
+      tier: 'free',
+      profile_limit: getHomeownerTierLimit('free'),
+      active_profiles: 0,
+    });
   }
 });
 

@@ -33,6 +33,8 @@ export default function HomeownerSignup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [plan, setPlan] = useState('free');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -105,31 +107,53 @@ export default function HomeownerSignup() {
 
             <div>
               <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="password">Password</label>
-              <input
-                id="password"
-                className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                disabled={loading}
-              />
+              <div className="relative flex items-center">
+                <input
+                  id="password"
+                  className="homeowner-input w-full rounded-md px-3 py-2 pr-10 outline-none"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                  className="absolute right-2 text-xl text-[#1d411d] hover:opacity-70 transition disabled:opacity-50"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
             </div>
           </div>
 
           <div>
             <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              disabled={loading}
-            />
+            <div className="relative flex items-center">
+              <input
+                id="confirmPassword"
+                className="homeowner-input w-full rounded-md px-3 py-2 pr-10 outline-none"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={loading}
+                className="absolute right-2 text-xl text-[#1d411d] hover:opacity-70 transition disabled:opacity-50"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
 
           <div>

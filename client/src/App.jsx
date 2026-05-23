@@ -65,7 +65,7 @@ function ProtectedRoute({ children }) {
 }
 
 function HomeownerProtectedRoute({ children }) {
-  const { isAuthenticated, isHomeowner, loading } = useHomeownerAuth();
+  const { isAuthenticated, loading } = useHomeownerAuth();
 
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading...</div>;
@@ -73,10 +73,6 @@ function HomeownerProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/homeowners/login" replace />;
-  }
-
-  if (!isHomeowner) {
-    return <Navigate to="/homeowners/signup" replace />;
   }
 
   return children;
