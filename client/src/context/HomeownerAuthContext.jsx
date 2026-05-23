@@ -5,12 +5,51 @@ const HomeownerAuthContext = createContext(null);
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL || '').toString().trim();
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storageKey: 'arbortag-homeowner-auth',
   },
 });
+
+function getHomeownerResetRedirectUrl() {
+  const configured = PUBLIC_APP_URL.replace(/\/$/, '');
+  if (configured) {
+    return `${configured}/homeowners/reset-password`;
+  }
+
+  const origin = (window?.location?.origin || '').toString().trim().replace(/\/$/, '');
+  // Localhost links in emails are unreachable for remote users; default to production URL.
+  if (!origin || /localhost|127\.0\.0\.1/i.test(origin)) {
+    return 'https://arbordex.onrender.com/homeowners/reset-password';
+  }
+
+  return `${origin}/homeowners/reset-password`;
+}
+
+function isRecoveryLinkVisit() {
+  const search = (window?.location?.search || '').toString().toLowerCase();
+  const hash = (window?.location?.hash || '').toString().toLowerCase();
+  return (
+    search.includes('type=recovery')
+    || hash.includes('type=recovery')
+    || hash.includes('recovery_token=')
+    || hash.includes('access_token=')
+  );
+}
+
+function redirectToResetPasswordRoute() {
+  const resetPath = '/homeowners/reset-password';
+  const pathname = (window?.location?.pathname || '').toString();
+  const search = (window?.location?.search || '').toString();
+  const hash = (window?.location?.hash || '').toString();
+
+  if (pathname === resetPath) return;
+
+  // Preserve search/hash because Supabase recovery tokens are often carried there.
+  window.location.replace(`${resetPath}${search}${hash}`);
+}
 
 export function HomeownerAuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -35,6 +74,10 @@ export function HomeownerAuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
+    if (isRecoveryLinkVisit()) {
+      redirectToResetPasswordRoute();
+    }
+
     async function hydrate() {
       try {
         setLoading(true);
@@ -58,6 +101,10 @@ export function HomeownerAuthProvider({ children }) {
     hydrate();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        redirectToResetPasswordRoute();
+      }
+
       const nextUser = session?.user || null;
       setLoading(true);
       setUser(nextUser);
@@ -100,7 +147,11 @@ export function HomeownerAuthProvider({ children }) {
 
     if (signupError) {
       const normalizedMessage = (signupError.message || '').toLowerCase();
-      if (normalizedMessage.includes('already registered')) {
+      if (
+        normalizedMessage.includes('already registered')
+        || normalizedMessage.includes('already exists')
+        || normalizedMessage.includes('user exists')
+      ) {
         // If Auth already has this email, try logging in so returning users are not blocked.
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: normalizedEmail,
@@ -145,7 +196,7 @@ export function HomeownerAuthProvider({ children }) {
 
   async function resetPassword(email) {
     setError('');
-    const redirectTo = `${window.location.origin}/homeowners/reset-password`;
+    const redirectTo = getHomeownerResetRedirectUrl();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (resetError) throw resetError;
   }

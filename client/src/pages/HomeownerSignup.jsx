@@ -28,7 +28,7 @@ const PLANS = [
 
 export default function HomeownerSignup() {
   const navigate = useNavigate();
-  const { signup, login, getAccessToken } = useHomeownerAuth();
+  const { signup, login, getAccessToken, resetPassword } = useHomeownerAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,14 +37,48 @@ export default function HomeownerSignup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [plan, setPlan] = useState('free');
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [showResetNow, setShowResetNow] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const selectedPlan = useMemo(() => PLANS.find((p) => p.key === plan), [plan]);
 
+  function isExistingAccountError(message) {
+    const normalized = (message || '').toString().toLowerCase();
+    return (
+      normalized.includes('already exists')
+      || normalized.includes('already registered')
+      || normalized.includes('user exists')
+      || normalized.includes('already in use')
+    );
+  }
+
+  async function handleSendResetNow() {
+    const normalizedEmail = (email || '').toString().trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Enter your email, then click Send reset email now.');
+      return;
+    }
+
+    setResetLoading(true);
+    setResetMessage('');
+    try {
+      await resetPassword(normalizedEmail);
+      setResetMessage('Reset email sent. Please check inbox and spam folders.');
+    } catch (err) {
+      setError(err?.message || 'Could not send reset email.');
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setResetMessage('');
+    setShowResetNow(false);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -78,7 +112,9 @@ export default function HomeownerSignup() {
 
       window.location.href = payload.url;
     } catch (err) {
-      setError(err.message || 'Signup failed');
+      const nextError = err?.message || 'Signup failed';
+      setError(nextError);
+      setShowResetNow(isExistingAccountError(nextError));
     } finally {
       setLoading(false);
     }
@@ -194,6 +230,20 @@ export default function HomeownerSignup() {
           </label>
 
           {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
+
+          {showResetNow && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleSendResetNow}
+                disabled={loading || resetLoading}
+                className="w-full rounded-md border border-[#1d411d] bg-white py-2 text-sm font-semibold text-[#1d411d] transition hover:bg-[#f4f8f1] disabled:opacity-60"
+              >
+                {resetLoading ? 'Sending reset email...' : 'Send reset email now'}
+              </button>
+              {resetMessage && <p className="homeowner-alert homeowner-alert-success">{resetMessage}</p>}
+            </div>
+          )}
 
           <button
             type="submit"
