@@ -446,6 +446,42 @@ function getStorageObjectPathFromPublicUrl(publicUrl, bucketName) {
   return decodeURIComponent(publicUrl.slice(idx + marker.length));
 }
 
+async function ensureHomeownerProfileExists(userId) {
+  // Check if profile exists
+  const { data: existing, error: checkError } = await writeSupabase
+    .from('homeowner_profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (!checkError && Array.isArray(existing) && existing.length > 0) {
+    return { profile: existing[0], created: false };
+  }
+
+  // Profile doesn't exist, create default one
+  const { data: newProfile, error: insertError } = await writeSupabase
+    .from('homeowner_profiles')
+    .insert([
+      {
+        user_id: userId,
+        tier: 'free',
+        stripe_customer_id: null,
+      },
+    ])
+    .select('id, user_id, tier, stripe_customer_id')
+    .limit(1);
+
+  if (insertError) {
+    console.error('Failed to create homeowner profile:', insertError.message || insertError);
+    return { profile: null, created: false, error: insertError };
+  }
+
+  return {
+    profile: Array.isArray(newProfile) ? newProfile[0] : newProfile,
+    created: true,
+  };
+}
+
 async function updateHomeownerProfileBy(column, value, payload) {
   const { error } = await writeSupabase
     .from('homeowner_profiles')
@@ -692,17 +728,14 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
       return res.status(400).json({ error: 'Tier must be gardener or estate for checkout' });
     }
 
-    const { data: profile, error: profileError } = await writeSupabase
-      .from('homeowner_profiles')
-      .select('id, user_id, stripe_customer_id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return res.status(400).json({ error: 'Homeowner profile not found' });
+    // Ensure profile exists before querying
+    const { profile, error: profileCreateError } = await ensureHomeownerProfileExists(user.id);
+    if (profileCreateError) {
+      console.error('Failed to ensure homeowner profile:', profileCreateError.message || profileCreateError);
+      return res.status(500).json({ error: 'Failed to set up homeowner account' });
     }
 
-    let stripeCustomerId = normalizeStripeCustomerId(profile.stripe_customer_id);
+    let stripeCustomerId = normalizeStripeCustomerId(profile?.stripe_customer_id);
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -745,15 +778,17 @@ api.post('/stripe/create-portal-session', requireHomeownerAuth, async (req, res)
     }
 
     const user = req.homeownerUser;
-    const { data: profile, error: profileError } = await writeSupabase
-      .from('homeowner_profiles')
-      .select('stripe_customer_id')
-      .eq('user_id', user.id)
-      .single();
+
+    // Ensure profile exists before querying
+    const { profile, error: profileCreateError } = await ensureHomeownerProfileExists(user.id);
+    if (profileCreateError) {
+      console.error('Failed to ensure homeowner profile:', profileCreateError.message || profileCreateError);
+      return res.status(500).json({ error: 'Failed to set up homeowner account' });
+    }
 
     const stripeCustomerId = normalizeStripeCustomerId(profile?.stripe_customer_id);
 
-    if (profileError || !stripeCustomerId) {
+    if (!stripeCustomerId) {
       return res.status(400).json({ error: 'No Stripe customer found for this account' });
     }
 
