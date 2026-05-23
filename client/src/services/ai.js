@@ -1,15 +1,15 @@
-export async function identifyPlant(photo) {
+export async function identifyPlant(_photo) {
   return { message: "AI not implemented yet" };
 }
 
-export async function diagnosePlant(photo) {
+export async function diagnosePlant(_photo) {
   return { message: "AI not implemented yet" };
 }
 
-export async function askPublic(question) {
+export async function askPublic(_question) {
   return { message: "AI not implemented yet" };
 }
 
-export async function askStaff(question) {
+export async function askStaff(_question) {
   return { message: "AI not implemented yet" };
 }

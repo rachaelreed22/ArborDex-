@@ -17,6 +17,14 @@ export function getNeedsAttention(diagnostics) {
           : [];
   if (riskFlags.length > 0) return true;
 
+  const hazardsDetected = (diagnostics.hazards_detected || diagnostics.hazard_detected || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  if (hazardsDetected === "yes" || hazardsDetected === "y" || hazardsDetected === "true") return true;
+
+  if (Array.isArray(diagnostics.hazard_details) && diagnostics.hazard_details.length > 0) return true;
+
   // Urgency level of Moderate, High, or Critical → needs attention
   const urgency = (diagnostics.urgency_level || diagnostics.urgencyLevel || "")
     .toString()

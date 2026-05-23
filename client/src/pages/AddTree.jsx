@@ -52,6 +52,7 @@ export default function AddTree() {
   useEffect(() => {
     if (!scanPrefill) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((prev) => ({
       ...prev,
       title: scanPrefill.title || prev.title,
@@ -304,6 +305,32 @@ export default function AddTree() {
     }).catch(() => null);
   };
 
+  const buildAttachPayload = () => {
+    const source = confirmedDiagnostics || scanPrefill?.scanPayload || {};
+
+    const photoUrls = Array.from(
+      new Set(
+        (Array.isArray(source.photo_urls) ? source.photo_urls : [])
+          .map((url) => (typeof url === "string" ? url.trim() : ""))
+          .filter((url) => /^https?:\/\//i.test(url))
+      )
+    );
+
+    return {
+      species: (source.species || "").toString().trim(),
+      confidence: (source.confidence || "").toString().trim(),
+      health_score: source.health_score,
+      summary: (source.summary || "").toString().trim(),
+      risks: Array.isArray(source.risks) ? source.risks : [],
+      recommendations: Array.isArray(source.recommendations) ? source.recommendations : [],
+      photo_summaries: Array.isArray(source.photo_summaries) ? source.photo_summaries : [],
+      hazards_detected: (source.hazards_detected || "No").toString(),
+      hazard_details: Array.isArray(source.hazard_details) ? source.hazard_details : [],
+      raw_ai_message: (source.raw_ai_message || scanPrefill?.assistantText || "").toString(),
+      photo_urls: photoUrls,
+    };
+  };
+
   const handleScanFlowSubmit = async () => {
     setError("");
 
@@ -336,12 +363,18 @@ export default function AddTree() {
 
     try {
       if (qrChoice === "attach") {
+        const attachPayload = buildAttachPayload();
+
+        if (!Array.isArray(attachPayload.photo_urls) || attachPayload.photo_urls.length === 0) {
+          throw new Error("No valid scan photo URLs are available to attach. Re-run Review, Confirm and try again.");
+        }
+
         const response = await fetch(apiUrl("/api/ai/attach-scan-to-tree"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             listing_id: selectedAttachListingId,
-            ...(scanPrefill?.scanPayload || {}),
+            ...attachPayload,
           }),
         });
 

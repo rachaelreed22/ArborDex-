@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './AdminLogin.css';
+
+const TERMS_KEY = 'arbortag_terms_accepted';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -11,6 +13,16 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(
+    () => localStorage.getItem(TERMS_KEY) === 'true'
+  );
+
+  const handleTermsChange = (e) => {
+    const checked = e.target.checked;
+    setTermsAccepted(checked);
+    if (checked) localStorage.setItem(TERMS_KEY, 'true');
+    else localStorage.removeItem(TERMS_KEY);
+  };
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -73,9 +85,25 @@ export default function AdminLogin() {
             </div>
           )}
 
+          <div className="terms-check-row">
+            <input
+              id="terms-check"
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={handleTermsChange}
+              disabled={loading}
+            />
+            <label htmlFor="terms-check" className="terms-check-label">
+              I have read and agree to the{' '}
+              <Link to="/policies" target="_blank" rel="noopener noreferrer">
+                Policies &amp; Terms
+              </Link>
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !termsAccepted}
             className="btn btn-primary login-button"
           >
             {loading ? 'Logging in...' : 'Sign In'}

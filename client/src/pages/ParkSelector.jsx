@@ -38,8 +38,8 @@ export default function ParkSelector() {
     localStorage.setItem('selectedParkId', parkId);
     localStorage.setItem('selectedParkName', parkName);
 
-    // Switch to staff/dex mode if not already
-    if (mode !== 'dex') {
+    // Only switch to staff/dex mode for logged-in users
+    if (user && mode !== 'dex') {
       toggleMode();
     }
 

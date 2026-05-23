@@ -9,11 +9,15 @@ const supabase = require('./db');
 const multer = require('multer');
 const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
+const Stripe = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/stripe/webhook') return next();
+  return express.json()(req, res, next);
+});
 
 // QR routes
 const qrRoutes = require("./qrRoutes");
@@ -28,6 +32,16 @@ const upload = multer({
 const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
 const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || PHOTO_BUCKET;
 const PORT = process.env.PORT || 5000;
+const CLIENT_URL = (process.env.CLIENT_URL || 'https://localhost:5173').toString().trim();
+
+const STRIPE_SECRET_KEY = (process.env.STRIPE_SECRET_KEY || '').toString().trim();
+const STRIPE_WEBHOOK_SECRET = (process.env.STRIPE_WEBHOOK_SECRET || '').toString().trim();
+const STRIPE_PRICE_GARDENER = (process.env.STRIPE_PRICE_GARDENER || '').toString().trim();
+const STRIPE_PRICE_ESTATE = (process.env.STRIPE_PRICE_ESTATE || '').toString().trim();
+
+const stripe = STRIPE_SECRET_KEY
+  ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
+  : null;
 
 const ASK_ARBORAI_BUCKET_CANDIDATES = Array.from(
   new Set(
@@ -170,6 +184,195 @@ function parseDateBoundary(value, endOfDay = false) {
   return parsed.toISOString();
 }
 
+const HAZARD_SIGNAL_KEYWORDS = [
+  'decay',
+  'decaying',
+  'rot',
+  'rotting',
+  'hollow',
+  'cavity',
+  'deadwood',
+  'dead wood',
+  'fungal conk',
+  'fungus',
+  'split trunk',
+  'crack',
+  'cracked',
+  'fracture',
+  'lean',
+  'uproot',
+  'root failure',
+  'structural',
+  'instability',
+  'collapse',
+  'fall risk',
+  'unsafe',
+  'hazard',
+  'basal decay',
+  'trunk rot',
+  'root rot',
+];
+
+const HAZARD_OBSERVED_EVIDENCE_PATTERNS = [
+  /\b(observed|visible|detected|identified|present|showing|shows|evidence)\b/i,
+  /\b(signs?\s+of|symptoms?\s+of)\b/i,
+  /\b(active|advanced|severe|ongoing|current(?:ly)?)\b/i,
+  /\b(needs\s+human\s+inspection)\b/i,
+];
+
+const HAZARD_ADVISORY_ONLY_PATTERNS = [
+  /\b(avoid|prevent|preventing|to\s+prevent)\b/i,
+  /\b(risk\s+of|chance\s+of|potential\s+for|can\s+cause|could\s+cause|may\s+cause|can\s+lead\s+to)\b/i,
+  /\b(susceptible\s+to|prone\s+to|watch\s+for|monitor\s+for|look\s+out\s+for)\b/i,
+  /\b(if\s+left\s+untreated|in\s+some\s+cases)\b/i,
+];
+
+function normalizeStringList(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map((item) => (item == null ? '' : item.toString().trim()))
+    .filter(Boolean);
+}
+
+function hasObservedHazardEvidence(text = '') {
+  const sample = (text || '').toString();
+  if (!sample.trim()) return false;
+
+  const lower = sample.toLowerCase();
+  const hasHazardSignal = HAZARD_SIGNAL_KEYWORDS.some((keyword) => lower.includes(keyword));
+  if (!hasHazardSignal) return false;
+
+  const hasObservedLanguage = HAZARD_OBSERVED_EVIDENCE_PATTERNS.some((pattern) => pattern.test(sample));
+  const hasAdvisoryLanguage = HAZARD_ADVISORY_ONLY_PATTERNS.some((pattern) => pattern.test(sample));
+
+  // Purely preventative wording (for example, "avoid root rot") should not count as active evidence.
+  if (hasAdvisoryLanguage && !hasObservedLanguage) return false;
+
+  return hasObservedLanguage;
+}
+
+function inferHazardDetailsFromTextSignals(signalTexts) {
+  const normalizedSignals = normalizeStringList(signalTexts);
+  const inferred = [];
+
+  for (const text of normalizedSignals) {
+    const lower = text.toLowerCase();
+    const hasNegatedHazardPhrase =
+      /(no|not|without|none)\s+(clear\s+)?(signs?\s+of\s+)?(hazards?|decay|rot|structural\s+issues?|cavity|hollow|instability)/i.test(lower);
+
+    if (hasNegatedHazardPhrase) continue;
+
+    const hasHazardSignal = HAZARD_SIGNAL_KEYWORDS.some((keyword) => lower.includes(keyword));
+    if (!hasHazardSignal) continue;
+
+    if (!hasObservedHazardEvidence(text)) continue;
+
+    inferred.push(text);
+  }
+
+  const combined = normalizedSignals.join(' | ').toLowerCase();
+  const hasTreeContext = /(tree|trunk|stem|canopy|root)/i.test(combined);
+  const hasBasalOrTrunkZone = /(base|basal|trunk|root\s*flare|root\s*collar|buttress)/i.test(combined);
+  const hasDecaySignal = /(decay|decaying|rot|rotting|hollow|cavity|punky|structural\s+instability)/i.test(combined);
+  const hasNegatedDecay = /(no|not|without)\s+(clear\s+)?(signs?\s+of\s+)?(decay|rot|hollow|cavity|structural\s+instability)/i.test(combined);
+  const hasObservedEvidence = normalizedSignals.some((text) => hasObservedHazardEvidence(text));
+
+  // Strict rule: trunk/base decay language always escalates to a hazard finding.
+  if (hasTreeContext && hasBasalOrTrunkZone && hasDecaySignal && hasObservedEvidence && !hasNegatedDecay) {
+    inferred.push('Basal/trunk decay suggests elevated structural failure risk and needs human inspection.');
+  }
+
+  return Array.from(new Set(inferred));
+}
+
+function resolveHazardClassification({ hazardsDetectedRaw, hazardDetails, signalTexts }) {
+  const explicitDetails = normalizeStringList(hazardDetails);
+  const inferredDetails = inferHazardDetailsFromTextSignals(signalTexts);
+  const mergedDetails = Array.from(new Set([...explicitDetails, ...inferredDetails]));
+
+  const raw = (hazardsDetectedRaw || '').toString().trim().toLowerCase();
+  const explicitYes = raw === 'yes' || raw === 'y' || raw === 'true';
+  const explicitNo = raw === 'no' || raw === 'n' || raw === 'false';
+
+  const inferredYes = mergedDetails.length > 0;
+  const hazardsDetected = explicitYes || inferredYes
+    ? 'Yes'
+    : explicitNo
+      ? 'No'
+      : 'No';
+
+  return {
+    hazards_detected: hazardsDetected,
+    hazard_details: mergedDetails,
+  };
+}
+
+function enforceHumanInspectionAlertSignals(payload = {}) {
+  const next = { ...payload };
+  const hasHazards = (next.hazards_detected || '').toString().trim().toLowerCase() === 'yes';
+  const alerts = normalizeStringList(next.alerts);
+
+  if (hasHazards) {
+    if (!alerts.some((item) => item.toLowerCase().includes('needs human inspection'))) {
+      alerts.unshift('Needs human inspection');
+    }
+
+    const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
+    if (!urgency || urgency === 'low') {
+      next.urgency_level = 'Moderate';
+    }
+
+    next.needs_human_inspection = true;
+  } else {
+    next.needs_human_inspection = false;
+  }
+
+  next.alerts = Array.from(new Set(alerts));
+  return next;
+}
+
+function enforceCriticalDecayFailSafe(payload = {}) {
+  const next = { ...payload };
+  const signalSnippets = [
+    next.summary,
+    next.raw_ai_message,
+    ...(Array.isArray(next.risks) ? next.risks : []),
+    ...(Array.isArray(next.recommendations) ? next.recommendations : []),
+    ...(Array.isArray(next.photo_summaries) ? next.photo_summaries : []),
+    ...(Array.isArray(next.hazard_details) ? next.hazard_details : []),
+  ];
+
+  const textBlob = signalSnippets
+    .map((item) => (item == null ? '' : item.toString().toLowerCase()))
+    .join(' | ');
+
+  const hasDecay = /(decay|decaying|rot|rotting|hollow|cavity|loss\s+of\s+integrity)/i.test(textBlob);
+  const hasStructuralRisk = /(instability|structural|failure|compromised|fall\s+risk|collapse|unsafe|consider\s+removal)/i.test(textBlob);
+  const hasTrunkBaseRoot = /(trunk|base|basal|root|root\s*flare|root\s*collar)/i.test(textBlob);
+  const hasNegatedRisk = /(no|not|without)\s+(clear\s+)?(signs?\s+of\s+)?(hazards?|risk|decay|rot|instability|failure)/i.test(textBlob);
+  const hasObservedEvidence = normalizeStringList(signalSnippets).some((snippet) => hasObservedHazardEvidence(snippet));
+
+  if (
+    hasObservedEvidence
+    && (
+      (hasDecay && hasStructuralRisk && hasTrunkBaseRoot && !hasNegatedRisk)
+      || (hasDecay && hasTrunkBaseRoot && !hasNegatedRisk)
+    )
+  ) {
+    next.hazards_detected = 'Yes';
+
+    const details = normalizeStringList(next.hazard_details);
+    const standard = 'Critical trunk/base decay indicators detected; needs human inspection.';
+    if (!details.some((item) => item.toLowerCase().includes('critical trunk/base decay indicators detected'))) {
+      details.unshift(standard);
+    }
+    next.hazard_details = Array.from(new Set(details));
+  }
+
+  return next;
+}
+
 async function sendWinnerNotificationEmail({ toEmail, listingTitle, listingId }) {
   if (!mailTransporter) {
     console.warn('Winner email not sent: SMTP configuration is missing.');
@@ -205,6 +408,250 @@ const writeSupabase =
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     : supabase;
 
+function getTierFromPriceId(priceId) {
+  if (!priceId) return 'free';
+  if (priceId === STRIPE_PRICE_GARDENER) return 'gardener';
+  if (priceId === STRIPE_PRICE_ESTATE) return 'estate';
+  return 'free';
+}
+
+const HOMEOWNER_TIER_LIMITS = {
+  free: 3,
+  gardener: 40,
+  estate: 65,
+};
+
+function getHomeownerTierLimit(tier) {
+  return HOMEOWNER_TIER_LIMITS[tier] || HOMEOWNER_TIER_LIMITS.free;
+}
+
+function getPriceIdFromTier(tier) {
+  if (tier === 'gardener') return STRIPE_PRICE_GARDENER;
+  if (tier === 'estate') return STRIPE_PRICE_ESTATE;
+  return null;
+}
+
+function normalizeStripeCustomerId(value) {
+  const normalized = (value || '').toString().trim();
+  if (!normalized) return null;
+  if (normalized.toLowerCase() === 'null' || normalized.toLowerCase() === 'none') return null;
+  return normalized;
+}
+
+function getStorageObjectPathFromPublicUrl(publicUrl, bucketName) {
+  if (typeof publicUrl !== 'string' || !publicUrl) return null;
+  const marker = `/storage/v1/object/public/${bucketName}/`;
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(publicUrl.slice(idx + marker.length));
+}
+
+async function updateHomeownerProfileBy(column, value, payload) {
+  const { error } = await writeSupabase
+    .from('homeowner_profiles')
+    .update(payload)
+    .eq(column, value);
+
+  if (!error) return null;
+
+  const missingSubscriptionColumn =
+    Object.prototype.hasOwnProperty.call(payload, 'stripe_subscription_id')
+    && (error.message || '').toLowerCase().includes('stripe_subscription_id');
+
+  if (!missingSubscriptionColumn) return error;
+
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.stripe_subscription_id;
+
+  const { error: fallbackError } = await writeSupabase
+    .from('homeowner_profiles')
+    .update(fallbackPayload)
+    .eq(column, value);
+
+  return fallbackError || null;
+}
+
+function getBearerToken(req) {
+  const auth = (req.headers.authorization || '').toString();
+  if (!auth.startsWith('Bearer ')) return null;
+  return auth.slice(7).trim();
+}
+
+async function requireHomeownerAuth(req, res, next) {
+  try {
+    const token = getBearerToken(req);
+    if (!token) return res.status(401).json({ error: 'Missing bearer token' });
+
+    const { data, error } = await writeSupabase.auth.getUser(token);
+    if (error || !data?.user) {
+      return res.status(401).json({ error: 'Invalid auth token' });
+    }
+
+    req.homeownerUser = data.user;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+
+async function getHomeownerTierAndCount(userId) {
+  const { data: profile, error: profileError } = await writeSupabase
+    .from('homeowner_profiles')
+    .select('tier')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    return { error: profileError || new Error('Homeowner profile not found') };
+  }
+
+  const tier = (profile.tier || 'free').toString().trim().toLowerCase();
+  const profileLimit = getHomeownerTierLimit(tier);
+
+  const { count, error: countError } = await writeSupabase
+    .from('homeowner_plants')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (countError) {
+    return { error: countError };
+  }
+
+  return {
+    tier,
+    profileLimit,
+    activeProfiles: count || 0,
+    error: null,
+  };
+}
+
+async function getOwnedHomeownerPlant(userId, plantId) {
+  const { data: plant, error } = await writeSupabase
+    .from('homeowner_plants')
+    .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+    .eq('id', plantId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !plant) {
+    return { plant: null, error: error || new Error('Plant profile not found') };
+  }
+
+  return { plant, error: null };
+}
+
+function buildHomeownerNoPhotoDiagnostics(plant) {
+  const displayName = plant?.name || 'This plant';
+  return {
+    likely_identification: plant?.species || displayName,
+    confidence: 'Low',
+    overall_condition: 'Unable to assess yet',
+    summary: 'No photos are available for diagnostics yet.',
+    key_features_noticed: ['No plant photos uploaded yet.'],
+    primary_concerns: [],
+    care_notes: [
+      'Upload at least one clear photo in good lighting.',
+      'Include a close-up of leaves and a full-plant photo if possible.',
+    ],
+    common_issues_to_watch_for: ['Visible leaf spots, yellowing, browning, wilting, or pest damage.'],
+    uses_throughout_history: [],
+    medicinal_qualities: 'Unknown until photos are provided and diagnosis is more reliable.',
+    watering_frequency_summer: 'Not enough information yet.',
+    watering_frequency_winter: 'Not enough information yet.',
+    under_over_watering_signs: [],
+    light_requirements: 'Not enough information yet.',
+    temp_humidity_preferences: 'Not enough information yet.',
+    potting_soil_requirements: 'Not enough information yet.',
+    warning_signs: [],
+    estimated_growth_rate: 'Not enough information yet.',
+    maintenance_requirements: 'Not enough information yet.',
+    toxicity_info: 'Unknown. Keep away from pets and children until identified with higher confidence.',
+    native_habitat: 'Unknown until identified with higher confidence.',
+    propagation_method: 'Unknown until identified with higher confidence.',
+    growing_difficulty_score: 'Unknown',
+    fun_facts: [],
+    data_quality_flags: ['No photos available for analysis.'],
+    photo_summaries: [],
+    hazards_detected: 'No',
+    hazard_details: [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function buildHomeownerDiagnosticsFromScan(scan = {}) {
+  const species = (scan.species || 'Unknown').toString().trim() || 'Unknown';
+  const confidence = (scan.confidence || 'Low').toString().trim() || 'Low';
+  const summary = (scan.summary || scan.raw_ai_message || 'Created from Ask ArborAI scan.').toString().trim();
+  const healthScore = Number.isFinite(Number(scan.health_score))
+    ? Math.max(0, Math.min(100, Number(scan.health_score)))
+    : null;
+  const risks = Array.isArray(scan.risks) ? scan.risks.map((item) => item?.toString().trim()).filter(Boolean) : [];
+  const recommendations = Array.isArray(scan.recommendations)
+    ? scan.recommendations.map((item) => item?.toString().trim()).filter(Boolean)
+    : [];
+  const photoSummaries = Array.isArray(scan.photo_summaries)
+    ? scan.photo_summaries.map((item) => item?.toString().trim()).filter(Boolean)
+    : [];
+  const hazardDetails = Array.isArray(scan.hazard_details)
+    ? scan.hazard_details.map((item) => item?.toString().trim()).filter(Boolean)
+    : [];
+
+  const signalTexts = [
+    summary,
+    scan.raw_ai_message,
+    ...risks,
+    ...recommendations,
+    ...photoSummaries,
+    ...hazardDetails,
+  ];
+
+  const hazardDecision = resolveHazardClassification({
+    hazardsDetectedRaw: scan.hazards_detected ?? scan.hazard_detected,
+    hazardDetails,
+    signalTexts,
+  });
+
+  let overallCondition = 'Needs review';
+  if (healthScore !== null) {
+    if (healthScore >= 80) overallCondition = 'Generally healthy';
+    else if (healthScore >= 60) overallCondition = 'Stable with some concerns';
+    else if (healthScore >= 40) overallCondition = 'Needs attention';
+    else overallCondition = 'High concern';
+  }
+
+  return {
+    likely_identification: species,
+    confidence,
+    overall_condition: overallCondition,
+    summary: summary || 'Created from Ask ArborAI scan.',
+    key_features_noticed: photoSummaries.length > 0 ? photoSummaries.slice(0, 3) : ['Created from Ask ArborAI scan photos.'],
+    primary_concerns: risks,
+    care_notes: recommendations.length > 0 ? recommendations : ['Run full diagnostics on the plant detail page for more detailed care guidance.'],
+    common_issues_to_watch_for: risks,
+    uses_throughout_history: [],
+    medicinal_qualities: 'Run full diagnostics for expanded plant background and care details.',
+    watering_frequency_summer: 'Run full diagnostics for plant-specific watering guidance.',
+    watering_frequency_winter: 'Run full diagnostics for plant-specific watering guidance.',
+    under_over_watering_signs: [],
+    light_requirements: 'Run full diagnostics for plant-specific light guidance.',
+    temp_humidity_preferences: 'Run full diagnostics for plant-specific temperature and humidity guidance.',
+    potting_soil_requirements: 'Run full diagnostics for plant-specific soil guidance.',
+    warning_signs: risks,
+    estimated_growth_rate: 'Run full diagnostics for plant-specific growth estimates.',
+    maintenance_requirements: 'Run full diagnostics for expanded maintenance guidance.',
+    toxicity_info: 'Run full diagnostics for toxicity details if available.',
+    native_habitat: 'Run full diagnostics for native habitat details if available.',
+    propagation_method: 'Run full diagnostics for propagation guidance if available.',
+    growing_difficulty_score: 'Unknown',
+    fun_facts: [],
+    data_quality_flags: [],
+    photo_summaries: photoSummaries,
+    hazards_detected: hazardDecision.hazards_detected,
+    hazard_details: hazardDecision.hazard_details,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 // ===========================
 // API ROUTER
 // ===========================
@@ -219,6 +666,865 @@ api.get('/', (req, res) => {
     staff_guard_enabled: Boolean(STAFF_API_KEY),
     winner_email_enabled: Boolean(mailTransporter),
   });
+});
+
+// ===========================
+// HOMEOWNER BILLING (STRIPE)
+// ===========================
+api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured on the server' });
+    }
+
+    const tier = (req.body?.tier || '').toString().trim().toLowerCase();
+    const user = req.homeownerUser;
+    const priceId = getPriceIdFromTier(tier);
+
+    if (!priceId) {
+      return res.status(400).json({ error: 'Tier must be gardener or estate for checkout' });
+    }
+
+    const { data: profile, error: profileError } = await writeSupabase
+      .from('homeowner_profiles')
+      .select('id, user_id, stripe_customer_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(400).json({ error: 'Homeowner profile not found' });
+    }
+
+    let stripeCustomerId = normalizeStripeCustomerId(profile.stripe_customer_id);
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { supabase_user_id: user.id },
+      });
+      stripeCustomerId = customer.id;
+
+      const updateError = await updateHomeownerProfileBy('user_id', user.id, {
+        stripe_customer_id: stripeCustomerId,
+      });
+      if (updateError) {
+        console.error('Failed to store Stripe customer ID:', updateError.message || updateError);
+        return res.status(500).json({ error: 'Failed to save Stripe customer record' });
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${CLIENT_URL}/homeowners/account?checkout=success`,
+      cancel_url: `${CLIENT_URL}/homeowners/tiers?checkout=cancelled`,
+      metadata: {
+        supabase_user_id: user.id,
+        requested_tier: tier,
+      },
+    });
+
+    return res.json({ url: session.url });
+  } catch (err) {
+    console.error('Stripe checkout session error:', err);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+api.post('/stripe/create-portal-session', requireHomeownerAuth, async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured on the server' });
+    }
+
+    const user = req.homeownerUser;
+    const { data: profile, error: profileError } = await writeSupabase
+      .from('homeowner_profiles')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .single();
+
+    const stripeCustomerId = normalizeStripeCustomerId(profile?.stripe_customer_id);
+
+    if (profileError || !stripeCustomerId) {
+      return res.status(400).json({ error: 'No Stripe customer found for this account' });
+    }
+
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: `${CLIENT_URL}/homeowners/account`,
+    });
+
+    return res.json({ url: portal.url });
+  } catch (err) {
+    console.error('Stripe portal session error:', err);
+    return res.status(500).json({ error: 'Failed to create portal session' });
+  }
+});
+
+// ===========================
+// HOMEOWNER PLANTS
+// ===========================
+api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+
+    const { data: plants, error: plantsError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (plantsError) {
+      return res.status(500).json({ error: plantsError.message || 'Failed to load plants' });
+    }
+
+    const status = await getHomeownerTierAndCount(userId);
+    if (status.error) {
+      return res.status(500).json({ error: status.error.message || 'Failed to load homeowner profile' });
+    }
+
+    return res.json({
+      plants: plants || [],
+      tier: status.tier,
+      profile_limit: status.profileLimit,
+      active_profiles: status.activeProfiles,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch homeowner plants' });
+  }
+});
+
+api.get('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    return res.json({ plant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch plant profile' });
+  }
+});
+
+api.post('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const name = (req.body?.name || '').toString().trim();
+    const species = (req.body?.species || '').toString().trim();
+    const roomOrBed = (req.body?.room_or_bed || '').toString().trim();
+
+    if (!name) {
+      return res.status(400).json({ error: 'Plant name is required' });
+    }
+
+    const status = await getHomeownerTierAndCount(userId);
+    if (status.error) {
+      return res.status(500).json({ error: status.error.message || 'Failed to check tier limits' });
+    }
+
+    if (status.activeProfiles >= status.profileLimit) {
+      return res.status(403).json({
+        error: 'Profile limit reached for current tier',
+        tier: status.tier,
+        profile_limit: status.profileLimit,
+        active_profiles: status.activeProfiles,
+      });
+    }
+
+    const { data: plant, error: insertError } = await writeSupabase
+      .from('homeowner_plants')
+      .insert([
+        {
+          user_id: userId,
+          name,
+          species: species || null,
+          room_or_bed: roomOrBed || null,
+          photos: [],
+        },
+      ])
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (insertError) {
+      return res.status(500).json({ error: insertError.message || 'Failed to create plant profile' });
+    }
+
+    return res.status(201).json({ plant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to create homeowner plant' });
+  }
+});
+
+api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+
+    const nextName = req.body?.name;
+    const nextSpecies = req.body?.species;
+    const nextRoomOrBed = req.body?.room_or_bed;
+
+    const updateData = {};
+    if (typeof nextName === 'string') {
+      const trimmedName = nextName.trim();
+      if (!trimmedName) {
+        return res.status(400).json({ error: 'Plant name cannot be empty' });
+      }
+      updateData.name = trimmedName;
+    }
+    if (typeof nextSpecies === 'string') {
+      updateData.species = nextSpecies.trim() || null;
+    }
+    if (typeof nextRoomOrBed === 'string') {
+      updateData.room_or_bed = nextRoomOrBed.trim() || null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { data: plant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to update plant profile' });
+    }
+
+    if (!plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    return res.json({ plant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update homeowner plant' });
+  }
+});
+
+api.delete('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+
+    const { data: plant, error: findError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, photos')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (findError || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const photos = Array.isArray(plant.photos) ? plant.photos : [];
+    for (const url of photos) {
+      const objectPath = getStorageObjectPathFromPublicUrl(url, PHOTO_BUCKET);
+      if (!objectPath) continue;
+      await writeSupabase.storage.from(PHOTO_BUCKET).remove([objectPath]);
+    }
+
+    const { error: deleteError } = await writeSupabase
+      .from('homeowner_plants')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message || 'Failed to delete plant profile' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete homeowner plant' });
+  }
+});
+
+api.post('/homeowners/plants/:id/photos', requireHomeownerAuth, upload.single('photo'), async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Photo file is required' });
+    }
+
+    const { data: plant, error: findError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, photos')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (findError || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const existingPhotos = Array.isArray(plant.photos) ? plant.photos : [];
+    if (existingPhotos.length >= 5) {
+      return res.status(400).json({ error: 'Maximum 5 photos allowed per plant profile' });
+    }
+
+    const ext = path.extname(req.file.originalname || '').toLowerCase() || '.jpg';
+    const objectPath = `homeowner-plants/${userId}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+
+    const { error: uploadError } = await writeSupabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(objectPath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return res.status(500).json({ error: uploadError.message || 'Failed to upload photo' });
+    }
+
+    const { data: publicUrlData } = writeSupabase.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
+    const nextPhotos = [...existingPhotos, publicUrlData.publicUrl];
+
+    const { data: updatedPlant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update({ photos: nextPhotos })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to save photo on profile' });
+    }
+
+    return res.status(201).json({ plant: updatedPlant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to upload homeowner plant photo' });
+  }
+});
+
+api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req, res) => {
+  try {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const photos = Array.isArray(plant.photos) ? plant.photos.filter(Boolean) : [];
+    if (photos.length === 0) {
+      const fallbackDiagnostics = buildHomeownerNoPhotoDiagnostics(plant);
+      const { data: updatedPlant, error: updateError } = await writeSupabase
+        .from('homeowner_plants')
+        .update({ last_diagnostics: fallbackDiagnostics })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({ error: updateError.message || 'Failed to store diagnostics' });
+      }
+
+      return res.json({ diagnostics: fallbackDiagnostics, plant: updatedPlant });
+    }
+
+    const diagnosticsPrompt = `${ARBORAI_REGIONAL_SCOPE}
+
+  Analyze the provided homeowner plant profile and photos. The plant name is a user label or nickname, NOT authoritative identification. The species field is only a weak user hint and may be wrong. Prioritize what is visually present in the photos over user-entered text.
+
+  Critical rules:
+  - Inspect every photo independently before forming a combined conclusion.
+  - If photos appear to show different plants, unrelated scenes, or conflicting species, do NOT force a single confident identification.
+  - In mixed or conflicting photo sets, explicitly say so, lower confidence, and include data quality or mismatch warnings.
+  - If one photo shows disease or damage, mention that specific issue instead of generic care advice.
+  - Do not describe the plant as healthy unless the visible evidence clearly supports that.
+  - Do not let the plant name override the images.
+  - If evidence is weak or contradictory, say the result is uncertain.
+
+  Respond ONLY with a valid JSON object using these exact keys:
+  - likely_identification: string
+  - confidence: string
+  - overall_condition: string
+  - summary: string
+  - key_features_noticed: array of strings
+  - primary_concerns: array of strings
+  - care_notes: array of strings
+  - common_issues_to_watch_for: array of strings
+  - uses_throughout_history: array of strings
+  - medicinal_qualities: string
+  - watering_frequency_summer: string
+  - watering_frequency_winter: string
+  - under_over_watering_signs: array of strings
+  - light_requirements: string
+  - temp_humidity_preferences: string
+  - potting_soil_requirements: string
+  - warning_signs: array of strings
+  - estimated_growth_rate: string
+  - maintenance_requirements: string
+  - toxicity_info: string
+  - native_habitat: string
+  - propagation_method: string
+  - growing_difficulty_score: string
+  - fun_facts: array of strings
+  - data_quality_flags: array of strings
+  - photo_summaries: array of strings
+
+  Keep the language friendly, simple, and specific to a homeowner or gardener. IMPORTANT: photo_summaries must contain exactly ${photos.length} non-empty items in the same order as the provided photos.`;
+
+    const userContent = [
+      {
+        type: 'text',
+        text: [
+          `Plant name: ${plant.name || 'Unknown'}`,
+          `Species field (weak hint, may be wrong): ${plant.species || 'Not provided'}`,
+          `Indoor or outdoor: ${plant.room_or_bed || 'Not provided'}`,
+          `Return categories tailored for a homeowner detail page.`,
+          `Call out photo mismatches, unrelated images, disease signs, or uncertainty when present.`,
+        ].join('\n'),
+      },
+      ...photos.map((_, index) => ({ type: 'text', text: `Photo ${index + 1}` })),
+      ...photos.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: diagnosticsPrompt },
+          { role: 'user', content: userContent },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 1400,
+      }),
+    });
+
+    let diagnostics;
+    if (!response.ok) {
+      const reasonText = await response.text().catch(() => 'AI provider error');
+      diagnostics = {
+        likely_identification: plant.species || plant.name,
+        confidence: 'Low',
+        overall_condition: 'Temporarily unavailable',
+        summary: 'Diagnostics are temporarily unavailable. Please try again shortly.',
+        key_features_noticed: ['AI service was unavailable for this run.'],
+        primary_concerns: [],
+        care_notes: ['Try diagnostics again in a moment.'],
+        common_issues_to_watch_for: ['Visible wilting, spotting, yellowing, or pest damage.'],
+        uses_throughout_history: [],
+        medicinal_qualities: 'Unavailable for this run.',
+        watering_frequency_summer: 'Unavailable for this run.',
+        watering_frequency_winter: 'Unavailable for this run.',
+        under_over_watering_signs: [],
+        light_requirements: 'Unavailable for this run.',
+        temp_humidity_preferences: 'Unavailable for this run.',
+        potting_soil_requirements: 'Unavailable for this run.',
+        warning_signs: [],
+        estimated_growth_rate: 'Unavailable for this run.',
+        maintenance_requirements: 'Unavailable for this run.',
+        toxicity_info: 'Unavailable for this run.',
+        native_habitat: 'Unavailable for this run.',
+        propagation_method: 'Unavailable for this run.',
+        growing_difficulty_score: 'Unknown',
+        fun_facts: [],
+        data_quality_flags: [],
+        photo_summaries: photos.map((_, index) => `Photo ${index + 1}: Diagnostics unavailable for this run.`),
+        hazards_detected: 'No',
+        hazard_details: [],
+        provider_note: reasonText.slice(0, 280),
+        updated_at: new Date().toISOString(),
+      };
+    } else {
+      const aiData = await response.json();
+      const raw = aiData?.choices?.[0]?.message?.content || '{}';
+      try {
+        diagnostics = JSON.parse(raw);
+      } catch {
+        diagnostics = {
+          likely_identification: plant.species || plant.name,
+          confidence: 'Low',
+          overall_condition: 'Format error',
+          summary: 'Diagnostics completed with an invalid AI response format. Please run again.',
+          key_features_noticed: ['AI response could not be parsed.'],
+          primary_concerns: [],
+          care_notes: ['Run diagnostics again for a fresh result.'],
+          common_issues_to_watch_for: ['Visible wilting, spotting, yellowing, or pest damage.'],
+          uses_throughout_history: [],
+          medicinal_qualities: 'Unavailable due to response format issue.',
+          watering_frequency_summer: 'Unavailable due to response format issue.',
+          watering_frequency_winter: 'Unavailable due to response format issue.',
+          under_over_watering_signs: [],
+          light_requirements: 'Unavailable due to response format issue.',
+          temp_humidity_preferences: 'Unavailable due to response format issue.',
+          potting_soil_requirements: 'Unavailable due to response format issue.',
+          warning_signs: [],
+          estimated_growth_rate: 'Unavailable due to response format issue.',
+          maintenance_requirements: 'Unavailable due to response format issue.',
+          toxicity_info: 'Unavailable due to response format issue.',
+          native_habitat: 'Unavailable due to response format issue.',
+          propagation_method: 'Unavailable due to response format issue.',
+          growing_difficulty_score: 'Unknown',
+          fun_facts: [],
+          data_quality_flags: ['AI response format was invalid.'],
+          photo_summaries: photos.map((_, index) => `Photo ${index + 1}: No parsed summary returned.`),
+          hazards_detected: 'No',
+          hazard_details: [],
+          updated_at: new Date().toISOString(),
+        };
+      }
+    }
+
+    const normalized = {
+      likely_identification: (diagnostics?.likely_identification || plant.species || 'Uncertain').toString().trim(),
+      confidence: (diagnostics?.confidence || 'Medium').toString().trim(),
+      overall_condition: (diagnostics?.overall_condition || 'Needs review').toString().trim(),
+      summary: (diagnostics?.summary || 'No summary available.').toString().trim(),
+      key_features_noticed: Array.isArray(diagnostics?.key_features_noticed) ? diagnostics.key_features_noticed.filter(Boolean) : [],
+      primary_concerns: Array.isArray(diagnostics?.primary_concerns) ? diagnostics.primary_concerns.filter(Boolean) : [],
+      care_notes: Array.isArray(diagnostics?.care_notes) ? diagnostics.care_notes.filter(Boolean) : [],
+      common_issues_to_watch_for: Array.isArray(diagnostics?.common_issues_to_watch_for) ? diagnostics.common_issues_to_watch_for.filter(Boolean) : [],
+      uses_throughout_history: Array.isArray(diagnostics?.uses_throughout_history) ? diagnostics.uses_throughout_history.filter(Boolean) : [],
+      medicinal_qualities: (diagnostics?.medicinal_qualities || 'Not provided.').toString().trim(),
+      watering_frequency_summer: (diagnostics?.watering_frequency_summer || 'Not provided.').toString().trim(),
+      watering_frequency_winter: (diagnostics?.watering_frequency_winter || 'Not provided.').toString().trim(),
+      under_over_watering_signs: Array.isArray(diagnostics?.under_over_watering_signs) ? diagnostics.under_over_watering_signs.filter(Boolean) : [],
+      light_requirements: (diagnostics?.light_requirements || 'Not provided.').toString().trim(),
+      temp_humidity_preferences: (diagnostics?.temp_humidity_preferences || 'Not provided.').toString().trim(),
+      potting_soil_requirements: (diagnostics?.potting_soil_requirements || 'Not provided.').toString().trim(),
+      warning_signs: Array.isArray(diagnostics?.warning_signs) ? diagnostics.warning_signs.filter(Boolean) : [],
+      estimated_growth_rate: (diagnostics?.estimated_growth_rate || 'Not provided.').toString().trim(),
+      maintenance_requirements: (diagnostics?.maintenance_requirements || 'Not provided.').toString().trim(),
+      toxicity_info: (diagnostics?.toxicity_info || 'Not provided.').toString().trim(),
+      native_habitat: (diagnostics?.native_habitat || 'Not provided.').toString().trim(),
+      propagation_method: (diagnostics?.propagation_method || 'Not provided.').toString().trim(),
+      growing_difficulty_score: (diagnostics?.growing_difficulty_score || 'Unknown').toString().trim(),
+      fun_facts: Array.isArray(diagnostics?.fun_facts) ? diagnostics.fun_facts.filter(Boolean) : [],
+      data_quality_flags: Array.isArray(diagnostics?.data_quality_flags) ? diagnostics.data_quality_flags.filter(Boolean) : [],
+      photo_summaries: Array.isArray(diagnostics?.photo_summaries) ? diagnostics.photo_summaries.slice(0, photos.length).map((item, index) => {
+        const text = (item || '').toString().trim();
+        return text || `Photo ${index + 1}: No summary returned.`;
+      }) : photos.map((_, index) => `Photo ${index + 1}: No summary returned.`),
+      updated_at: new Date().toISOString(),
+    };
+
+    const hazardDecision = resolveHazardClassification({
+      hazardsDetectedRaw: diagnostics?.hazards_detected ?? diagnostics?.hazard_detected,
+      hazardDetails: Array.isArray(diagnostics?.hazard_details) ? diagnostics.hazard_details : [],
+      signalTexts: [
+        normalized.summary,
+        ...normalized.primary_concerns,
+        ...normalized.care_notes,
+        ...normalized.common_issues_to_watch_for,
+        ...normalized.warning_signs,
+        ...normalized.photo_summaries,
+      ],
+    });
+
+    normalized.hazards_detected = hazardDecision.hazards_detected;
+    normalized.hazard_details = hazardDecision.hazard_details;
+    Object.assign(normalized, enforceCriticalDecayFailSafe(normalized));
+    Object.assign(normalized, enforceHumanInspectionAlertSignals(normalized));
+
+    while (normalized.photo_summaries.length < photos.length) {
+      normalized.photo_summaries.push(`Photo ${normalized.photo_summaries.length + 1}: No summary returned.`);
+    }
+
+    const photoSummaryText = normalized.photo_summaries.join(' ').toLowerCase();
+    const mismatchDetected = [
+      'unrelated',
+      'different plant',
+      'different species',
+      'not the same plant',
+      'mismatch',
+      'tree',
+      'fall foliage',
+      'unrelated image',
+    ].some((term) => photoSummaryText.includes(term));
+
+    if (mismatchDetected) {
+      normalized.confidence = 'Low';
+      normalized.likely_identification = 'Uncertain due to conflicting photos';
+      normalized.overall_condition = 'Cannot assess reliably from mixed photo set';
+      normalized.summary = 'The uploaded photos do not appear to show the same plant consistently, so this result should not be treated as a reliable identification or diagnosis yet.';
+      normalized.data_quality_flags = [
+        'Conflicting or unrelated photos were detected in this profile.',
+        ...normalized.data_quality_flags,
+      ].filter(Boolean);
+      normalized.primary_concerns = [
+        'At least one uploaded photo appears unrelated to the main plant being diagnosed.',
+        ...normalized.primary_concerns,
+      ].filter(Boolean);
+      normalized.care_notes = [
+        'Remove unrelated photos and rerun diagnostics with close-up and full-plant images of the same plant only.',
+        ...normalized.care_notes,
+      ].filter(Boolean);
+    }
+
+    const { data: updatedPlant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update({ last_diagnostics: normalized })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to store diagnostics' });
+    }
+
+    return res.json({ diagnostics: normalized, plant: updatedPlant });
+  } catch (err) {
+    console.error('Homeowner diagnostics error:', err);
+    return res.status(500).json({ error: 'Failed to run homeowner diagnostics' });
+  }
+});
+
+api.delete('/homeowners/plants/:id/photos/:photoIndex', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const photoIndex = Number.parseInt(req.params.photoIndex, 10);
+
+    if (!Number.isInteger(photoIndex) || photoIndex < 0) {
+      return res.status(400).json({ error: 'Invalid photo index' });
+    }
+
+    const { data: plant, error: findError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (findError || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const photos = Array.isArray(plant.photos) ? plant.photos : [];
+    if (photoIndex >= photos.length) {
+      return res.status(400).json({ error: 'Photo index out of range' });
+    }
+
+    const removedUrl = photos[photoIndex];
+    const nextPhotos = photos.filter((_url, index) => index !== photoIndex);
+
+    const { data: updatedPlant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update({ photos: nextPhotos })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to remove photo from profile' });
+    }
+
+    const objectPath = getStorageObjectPathFromPublicUrl(removedUrl, PHOTO_BUCKET);
+    if (objectPath) {
+      await writeSupabase.storage.from(PHOTO_BUCKET).remove([objectPath]);
+    }
+
+    return res.json({ plant: updatedPlant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete homeowner plant photo' });
+  }
+});
+
+api.post('/homeowners/plants/:id/photos/:photoIndex/replace', requireHomeownerAuth, upload.single('photo'), async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const photoIndex = Number.parseInt(req.params.photoIndex, 10);
+
+    if (!Number.isInteger(photoIndex) || photoIndex < 0) {
+      return res.status(400).json({ error: 'Invalid photo index' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Photo file is required' });
+    }
+
+    const { data: plant, error: findError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (findError || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const photos = Array.isArray(plant.photos) ? plant.photos : [];
+    if (photoIndex >= photos.length) {
+      return res.status(400).json({ error: 'Photo index out of range' });
+    }
+
+    const ext = path.extname(req.file.originalname || '').toLowerCase() || '.jpg';
+    const objectPath = `homeowner-plants/${userId}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+
+    const { error: uploadError } = await writeSupabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(objectPath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return res.status(500).json({ error: uploadError.message || 'Failed to upload replacement photo' });
+    }
+
+    const { data: publicUrlData } = writeSupabase.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
+    const oldUrl = photos[photoIndex];
+    const nextPhotos = [...photos];
+    nextPhotos[photoIndex] = publicUrlData.publicUrl;
+
+    const { data: updatedPlant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update({ photos: nextPhotos })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to save replacement photo' });
+    }
+
+    const oldObjectPath = getStorageObjectPathFromPublicUrl(oldUrl, PHOTO_BUCKET);
+    if (oldObjectPath) {
+      await writeSupabase.storage.from(PHOTO_BUCKET).remove([oldObjectPath]);
+    }
+
+    return res.json({ plant: updatedPlant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to replace homeowner plant photo' });
+  }
+});
+
+api.post('/homeowners/ai/create-plant-from-scan', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { tier, profileLimit, activeProfiles, error: tierError } = await getHomeownerTierAndCount(userId);
+
+    if (tierError) {
+      return res.status(500).json({ error: tierError.message || 'Failed to verify tier limits' });
+    }
+
+    if (activeProfiles >= profileLimit) {
+      return res.status(400).json({ error: `Profile limit reached for ${tier} tier` });
+    }
+
+    const normalizedSpecies = (req.body?.species || 'Untitled Plant').toString().trim() || 'Untitled Plant';
+    const normalizedUrls = Array.from(
+      new Set(
+        (Array.isArray(req.body?.photo_urls) ? req.body.photo_urls : [])
+          .map((url) => (typeof url === 'string' ? url.trim() : ''))
+          .filter((url) => /^https?:\/\//i.test(url))
+      )
+    ).slice(0, 5);
+
+    const diagnostics = buildHomeownerDiagnosticsFromScan(req.body || {});
+
+    const { data: plant, error: insertError } = await writeSupabase
+      .from('homeowner_plants')
+      .insert([
+        {
+          user_id: userId,
+          name: normalizedSpecies,
+          species: normalizedSpecies,
+          room_or_bed: null,
+          photos: normalizedUrls,
+          last_diagnostics: diagnostics,
+        },
+      ])
+      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (insertError || !plant) {
+      return res.status(500).json({ error: insertError?.message || 'Failed to create plant from scan' });
+    }
+
+    return res.status(201).json({ plant, added_photos: normalizedUrls.length });
+  } catch (err) {
+    console.error('Unexpected homeowner create-plant-from-scan error:', err);
+    return res.status(500).json({ error: 'Unexpected homeowner create-plant-from-scan error' });
+  }
+});
+
+api.post('/homeowners/ai/attach-scan-to-plant', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const plantId = (req.body?.plant_id || '').toString().trim();
+
+    if (!plantId) {
+      return res.status(400).json({ error: 'plant_id is required' });
+    }
+
+    const { plant, error } = await getOwnedHomeownerPlant(userId, plantId);
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const existingPhotos = Array.isArray(plant.photos) ? plant.photos : [];
+    const incomingUrls = Array.from(
+      new Set(
+        (Array.isArray(req.body?.photo_urls) ? req.body.photo_urls : [])
+          .map((url) => (typeof url === 'string' ? url.trim() : ''))
+          .filter((url) => /^https?:\/\//i.test(url))
+      )
+    );
+
+    if (incomingUrls.length === 0) {
+      return res.status(400).json({ error: 'No valid photo_urls provided for attach.' });
+    }
+
+    const existingUrlSet = new Set(existingPhotos);
+    const urlsToAdd = incomingUrls.filter((url) => !existingUrlSet.has(url));
+    const nextPhotos = [...existingPhotos, ...urlsToAdd];
+
+    if (nextPhotos.length > 5) {
+      return res.status(400).json({ error: 'Attaching this scan would exceed the 5 photo limit for this plant profile' });
+    }
+
+    const diagnostics = buildHomeownerDiagnosticsFromScan(req.body || {});
+
+    const { data: updatedPlant, error: updateError } = await writeSupabase
+      .from('homeowner_plants')
+      .update({ photos: nextPhotos, last_diagnostics: diagnostics })
+      .eq('id', plantId)
+      .eq('user_id', userId)
+      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .single();
+
+    if (updateError || !updatedPlant) {
+      return res.status(500).json({ error: updateError?.message || 'Failed to attach scan to plant' });
+    }
+
+    return res.json({ plant: updatedPlant, added_photos: urlsToAdd.length });
+  } catch (err) {
+    console.error('Unexpected homeowner attach-scan-to-plant error:', err);
+    return res.status(500).json({ error: 'Unexpected homeowner attach-scan-to-plant error' });
+  }
 });
 
 // ===========================
@@ -1149,7 +2455,9 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
         alerts: ['No photos available'],
         health_score: '0/10',
         confidence: 'Low',
-        risk_flags: []
+        risk_flags: [],
+        hazards_detected: 'No',
+        hazard_details: []
       };
 
       const { error: noPhotoLogError } = await writeSupabase
@@ -1206,7 +2514,9 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
         alerts: ['Diagnostics temporarily unavailable'],
         health_score: 'Pending',
         confidence: 'Low',
-        risk_flags: []
+        risk_flags: [],
+        hazards_detected: 'No',
+        hazard_details: []
       };
     }
 
@@ -1253,6 +2563,8 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 - confidence: string (e.g. "High", "Medium", "Low")
 - risk_flags: array of strings (potential hazards or structural concerns, empty array if none)
 - urgency_level: string (one of: "Low", "Moderate", "High", "Critical" — overall urgency for human follow-up)
+- hazards_detected: string ("Yes" or "No")
+- hazard_details: array of strings (specific hazard findings; empty array if none)
 IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-empty items, in the same order as the provided photos.`;
 
     const userContent = [
@@ -1342,6 +2654,32 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
     }
 
     diagnostics.photo_summaries = normalizedPhotoSummaries;
+
+    const hazardSignals = [
+      diagnostics?.summary,
+      diagnostics?.environment,
+      diagnostics?.public_about,
+      diagnostics?.uses_throughout_history,
+      ...(Array.isArray(diagnostics?.recommendations) ? diagnostics.recommendations : []),
+      ...(Array.isArray(diagnostics?.risk_flags) ? diagnostics.risk_flags : []),
+      ...(Array.isArray(diagnostics?.alerts) ? diagnostics.alerts : []),
+      ...(Array.isArray(diagnostics?.photo_summaries) ? diagnostics.photo_summaries : []),
+    ];
+
+    const hazardDecision = resolveHazardClassification({
+      hazardsDetectedRaw: diagnostics?.hazards_detected ?? diagnostics?.hazard_detected,
+      hazardDetails: Array.isArray(diagnostics?.hazard_details)
+        ? diagnostics.hazard_details
+        : Array.isArray(diagnostics?.hazards_details)
+          ? diagnostics.hazards_details
+          : [],
+      signalTexts: hazardSignals,
+    });
+
+    diagnostics.hazards_detected = hazardDecision.hazards_detected;
+    diagnostics.hazard_details = hazardDecision.hazard_details;
+    diagnostics = enforceCriticalDecayFailSafe(diagnostics);
+    diagnostics = enforceHumanInspectionAlertSignals(diagnostics);
 
     const speciesName = diagnostics?.species && diagnostics.species !== 'Unknown'
       ? diagnostics.species
@@ -1458,6 +2796,8 @@ api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
 - risks: array of strings
 - recommendations: array of strings
 - photo_summaries: array of strings
+- hazards_detected: string ("Yes" or "No")
+- hazard_details: array of strings
 - raw_ai_message: string (friendly conversational chat response)
 If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.`;
 
@@ -1525,11 +2865,38 @@ If information is uncertain, state best estimate and keep raw_ai_message support
       photo_summaries: Array.isArray(parsed.photo_summaries)
         ? parsed.photo_summaries.map((item) => item.toString()).filter(Boolean)
         : [],
+      hazards_detected: (() => {
+        const raw = (parsed.hazards_detected ?? parsed.hazard_detected ?? '').toString().trim().toLowerCase();
+        return raw === 'yes' || raw === 'y' || raw === 'true' ? 'Yes' : 'No';
+      })(),
+      hazard_details: Array.isArray(parsed.hazard_details)
+        ? parsed.hazard_details.map((item) => item.toString()).filter(Boolean)
+        : Array.isArray(parsed.hazards_details)
+          ? parsed.hazards_details.map((item) => item.toString()).filter(Boolean)
+          : [],
       raw_ai_message: (parsed.raw_ai_message || 'Here is your scan summary from ArborAI.').toString(),
       photo_urls: uploadedPhotoUrls,
     };
 
-    res.json(payload);
+    const hazardDecision = resolveHazardClassification({
+      hazardsDetectedRaw: parsed.hazards_detected ?? parsed.hazard_detected,
+      hazardDetails: payload.hazard_details,
+      signalTexts: [
+        payload.summary,
+        payload.raw_ai_message,
+        ...payload.risks,
+        ...payload.recommendations,
+        ...payload.photo_summaries,
+      ],
+    });
+
+    payload.hazards_detected = hazardDecision.hazards_detected;
+    payload.hazard_details = hazardDecision.hazard_details;
+    const normalizedPayload = enforceHumanInspectionAlertSignals(
+      enforceCriticalDecayFailSafe(payload)
+    );
+
+    res.json(normalizedPayload);
   } catch (err) {
     console.error('Unexpected Ask ArborAI error:', err);
     res.status(500).json({ error: 'Unexpected Ask ArborAI error' });
@@ -1799,6 +3166,88 @@ ${question}
 });
 
 // ===========================
+// STRIPE WEBHOOK
+// ===========================
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+    return res.status(500).send('Stripe webhook not configured');
+  }
+
+  const signature = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, signature, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Stripe webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const customerId = normalizeStripeCustomerId(session.customer?.toString());
+      const subscriptionId = session.subscription?.toString() || null;
+
+      let tier = 'free';
+      if (subscriptionId) {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        const priceId = sub?.items?.data?.[0]?.price?.id || null;
+        tier = getTierFromPriceId(priceId);
+      }
+
+      const userId = session.metadata?.supabase_user_id || null;
+
+      if (userId) {
+        const updateError = await updateHomeownerProfileBy('user_id', userId, {
+          tier,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+        });
+        if (updateError) {
+          console.error('Stripe webhook profile update error (user_id):', updateError.message || updateError);
+        }
+      } else if (customerId) {
+        const updateError = await updateHomeownerProfileBy('stripe_customer_id', customerId, {
+          tier,
+          stripe_subscription_id: subscriptionId,
+        });
+        if (updateError) {
+          console.error('Stripe webhook profile update error (stripe_customer_id):', updateError.message || updateError);
+        }
+      }
+    }
+
+    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object;
+      const customerId = normalizeStripeCustomerId(subscription.customer?.toString());
+      const subscriptionId = subscription.id?.toString() || null;
+      const priceId = subscription?.items?.data?.[0]?.price?.id || null;
+
+      let tier = getTierFromPriceId(priceId);
+      if (event.type === 'customer.subscription.deleted') {
+        tier = 'free';
+      }
+
+      if (customerId) {
+        const updateError = await updateHomeownerProfileBy('stripe_customer_id', customerId, {
+          tier,
+          stripe_subscription_id: event.type === 'customer.subscription.deleted' ? null : subscriptionId,
+        });
+        if (updateError) {
+          console.error('Stripe subscription webhook update error:', updateError.message || updateError);
+        }
+      }
+    }
+
+    return res.json({ received: true });
+  } catch (err) {
+    console.error('Stripe webhook handling error:', err);
+    return res.status(500).send('Webhook handling failed');
+  }
+});
+
+// ===========================
 // MOUNT API
 // ===========================
 app.use('/api', api);
@@ -1853,6 +3302,10 @@ if (fs.existsSync(distPath)) {
 // ===========================
 // START SERVER
 // ===========================
-app.listen(PORT, () => {
-  console.log('ArborDex API running on port ' + PORT);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log('ArborDex API running on port ' + PORT);
+  });
+}
+
+module.exports = app;

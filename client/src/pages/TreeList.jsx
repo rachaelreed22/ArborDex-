@@ -5,6 +5,37 @@ import { API_BASE_URL, apiUrl } from "../utils/apiUrl";
 import { getNeedsAttention } from "../utils/attentionRules";
 import "./TreeList.css";
 
+function inferHazardsFromDiagnostics(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== "object") {
+    return false;
+  }
+
+  const explicitHazard = ["yes", "y", "true"].includes(
+    (diagnostics.hazards_detected ?? diagnostics.hazard_detected ?? "").toString().trim().toLowerCase()
+  );
+
+  const details = Array.isArray(diagnostics.hazard_details) ? diagnostics.hazard_details : [];
+  if (explicitHazard || details.length > 0) return true;
+
+  const signals = [
+    diagnostics.summary,
+    diagnostics.environment,
+    diagnostics.public_about,
+    ...(Array.isArray(diagnostics.risk_flags) ? diagnostics.risk_flags : []),
+    ...(Array.isArray(diagnostics.alerts) ? diagnostics.alerts : []),
+    ...(Array.isArray(diagnostics.photo_summaries) ? diagnostics.photo_summaries : []),
+    ...details,
+  ]
+    .map((item) => (item == null ? "" : item.toString().toLowerCase()))
+    .join(" | ");
+
+  const hasDecay = /(decay|decaying|rot|rotting|hollow|cavity|loss\s+of\s+integrity)/i.test(signals);
+  const hasStructuralRisk = /(instability|structural|failure|compromised|fall\s+risk|collapse|unsafe|consider\s+removal)/i.test(signals);
+  const hasTrunkBaseRoot = /(trunk|base|basal|root|root\s*flare|root\s*collar)/i.test(signals);
+  const hasNegatedRisk = /(no|not|without)\s+(clear\s+)?(signs?\s+of\s+)?(hazards?|risk|decay|rot|instability|failure)/i.test(signals);
+  return hasDecay && hasTrunkBaseRoot && !hasNegatedRisk && (hasStructuralRisk || hasDecay);
+}
+
 export default function TreeList() {
   const { mode } = useMode();
   const isStaff = mode === "dex";
@@ -15,6 +46,7 @@ export default function TreeList() {
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [attentionByListingId, setAttentionByListingId] = useState({});
+  const [hazardByListingId, setHazardByListingId] = useState({});
 
   useEffect(() => {
     fetchListings();
@@ -25,7 +57,9 @@ export default function TreeList() {
     if (listings.length > 0) {
       fetchAttentionFlags(listings);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAttentionByListingId({});
+      setHazardByListingId({});
     }
   }, [isStaff]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -38,17 +72,20 @@ export default function TreeList() {
       const data = await res.json();
       const nextListings = Array.isArray(data) ? data : [];
       setListings(nextListings);
+      setLoading(false); // show cards immediately
 
       if (nextListings.length > 0) {
-        await fetchAttentionFlags(nextListings);
+        fetchAttentionFlags(nextListings); // background — no await
       } else {
         setAttentionByListingId({});
+        setHazardByListingId({});
       }
     } catch (err) {
       console.error("Error fetching listings:", err);
       setAttentionByListingId({});
+      setHazardByListingId({});
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function fetchAttentionFlags(listingRows) {
@@ -63,12 +100,14 @@ export default function TreeList() {
 
       if (!res.ok) {
         setAttentionByListingId({});
+        setHazardByListingId({});
         return;
       }
 
       const latestByListing = await res.json().catch(() => ({}));
 
       const flags = {};
+      const hazards = {};
       for (const listing of listingRows) {
         const listingId = (listing?.id ?? "").toString();
         let diagnostics = latestByListing[listingId] ?? null;
@@ -76,12 +115,15 @@ export default function TreeList() {
           try { diagnostics = JSON.parse(diagnostics); } catch { diagnostics = null; }
         }
         flags[listingId] = getNeedsAttention(diagnostics);
+        hazards[listingId] = inferHazardsFromDiagnostics(diagnostics);
       }
 
       setAttentionByListingId(flags);
+      setHazardByListingId(hazards);
     } catch (err) {
       console.error("Error fetching diagnostics attention flags:", err);
       setAttentionByListingId({});
+      setHazardByListingId({});
     }
   }
 
@@ -135,7 +177,7 @@ export default function TreeList() {
       setListings(nextListings);
 
       if (nextListings.length > 0) {
-        await fetchAttentionFlags(nextListings);
+        fetchAttentionFlags(nextListings); // background — no await
       } else {
         setAttentionByListingId({});
       }
@@ -213,6 +255,7 @@ export default function TreeList() {
           const hasQR = Boolean(tree.qr_url);
           const treeIdKey = (tree?.id ?? "").toString();
           const needsAttention = Boolean(attentionByListingId[treeIdKey]);
+          const hazardsDetected = Boolean(hazardByListingId[treeIdKey]);
 
           return (
             <div
@@ -227,6 +270,8 @@ export default function TreeList() {
                     src={main.url}
                     alt={tree.title}
                     className="tree-card-photo"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="tree-card-no-photo">🌿 No Photo</div>
@@ -252,6 +297,10 @@ export default function TreeList() {
                 {tree.location && (
                   <p className="tree-card-location">📍 {tree.location}</p>
                 )}
+
+                <p className={`tree-card-location tree-card-hazards ${hazardsDetected ? "tree-card-hazards-danger" : ""}`}>
+                  Hazards Detected: {hazardsDetected ? "Y" : "N"}
+                </p>
 
                 <p className="tree-card-meta">
                   {photos.length} photo{photos.length !== 1 ? "s" : ""}

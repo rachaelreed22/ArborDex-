@@ -4,6 +4,7 @@
   justify-content: center;
   min-height: calc(100vh - 70px);
   padding: 2rem 1rem;
+  background: var(--homeowner-shell-bg);
 }
 
 .homeowners-container {
@@ -12,12 +13,12 @@
 }
 
 .coming-soon-card {
-  background: linear-gradient(135deg, #f0f8f0 0%, #e8f2e8 100%);
-  border: 2px solid #c8dcc8;
+  background: var(--homeowner-surface-bg);
+  border: 2px solid var(--homeowner-green-dark);
   border-radius: 16px;
   padding: 3rem 2rem;
   text-align: center;
-  box-shadow: 0 16px 30px rgba(29, 65, 29, 0.1);
+  box-shadow: 0 16px 30px rgba(29, 65, 29, 0.25);
 }
 
 .coming-soon-card h1 {
@@ -29,7 +30,7 @@
 .coming-soon-text {
   margin: 0 0 1.5rem;
   font-size: clamp(1.5rem, 3vw, 2rem);
-  color: #2e5e2e;
+  color: #1d411d;
   font-weight: 600;
   letter-spacing: 1px;
 }
@@ -37,8 +38,36 @@
 .coming-soon-description {
   margin: 0;
   font-size: 1rem;
-  color: #4f694f;
+  color: #1f3f1f;
   line-height: 1.6;
+}
+
+.homeowners-feature-strip {
+  margin-top: 1.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.homeowners-feature-pill {
+  border: 1px solid rgb(29 65 29 / 45%);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  background: rgb(245 238 207 / 78%);
+  color: var(--homeowner-text-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.homeowners-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 600px) {
@@ -48,5 +77,9 @@
 
   .coming-soon-card {
     padding: 2rem 1.5rem;
+  }
+
+  .homeowners-actions {
+    flex-direction: column;
   }
 }

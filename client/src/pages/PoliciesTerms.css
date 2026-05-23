@@ -1,0 +1,196 @@
+.policies-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1d411d 0%, #2e5e2e 100%);
+  padding: 2rem 1rem;
+}
+
+.policies-container {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ── Header ── */
+
+.policies-header {
+  background: rgba(251, 255, 249, 0.97);
+  border-radius: 14px;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 8px 30px rgba(13, 37, 13, 0.25);
+  border: 1px solid rgba(76, 132, 76, 0.35);
+  text-align: center;
+  position: relative;
+}
+
+.policies-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  color: #1d411d;
+  font-weight: 700;
+}
+
+.policies-subheading {
+  color: #4f694f;
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+}
+
+.policies-back-btn {
+  font-size: 0.9rem;
+}
+
+/* ── Cards ── */
+
+.policies-card {
+  background: rgba(251, 255, 249, 0.97);
+  border-radius: 14px;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 8px 30px rgba(13, 37, 13, 0.2);
+  border: 1px solid rgba(76, 132, 76, 0.3);
+  position: relative;
+}
+
+.policies-card h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  color: #1d411d;
+  font-weight: 700;
+}
+
+.policies-meta {
+  font-size: 0.82rem;
+  color: #6a7e6a;
+  margin: 0 0 1.5rem;
+  font-style: italic;
+}
+
+/* Terms of Service card gets a subtle distinction */
+
+.policies-card-tos {
+  border: 2px solid rgba(76, 132, 76, 0.55);
+  box-shadow: 0 8px 32px rgba(13, 37, 13, 0.28);
+}
+
+.policies-tos-badge {
+  display: inline-block;
+  background: #2e5e2e;
+  color: #d8f0d8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Sections ── */
+
+.policies-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e8f0e8;
+}
+
+.policies-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.policies-section h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.05rem;
+  color: #2e5e2e;
+  font-weight: 700;
+}
+
+.policies-section h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.95rem;
+  color: #3d6b3d;
+  font-weight: 600;
+}
+
+.policies-section p {
+  margin: 0 0 0.5rem;
+  line-height: 1.65;
+  color: #2c3e2c;
+  font-size: 0.95rem;
+}
+
+.policies-section ul {
+  margin: 0.25rem 0 0.5rem 1.25rem;
+  padding: 0;
+  color: #2c3e2c;
+  font-size: 0.95rem;
+}
+
+.policies-section ul li {
+  margin-bottom: 0.3rem;
+  line-height: 1.55;
+}
+
+.policies-section a {
+  color: #2e5e2e;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.policies-highlight {
+  background: #edf8ed;
+  border-left: 4px solid #4a9a4a;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 6px 6px 0;
+  font-weight: 600;
+  color: #1d411d !important;
+  margin: 0.5rem 0 !important;
+}
+
+.policies-section-critical {
+  background: #fef9ed;
+  border: 1px solid #e6c96a;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.policies-section-critical h3 {
+  color: #7a5a10;
+}
+
+/* ── Footer ── */
+
+.policies-footer {
+  background: rgba(251, 255, 249, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 4px 16px rgba(13, 37, 13, 0.15);
+}
+
+.policies-footer p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4f694f;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 600px) {
+  .policies-card,
+  .policies-header {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .policies-footer {
+    flex-direction: column;
+    text-align: center;
+  }
+}

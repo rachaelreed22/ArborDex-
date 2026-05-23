@@ -1,0 +1,190 @@
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiUrl } from '../utils/apiUrl';
+import { useHomeownerAuth } from '../context/HomeownerAuthContext';
+import { getTierLabel } from '../utils/homeownerTier';
+import './HomeownerTheme.css';
+
+const PLANS = [
+  {
+    key: 'free',
+    title: 'Free Tier',
+    price: '$0/mo',
+    limit: 'Up to 3 active plant profiles',
+  },
+  {
+    key: 'gardener',
+    title: "Gardener's Tier",
+    price: '$10.99/mo',
+    limit: 'Up to 40 active plant profiles',
+  },
+  {
+    key: 'estate',
+    title: 'Estate Tier',
+    price: '$35/mo',
+    limit: 'Up to 65 active plant profiles',
+  },
+];
+
+export default function HomeownerSignup() {
+  const navigate = useNavigate();
+  const { signup, login, getAccessToken } = useHomeownerAuth();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [plan, setPlan] = useState('free');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const selectedPlan = useMemo(() => PLANS.find((p) => p.key === plan), [plan]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signup({ email, password });
+      await login(email, password);
+
+      if (plan === 'free') {
+        navigate('/homeowners/plants', { replace: true });
+        return;
+      }
+
+      const token = await getAccessToken();
+      const res = await fetch(apiUrl('/api/stripe/create-checkout-session'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ tier: plan }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload.url) {
+        throw new Error(payload.error || 'Could not start Stripe checkout');
+      }
+
+      window.location.href = payload.url;
+    } catch (err) {
+      setError(err.message || 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="homeowner-shell min-h-screen px-4 py-10">
+      <div className="homeowner-surface mx-auto w-full max-w-3xl rounded-2xl p-8 shadow-2xl">
+        <h1 className="homeowner-heading text-center text-3xl font-bold">Create Homeowner Account</h1>
+        <p className="homeowner-subtext mt-2 text-center text-sm">Choose your tier and create your Homeowner's Edition login.</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="email">Email</label>
+              <input
+                id="email"
+                className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="password">Password</label>
+              <input
+                id="password"
+                className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="confirmPassword">Confirm Password</label>
+            <input
+              id="confirmPassword"
+              className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <h2 className="mb-3 text-lg font-semibold text-[#1d411d]">Select Tier</h2>
+            <div className="grid gap-3 md:grid-cols-3">
+              {PLANS.map((tier) => (
+                <button
+                  key={tier.key}
+                  type="button"
+                  onClick={() => setPlan(tier.key)}
+                  className={`homeowner-option-card rounded-xl p-4 text-left transition ${plan === tier.key ? 'homeowner-option-card-active shadow' : ''}`}
+                >
+                  <p className="text-sm font-semibold text-[#1d411d]">{tier.title}</p>
+                  <p className="homeowner-subtext mt-1 text-xl font-bold">{tier.price}</p>
+                  <p className="homeowner-subtext mt-1 text-xs">{tier.limit}</p>
+                </button>
+              ))}
+            </div>
+            <p className="homeowner-muted mt-3 text-sm">
+              Over 65 active plant IDs requires a B2B arrangement with custom pricing. Email{' '}
+              <a className="font-semibold underline" href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a>.
+            </p>
+          </div>
+
+          <label className="flex items-start gap-2 text-sm homeowner-subtext cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              disabled={loading}
+              className="mt-0.5 accent-[#1d411d]"
+              required
+            />
+            <span>
+              I agree to the{' '}
+              <Link to="/policies" target="_blank" className="font-semibold text-[#1d411d] underline">Policies &amp; Terms</Link>
+            </span>
+          </label>
+
+          {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading || !agreedToTerms}
+            className="homeowner-button-primary w-full rounded-md py-3 text-sm font-semibold transition disabled:opacity-60"
+          >
+            {loading ? 'Creating account...' : `Continue with ${getTierLabel(selectedPlan?.key || 'free')}`}
+          </button>
+        </form>
+
+        <p className="homeowner-muted mt-4 text-center text-sm">
+          Already have an account?{' '}
+          <Link to="/homeowners/login" className="font-semibold text-[#1d411d] underline">Sign in</Link>
+        </p>
+      </div>
+    </main>
+  );
+}

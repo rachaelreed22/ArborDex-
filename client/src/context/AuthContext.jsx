@@ -23,6 +23,18 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    const isHomeownerSession =
+      authUser?.user_metadata?.account_type === 'homeowner'
+      || (typeof window !== 'undefined' && window.location.pathname.startsWith('/homeowners'));
+
+    if (isHomeownerSession) {
+      // Homeowner auth is handled by HomeownerAuthContext; skip staff profile hydration.
+      setUser(null);
+      setUserRole(null);
+      setUserParkId(null);
+      return;
+    }
+
     setUser(authUser);
 
     try {
@@ -154,6 +166,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

@@ -375,6 +375,51 @@ export default function TreeDetail() {
     : diagnosticsStatus === "error"
     ? "Diagnostics failed"
     : "Diagnostics idle";
+  const hazardDetails = Array.isArray(diagnostics?.hazard_details)
+    ? diagnostics.hazard_details
+    : [];
+  const hazardsDetected = (() => {
+    const raw = (diagnostics?.hazards_detected ?? diagnostics?.hazard_detected ?? "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    if (raw === "yes" || raw === "y" || raw === "true") return true;
+
+    if (hazardDetails.length > 0) return true;
+
+    const needsInspection = Boolean(diagnostics?.needs_human_inspection);
+    if (needsInspection) return true;
+
+    const alerts = Array.isArray(diagnostics?.alerts) ? diagnostics.alerts : [];
+    if (alerts.some((item) => /needs\s+human\s+inspection|hazard|unsafe|structural/i.test((item || "").toString()))) {
+      return true;
+    }
+
+    const riskFlags = Array.isArray(diagnostics?.risk_flags)
+      ? diagnostics.risk_flags
+      : Array.isArray(diagnostics?.riskFlags)
+        ? diagnostics.riskFlags
+        : [];
+
+    if (riskFlags.some((item) => /decay|rot|hollow|cavity|instability|failure|fall\s*risk|unsafe|structural/i.test((item || "").toString()))) {
+      return true;
+    }
+
+    const summaryText = [
+      diagnostics?.summary,
+      diagnostics?.environment,
+      diagnostics?.public_about,
+      ...(Array.isArray(diagnostics?.photo_summaries) ? diagnostics.photo_summaries : []),
+    ]
+      .map((item) => (item == null ? "" : item.toString().toLowerCase()))
+      .join(" | ");
+
+    const hasDecay = /(decay|decaying|rot|rotting|hollow|cavity|loss\s+of\s+integrity)/i.test(summaryText);
+    const hasTrunkBaseRoot = /(trunk|base|basal|root|root\s*flare|root\s*collar)/i.test(summaryText);
+    const hasNegatedRisk = /(no|not|without)\s+(clear\s+)?(signs?\s+of\s+)?(hazards?|risk|decay|rot|instability|failure)/i.test(summaryText);
+
+    return hasDecay && hasTrunkBaseRoot && !hasNegatedRisk;
+  })();
 
 return (
   <div className="page tree-detail-page">
@@ -746,6 +791,25 @@ return (
           </ul>
         </section>
       )}
+
+      <section className={`card section-risks ${needsAttention ? "needs-attention" : ""}`}>
+        <h2>Hazards Detected</h2>
+        <p className={hazardsDetected ? "tree-hazard-flag" : ""}>{hazardsDetected ? "Y" : "N"}</p>
+        {hazardsDetected && (
+          <>
+            <h3 className="tree-hazard-flag">Hazard Details</h3>
+            {hazardDetails.length > 0 ? (
+              <ul className="risk-list">
+                {hazardDetails.map((item, i) => (
+                  <li key={i} className="risk-item">{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>Hazard inferred from diagnostics risk signals (decay/structural instability); needs human inspection.</p>
+            )}
+          </>
+        )}
+      </section>
     </>
   )}
 

@@ -49,7 +49,7 @@ export default function Home() {
               <h2 className="section-title">⚙️ Admin Dashboard</h2>
               <button 
                 className="btn btn-admin"
-                onClick={() => navigate("/admin")}
+                onClick={() => navigate("/staff/login")}
                 aria-label="Admin Dashboard"
               >
                 Staff Access
@@ -61,10 +61,10 @@ export default function Home() {
               <h2 className="section-title">🏡 Homeowner's Edition</h2>
               <button 
                 className="btn btn-homeowner"
-                onClick={() => navigate("/homeowners")}
+                onClick={() => navigate("/homeowners/login")}
                 aria-label="Homeowner's Edition"
               >
-                Coming Soon
+                Enter Homeowner Edition
               </button>
             </section>
           </div>

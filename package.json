@@ -4,6 +4,7 @@
   "description": "QR code based tree/plant management system for MO parks",
   "private": true,
   "scripts": {
+    "dev": "npm run dev:client",
     "dev:server": "cd server && node index.js",
     "dev:client": "cd client && npm run dev",
     "build": "cd client && npm run build",

@@ -1,3 +1,6 @@
+@tailwind components;
+@tailwind utilities;
+
 /* ===========================
    ArborDex Global Styles
    Clean build — duplicates removed,
@@ -21,7 +24,6 @@ body,
 
 html {
   background: linear-gradient(135deg, #31bb4a, #b1b53b);
-  background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
 }

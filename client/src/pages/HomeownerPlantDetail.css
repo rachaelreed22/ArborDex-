@@ -1,0 +1,184 @@
+.homeowner-plant-detail-page {
+  --fall-burnt-orange: var(--homeowner-green-dark);
+  --fall-bright-yellow: var(--homeowner-lime-bright);
+  --fall-light-brown: var(--homeowner-olive);
+  --fall-border: var(--homeowner-green-dark);
+  --fall-text: #4a2509;
+  --fall-card-bg: linear-gradient(160deg, var(--homeowner-lime-bright) 0%, var(--homeowner-green-dark) 54%, var(--homeowner-olive) 100%);
+  --fall-card-soft: rgba(255, 247, 220, 0.9);
+}
+
+.homeowner-plant-detail-page .card {
+  background: var(--fall-card-bg);
+  border-color: var(--fall-border);
+  box-shadow: 0 3px 10px rgba(29, 65, 29, 0.26);
+}
+
+.homeowner-detail-hero .detail-title {
+  color: var(--fall-text);
+}
+
+.homeowner-detail-error {
+  margin: 0;
+  color: #8f1d1d;
+  font-weight: 700;
+}
+
+.homeowner-plant-photo-gallery p {
+  margin: 0;
+}
+
+.homeowner-detail-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.homeowner-detail-photo-link {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--fall-border);
+  background: #f7e6c7;
+}
+
+.homeowner-detail-thumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.homeowner-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.homeowner-diag-mini-card {
+  background: var(--fall-card-soft);
+  border: 1px solid var(--fall-border);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+}
+
+.homeowner-diag-mini-card h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.02rem;
+  color: var(--fall-text);
+}
+
+.homeowner-diag-label {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #f7e39b;
+  font-weight: 700;
+}
+
+.homeowner-diag-mini-card .homeowner-diag-label {
+  color: #1d411d;
+}
+
+.homeowner-diag-subheading {
+  margin-top: 0.9rem;
+}
+
+.homeowner-diagnostics-board {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+}
+
+.diag-card {
+  padding: 1rem;
+}
+
+.diag-card h2 {
+  margin: 0;
+  color: #fff7d8;
+}
+
+.diag-card p {
+  margin: 0.35rem 0 0;
+  line-height: 1.45;
+  color: #fff2cc;
+}
+
+.diag-card ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.diag-card li {
+  margin-bottom: 0.35rem;
+  color: #fff2cc;
+}
+
+.diag-card li::marker {
+  color: #ffe388;
+}
+
+.diag-card-span-full {
+  grid-column: 1 / -1;
+}
+
+.diag-card-warn {
+  background: linear-gradient(165deg, #f4c93f 0%, #507635 48%, #1d411d 100%);
+  border-color: #1d411d;
+}
+
+.diag-card-note {
+  background: linear-gradient(160deg, #f4e4a6 0%, #9bb16d 55%, #657527 100%);
+  border-color: #2e5a2e;
+}
+
+.homeowner-diag-section {
+  margin-top: 1rem;
+}
+
+.homeowner-diag-section p {
+  line-height: 1.45;
+}
+
+.homeowner-diag-section ul {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.homeowner-diag-section li {
+  margin-bottom: 0.35rem;
+}
+
+.homeowner-diag-section-warn {
+  background: rgba(211, 229, 175, 0.72);
+  border: 1px solid #507635;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+}
+
+.homeowner-diag-section-note {
+  background: rgba(232, 239, 195, 0.78);
+  border: 1px solid #657527;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+}
+
+.homeowner-hazard-flag {
+  color: #ff6b6b !important;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .homeowner-plant-detail-page .tree-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .homeowner-diagnostics-board {
+    grid-template-columns: 1fr;
+  }
+}

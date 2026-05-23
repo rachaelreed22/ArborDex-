@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMode } from '../context/ModeContext';
 import { apiUrl } from '../utils/apiUrl';
+import { useHomeownerAuth } from '../context/HomeownerAuthContext';
+import './HomeownerTheme.css';
 import './AskArborAI.css';
+import './HomeownerAskArborAI.css';
 
 function createMessage({
   role,
@@ -28,14 +30,13 @@ function createMessage({
   };
 }
 
-export default function AskArborAI() {
-  const { mode } = useMode();
-  const isStaff = mode === 'dex';
+export default function HomeownerAskArborAI() {
   const navigate = useNavigate();
+  const { getAccessToken } = useHomeownerAuth();
   const [messages, setMessages] = useState([
     createMessage({
       role: 'assistant',
-      text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
+      text: 'Hi! I am ArborAI. Upload or take a plant photo and I can help you identify it before you create a new Plant ID or add this scan to an existing one.',
     }),
   ]);
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
@@ -43,45 +44,12 @@ export default function AskArborAI() {
   const [isLoading, setIsLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
-  const [listings, setListings] = useState([]);
-  const [isListingsLoading, setIsListingsLoading] = useState(false);
+  const [plants, setPlants] = useState([]);
+  const [isPlantsLoading, setIsPlantsLoading] = useState(false);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
-  const [selectedListingId, setSelectedListingId] = useState('');
+  const [selectedPlantId, setSelectedPlantId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
   const bottomRef = useRef(null);
-
-  const buildPrefillDescription = ({ summary, confidence, healthScore, recommendations, assistantText }) => {
-    const parts = [
-      typeof summary === 'string' ? summary.trim() : '',
-      confidence ? `Confidence: ${confidence}` : '',
-      healthScore !== undefined && healthScore !== null ? `Health score: ${healthScore}` : '',
-      Array.isArray(recommendations) && recommendations.length > 0
-        ? `Care tips: ${recommendations.slice(0, 2).join(' ')}`
-        : '',
-      typeof assistantText === 'string' ? assistantText.trim() : '',
-    ].filter(Boolean);
-
-    return parts.join('\n\n');
-  };
-
-  const resetConversation = () => {
-    setMessages([
-      createMessage({
-        role: 'assistant',
-        text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
-      }),
-    ]);
-    setQuestion('');
-    setUploadedPhotos([]);
-    setActionError('');
-    setListings([]);
-    setIsListingsLoading(false);
-    setIsActionLoading(false);
-    setIsLoading(false);
-    setAttachDialogOpen(false);
-    setSelectedListingId('');
-    setAttachMessageId('');
-  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,6 +66,24 @@ export default function AskArborAI() {
     };
   }, [photoPreviews]);
 
+  async function authJsonFetch(path, options = {}) {
+    const token = await getAccessToken();
+    const response = await fetch(apiUrl(path), {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || 'Request failed');
+    }
+
+    return payload;
+  }
+
   const handleFilesSelected = (event) => {
     const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
     if (!files.length) return;
@@ -106,22 +92,34 @@ export default function AskArborAI() {
   };
 
   const removePhoto = (index) => {
-    setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
+    setUploadedPhotos((prev) => prev.filter((_file, fileIndex) => fileIndex !== index));
   };
 
-  const resetComposer = () => {
+  const resetConversation = () => {
+    setMessages([
+      createMessage({
+        role: 'assistant',
+        text: 'Hi! I am ArborAI. Upload or take a plant photo and I can help you identify it before you create a new Plant ID or add this scan to an existing one.',
+      }),
+    ]);
     setQuestion('');
     setUploadedPhotos([]);
+    setActionError('');
+    setPlants([]);
+    setIsPlantsLoading(false);
+    setIsActionLoading(false);
+    setIsLoading(false);
+    setAttachDialogOpen(false);
+    setSelectedPlantId('');
+    setAttachMessageId('');
   };
 
   const markActionCompleted = (messageId) => {
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId
-          ? { ...message, actionCompleted: true, showActions: false }
-          : message
-      )
-    );
+    setMessages((prev) => prev.map((message) => (
+      message.id === messageId
+        ? { ...message, actionCompleted: true, showActions: false }
+        : message
+    )));
   };
 
   const appendAssistantMessage = (text) => {
@@ -134,21 +132,19 @@ export default function AskArborAI() {
     if (isLoading) return;
 
     const imagePreviewUrls = uploadedPhotos.map((file) => URL.createObjectURL(file));
-
     setMessages((prev) => [
       ...prev,
       createMessage({
         role: 'user',
-        text: trimmedQuestion || 'Analyze these photos',
+        text: trimmedQuestion || 'Analyze these plant photos',
         photos: imagePreviewUrls,
       }),
     ]);
 
     setIsLoading(true);
-
     try {
       const formData = new FormData();
-      formData.append('question', trimmedQuestion);
+      formData.append('question', trimmedQuestion || 'Please analyze these plant photos for identification and condition.');
       uploadedPhotos.forEach((file) => formData.append('photos', file));
 
       const response = await fetch(apiUrl('/api/ai/ask-arborai'), {
@@ -156,7 +152,7 @@ export default function AskArborAI() {
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to get ArborAI response');
       }
@@ -165,7 +161,12 @@ export default function AskArborAI() {
       const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
       const photoSummaries = Array.isArray(data.photo_summaries) ? data.photo_summaries : [];
       const hazardDetails = Array.isArray(data.hazard_details) ? data.hazard_details : [];
+      const confidence = data.confidence || 'Unknown';
+      const healthScore = data.health_score ?? 'Unknown';
+      const species = data.species || 'Unknown';
+      const summary = data.summary || 'No summary returned.';
 
+      // Frontend inference fallback for hazards
       const hazardTextBlob = [
         data.summary,
         data.raw_ai_message,
@@ -201,10 +202,6 @@ export default function AskArborAI() {
         ['yes', 'y', 'true'].includes((data.hazards_detected || '').toString().trim().toLowerCase())
           ? 'Yes'
           : 'No';
-      const confidence = data.confidence || 'Unknown';
-      const healthScore = data.health_score ?? 'Unknown';
-      const species = data.species || 'Unknown';
-      const summary = data.summary || 'No summary returned.';
 
       const assistantText =
         data.raw_ai_message ||
@@ -244,16 +241,11 @@ export default function AskArborAI() {
         }),
       ]);
 
-      resetComposer();
+      setQuestion('');
+      setUploadedPhotos([]);
       setActionError('');
     } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        createMessage({
-          role: 'assistant',
-          text: `I could not complete that scan yet: ${error.message}`,
-        }),
-      ]);
+      appendAssistantMessage(`I could not complete that scan yet: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -262,38 +254,34 @@ export default function AskArborAI() {
   const onComposerKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      sendMessage();
+      void sendMessage();
     }
   };
 
-  const createTreeFromScan = async (message) => {
+  const createPlantFromScan = async (message) => {
     if (!message?.scanPayload) {
       appendAssistantMessage('This scan is missing payload data. Run a new scan and try again.');
       return;
     }
 
-    const species = (message.scanPayload.species || '').toString().trim();
-    const title = species || 'Untitled Tree';
-    const description = buildPrefillDescription({
-      summary: message.scanPayload.summary,
-      confidence: message.scanPayload.confidence,
-      healthScore: message.scanPayload.health_score,
-      recommendations: message.scanPayload.recommendations,
-      assistantText: message.text,
-    });
+    setIsActionLoading(true);
+    setActionError('');
+    try {
+      const payload = await authJsonFetch('/api/homeowners/ai/create-plant-from-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message.scanPayload),
+      });
 
-    markActionCompleted(message.id);
-    navigate('/add', {
-      state: {
-        fromScan: {
-          title,
-          description,
-          photos: Array.isArray(message.photoFiles) ? message.photoFiles : [],
-          scanPayload: message.scanPayload,
-          assistantText: message.text,
-        },
-      },
-    });
+      markActionCompleted(message.id);
+      appendAssistantMessage(`Created a new Plant ID and attached ${payload.added_photos || 0} photo(s).`);
+      navigate(`/homeowners/plants/${payload.plant.id}`);
+    } catch (error) {
+      setActionError(error.message);
+      appendAssistantMessage(`Create Plant ID failed: ${error.message}`);
+    } finally {
+      setIsActionLoading(false);
+    }
   };
 
   const openAttachDialog = async (message) => {
@@ -306,38 +294,33 @@ export default function AskArborAI() {
     setAttachDialogOpen(true);
     setActionError('');
 
-    if (listings.length > 0) {
-      if (!selectedListingId) {
-        setSelectedListingId(listings[0].id);
+    if (plants.length > 0) {
+      if (!selectedPlantId) {
+        setSelectedPlantId(plants[0].id);
       }
       return;
     }
 
-    setIsListingsLoading(true);
+    setIsPlantsLoading(true);
     try {
-      const response = await fetch(apiUrl('/api/listings'));
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to load trees');
-      }
-
-      const normalized = Array.isArray(data) ? data : [];
-      setListings(normalized);
+      const payload = await authJsonFetch('/api/homeowners/plants');
+      const normalized = Array.isArray(payload.plants) ? payload.plants : [];
+      setPlants(normalized);
       if (normalized[0]?.id) {
-        setSelectedListingId(normalized[0].id);
+        setSelectedPlantId(normalized[0].id);
       }
     } catch (error) {
       setActionError(error.message);
-      appendAssistantMessage(`Could not load trees for attach: ${error.message}`);
+      appendAssistantMessage(`Could not load Plant IDs for attach: ${error.message}`);
     } finally {
-      setIsListingsLoading(false);
+      setIsPlantsLoading(false);
     }
   };
 
-  const attachScanToExistingTree = async () => {
+  const attachScanToExistingPlant = async () => {
     if (!attachMessageId) return;
-    if (!selectedListingId) {
-      setActionError('Select a tree before attaching this scan.');
+    if (!selectedPlantId) {
+      setActionError('Select a Plant ID before attaching this scan.');
       return;
     }
 
@@ -349,29 +332,23 @@ export default function AskArborAI() {
 
     setIsActionLoading(true);
     setActionError('');
-
     try {
-      const response = await fetch(apiUrl('/api/ai/attach-scan-to-tree'), {
+      const payload = await authJsonFetch('/api/homeowners/ai/attach-scan-to-plant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          listing_id: selectedListingId,
+          plant_id: selectedPlantId,
           ...sourceMessage.scanPayload,
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to attach scan to tree');
-      }
-
       markActionCompleted(sourceMessage.id);
       setAttachDialogOpen(false);
-      appendAssistantMessage(`Attached ${data.added_photos} photo(s) to tree ${data.listing_id}.`);
-      navigate(`/listing/${data.listing_id}`);
+      appendAssistantMessage(`Added ${payload.added_photos || 0} photo(s) to Plant ID ${payload.plant.id}.`);
+      navigate(`/homeowners/plants/${payload.plant.id}`);
     } catch (error) {
       setActionError(error.message);
-      appendAssistantMessage(`Attach scan failed: ${error.message}`);
+      appendAssistantMessage(`Add to existing Plant ID failed: ${error.message}`);
     } finally {
       setIsActionLoading(false);
     }
@@ -424,6 +401,17 @@ export default function AskArborAI() {
           </div>
         )}
 
+        {diagnostics.photoSummaries.length > 0 && (
+          <div className="ask-diag-section">
+            <p className="ask-diag-label">Photo Notes</p>
+            <ul>
+              {diagnostics.photoSummaries.map((note, index) => (
+                <li key={`note-${index}`}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="ask-diag-section">
           <p className="ask-diag-label">Hazards Detected</p>
           <p>{diagnostics.hazardsDetected === 'Yes' ? 'Y' : 'N'}</p>
@@ -439,19 +427,8 @@ export default function AskArborAI() {
                 ))}
               </ul>
             ) : (
-              <p>No specific hazard details returned.</p>
+              <p>Hazard inferred from diagnostics risk signals (decay/structural instability); needs human inspection.</p>
             )}
-          </div>
-        )}
-
-        {diagnostics.photoSummaries.length > 0 && (
-          <div className="ask-diag-section">
-            <p className="ask-diag-label">Photo Notes</p>
-            <ul>
-              {diagnostics.photoSummaries.map((note, index) => (
-                <li key={`note-${index}`}>{note}</li>
-              ))}
-            </ul>
           </div>
         )}
       </div>
@@ -459,31 +436,52 @@ export default function AskArborAI() {
   };
 
   return (
-    <main className="ask-page">
-      <section className="ask-shell">
-        <header className="ask-header">
-          <div className="ask-header-row">
-            <h1>Ask ArborAI</h1>
-            <button className="btn btn-secondary" onClick={() => navigate("/")}>
-              Home
+    <main className="ask-page homeowner-shell homeowner-ask-page">
+      <section className="ask-shell homeowner-ask-shell">
+        <header className="ask-header homeowner-ask-header">
+          <div className="ask-header-row homeowner-ask-header-row">
+            <div>
+              <p className="homeowner-ask-kicker">Homeowner's Edition</p>
+              <h1>Ask ArborAI</h1>
+              <p>Scan a plant first, then choose whether to create a new Plant ID or add the scan to an existing one.</p>
+            </div>
+            <button className="homeowner-button-secondary homeowner-ask-back-button" onClick={() => navigate('/homeowners/account')}>
+              Back to Account
             </button>
           </div>
-          <p>Snap, upload, ask, and get species plus health diagnostics instantly.</p>
+
+          <div className="homeowner-ask-intro-grid">
+            <div className="homeowner-ask-intro-card">
+              <span className="homeowner-ask-intro-label">Step 1</span>
+              <strong>Upload or take photos</strong>
+              <p>Use one clear photo or a small set that all belong to the same plant.</p>
+            </div>
+            <div className="homeowner-ask-intro-card">
+              <span className="homeowner-ask-intro-label">Step 2</span>
+              <strong>Review the scan</strong>
+              <p>ArborAI returns an identification guess, health score, risks, and next-step notes.</p>
+            </div>
+            <div className="homeowner-ask-intro-card">
+              <span className="homeowner-ask-intro-label">Step 3</span>
+              <strong>Save it where it belongs</strong>
+              <p>Create a new Plant ID or attach the scan to an existing profile in one step.</p>
+            </div>
+          </div>
         </header>
 
-        <section className="ask-chat" aria-live="polite">
+        <section className="ask-chat homeowner-ask-chat" aria-live="polite">
           {messages.map((message) => (
             <article
               key={message.id}
               className={`ask-message ${message.role === 'user' ? 'ask-user' : 'ask-assistant'}`}
             >
-              <div className="ask-bubble">
+              <div className={`ask-bubble homeowner-ask-bubble ${message.role === 'user' ? 'homeowner-ask-bubble-user' : 'homeowner-ask-bubble-assistant'}`}>
                 {message.text && <p>{message.text}</p>}
 
                 {message.photos.length > 0 && (
                   <div className="ask-photo-row">
                     {message.photos.map((url, index) => (
-                      <img key={`${message.id}-photo-${index}`} src={url} alt="Uploaded tree" />
+                      <img key={`${message.id}-photo-${index}`} src={url} alt="Uploaded plant" />
                     ))}
                   </div>
                 )}
@@ -491,25 +489,13 @@ export default function AskArborAI() {
                 {renderDiagnostics(message.diagnostics)}
 
                 {message.showActions && !message.actionCompleted && (
-                  <div className="ask-action-row">
-                    {isStaff && (
-                      <button
-                        type="button"
-                        onClick={() => createTreeFromScan(message)}
-                        disabled={isActionLoading}
-                      >
-                        Create Tree From This Scan
-                      </button>
-                    )}
-                    {isStaff && (
-                      <button
-                        type="button"
-                        onClick={() => openAttachDialog(message)}
-                        disabled={isActionLoading}
-                      >
-                        Attach to Existing Tree
-                      </button>
-                    )}
+                  <div className="ask-action-row homeowner-ask-action-row">
+                    <button type="button" onClick={() => createPlantFromScan(message)} disabled={isActionLoading}>
+                      Create New Plant ID
+                    </button>
+                    <button type="button" onClick={() => openAttachDialog(message)} disabled={isActionLoading}>
+                      Add to Existing Plant ID
+                    </button>
                     <button type="button" onClick={resetConversation} disabled={isActionLoading}>
                       Start Over
                     </button>
@@ -531,8 +517,12 @@ export default function AskArborAI() {
           <div ref={bottomRef}></div>
         </section>
 
-        <section className="ask-composer">
+        <section className="ask-composer homeowner-ask-composer">
           {actionError && <p className="ask-error">{actionError}</p>}
+
+          <div className="homeowner-ask-composer-note">
+            Tip: keep each scan to one plant. Mixed photos lower the odds of a usable Plant ID.
+          </div>
 
           {photoPreviews.length > 0 && (
             <div className="ask-selected-photos">
@@ -547,21 +537,22 @@ export default function AskArborAI() {
             </div>
           )}
 
-          <div className="ask-input-row">
+          <div className="ask-input-row homeowner-ask-input-row">
             <textarea
+              className="homeowner-ask-textarea"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               onKeyDown={onComposerKeyDown}
               rows={2}
-              placeholder="Ask ArborAI anything..."
+              placeholder="Ask ArborAI anything about this plant..."
             />
 
-            <div className="ask-tools">
-              <label className="ask-tool-btn" htmlFor="camera-input">
+            <div className="ask-tools homeowner-ask-tools">
+              <label className="ask-tool-btn homeowner-ask-tool-btn" htmlFor="homeowner-camera-input">
                 Take Photo
               </label>
               <input
-                id="camera-input"
+                id="homeowner-camera-input"
                 type="file"
                 accept="image/*"
                 capture="environment"
@@ -569,11 +560,11 @@ export default function AskArborAI() {
                 hidden
               />
 
-              <label className="ask-tool-btn" htmlFor="upload-input">
+              <label className="ask-tool-btn homeowner-ask-tool-btn" htmlFor="homeowner-upload-input">
                 Upload Photo
               </label>
               <input
-                id="upload-input"
+                id="homeowner-upload-input"
                 type="file"
                 accept="image/*"
                 multiple
@@ -581,7 +572,7 @@ export default function AskArborAI() {
                 hidden
               />
 
-              <button type="button" className="ask-send-btn" onClick={sendMessage} disabled={isLoading}>
+              <button type="button" className="ask-send-btn homeowner-ask-send-btn" onClick={() => void sendMessage()} disabled={isLoading}>
                 Send
               </button>
             </div>
@@ -589,26 +580,26 @@ export default function AskArborAI() {
         </section>
 
         {attachDialogOpen && (
-          <div className="ask-modal-overlay" role="dialog" aria-modal="true" aria-label="Attach scan dialog">
-            <div className="ask-modal-card">
-              <h2>Attach Scan To Existing Tree</h2>
+          <div className="ask-modal-overlay" role="dialog" aria-modal="true" aria-label="Add scan to existing plant ID dialog">
+            <div className="ask-modal-card homeowner-ask-modal-card">
+              <h2>Add Scan To Existing Plant ID</h2>
 
-              {isListingsLoading && <p>Loading tree list...</p>}
+              {isPlantsLoading && <p>Loading plant IDs...</p>}
 
-              {!isListingsLoading && listings.length === 0 && (
-                <p>No trees found. Add a tree first or use Create Tree From This Scan.</p>
+              {!isPlantsLoading && plants.length === 0 && (
+                <p>No plant IDs found. Create a Plant ID first or use Create New Plant ID.</p>
               )}
 
-              {!isListingsLoading && listings.length > 0 && (
-                <label className="ask-modal-field">
-                  Select tree
+              {!isPlantsLoading && plants.length > 0 && (
+                <label className="ask-modal-field homeowner-ask-modal-field">
+                  Select Plant ID
                   <select
-                    value={selectedListingId}
-                    onChange={(event) => setSelectedListingId(event.target.value)}
+                    value={selectedPlantId}
+                    onChange={(event) => setSelectedPlantId(event.target.value)}
                   >
-                    {listings.map((listing) => (
-                      <option key={listing.id} value={listing.id}>
-                        {listing.title || 'Untitled Tree'} ({listing.id})
+                    {plants.map((plant) => (
+                      <option key={plant.id} value={plant.id}>
+                        {plant.name || 'Untitled Plant'} ({plant.id})
                       </option>
                     ))}
                   </select>
@@ -618,15 +609,15 @@ export default function AskArborAI() {
               <div className="ask-modal-actions">
                 <button
                   type="button"
-                  className="ask-send-btn"
-                  onClick={attachScanToExistingTree}
-                  disabled={isActionLoading || isListingsLoading || listings.length === 0}
+                  className="ask-send-btn homeowner-ask-send-btn"
+                  onClick={() => void attachScanToExistingPlant()}
+                  disabled={isActionLoading || isPlantsLoading || plants.length === 0}
                 >
-                  Attach Scan
+                  Add Scan
                 </button>
                 <button
                   type="button"
-                  className="ask-tool-btn"
+                  className="ask-tool-btn homeowner-ask-tool-btn"
                   onClick={() => setAttachDialogOpen(false)}
                   disabled={isActionLoading}
                 >

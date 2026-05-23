@@ -68,15 +68,16 @@ export default function Navbar() {
           Ask ArborAI
         </NavLink>
 
+        {isAuthenticated && isStaff && (
+          <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
+            Park Report
+          </NavLink>
+        )}
+
         {isAuthenticated && (
-          <>
-            <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
-              Park Report
-            </NavLink>
-            <button className="logout-btn" onClick={handleLogout}>
-              Sign Out
-            </button>
-          </>
+          <button className="logout-btn" onClick={handleLogout}>
+            Sign Out
+          </button>
         )}
 
         <button className="mode-toggle" onClick={() => { toggleMode(); setMenuOpen(false); }}>

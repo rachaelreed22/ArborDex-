@@ -105,6 +105,38 @@
   margin: 1.5rem 0 0;
 }
 
+.terms-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #f3faf3;
+  border: 1px solid #c0dcc0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.terms-check-row input[type='checkbox'] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: #2e5e2e;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.terms-check-label {
+  font-size: 0.9rem;
+  color: #274f27;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.terms-check-label a {
+  color: #1d411d;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 @media (max-width: 600px) {
   .admin-login-box {
     padding: 1.5rem;

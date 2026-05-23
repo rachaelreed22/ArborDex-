@@ -64,6 +64,7 @@
   display: flex;
   flex-direction: column;
   transition: transform 0.15s ease;
+  will-change: transform;
 }
 
 .tree-card:hover {
@@ -83,6 +84,7 @@
   position: relative;
   height: 160px;
   background: #9fe59c;
+  contain: layout;
 }
 
 .tree-card-photo {
@@ -145,6 +147,15 @@
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
   color: #555;
+}
+
+.tree-card-hazards {
+  font-weight: 700;
+}
+
+.tree-card-hazards-danger {
+  color: #c21717;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .attention-pill {

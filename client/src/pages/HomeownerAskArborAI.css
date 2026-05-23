@@ -1,0 +1,251 @@
+.homeowner-ask-page {
+  --homeowner-ask-card-bg: linear-gradient(160deg, var(--homeowner-lime-bright) 0%, var(--homeowner-green-dark) 54%, var(--homeowner-olive) 100%);
+  --homeowner-ask-card-soft: rgb(255 247 220 / 92%);
+  --homeowner-ask-border: var(--homeowner-green-dark);
+  padding: 1.5rem 1rem 2rem;
+}
+
+.homeowner-ask-shell {
+  max-width: 1080px;
+  border: 1px solid rgb(29 65 29 / 58%);
+  background: linear-gradient(145deg, rgb(245 231 168 / 96%) 0%, rgb(215 226 154 / 94%) 48%, rgb(138 168 72 / 90%) 100%);
+  box-shadow: 0 24px 44px rgb(19 46 19 / 24%);
+}
+
+.homeowner-ask-header {
+  padding: 1.35rem 1.4rem 1.2rem;
+  background:
+    linear-gradient(135deg, rgb(29 65 29 / 96%), rgb(47 92 47 / 94%)),
+    linear-gradient(120deg, transparent, rgb(163 244 63 / 12%));
+  color: #f4f8ea;
+}
+
+.homeowner-ask-header-row {
+  align-items: flex-start;
+}
+
+.homeowner-ask-kicker {
+  margin: 0 0 0.3rem;
+  color: rgb(219 233 176 / 92%);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.homeowner-ask-back-button {
+  background: rgb(245 238 207 / 92%);
+  padding: 0.6rem 0.95rem;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.homeowner-ask-intro-grid {
+  margin-top: 1.15rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.homeowner-ask-intro-card {
+  border: 1px solid rgb(29 65 29 / 56%);
+  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+  background: linear-gradient(160deg, rgb(244 201 63 / 92%) 0%, rgb(80 118 53 / 94%) 48%, rgb(29 65 29 / 96%) 100%);
+  box-shadow: 0 8px 18px rgb(19 46 19 / 16%);
+}
+
+.homeowner-ask-intro-card strong {
+  display: block;
+  margin-top: 0.15rem;
+  color: #fff8dc;
+}
+
+.homeowner-ask-intro-card p {
+  margin-top: 0.35rem;
+  color: rgb(255 242 204 / 92%);
+}
+
+.homeowner-ask-intro-label {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.58rem;
+  background: rgb(163 244 63 / 18%);
+  color: #e9f7b6;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.homeowner-ask-chat {
+  padding: 1.15rem;
+  background:
+    linear-gradient(180deg, rgb(245 238 207 / 36%), rgb(255 255 255 / 8%)),
+    transparent;
+}
+
+.homeowner-ask-bubble {
+  box-shadow: 0 8px 18px rgb(27 51 22 / 12%);
+  border-radius: 14px;
+}
+
+.homeowner-ask-bubble-assistant {
+  background: var(--homeowner-ask-card-soft);
+  border: 1px solid var(--homeowner-ask-border);
+  color: #4a2509;
+}
+
+.homeowner-ask-bubble-user {
+  background: var(--homeowner-ask-card-bg);
+  border: 1px solid var(--homeowner-ask-border);
+  color: #fff2cc;
+}
+
+.homeowner-ask-bubble-assistant .ask-diagnostics {
+  background: rgb(255 247 220 / 94%);
+  border-color: var(--homeowner-ask-border);
+}
+
+.homeowner-ask-bubble-assistant .ask-diag-card {
+  background: rgb(255 255 255 / 62%);
+  border-color: var(--homeowner-ask-border);
+}
+
+.homeowner-ask-bubble-assistant .ask-diag-label {
+  color: var(--homeowner-green-dark);
+}
+
+.homeowner-ask-bubble-assistant .ask-diag-card h3,
+.homeowner-ask-bubble-assistant .ask-diagnostics p,
+.homeowner-ask-bubble-assistant .ask-diagnostics li {
+  color: #4a2509;
+}
+
+.homeowner-ask-bubble-user .ask-diag-label,
+.homeowner-ask-bubble-user p,
+.homeowner-ask-bubble-user li,
+.homeowner-ask-bubble-user .ask-diag-card h3 {
+  color: #fff2cc;
+}
+
+.homeowner-ask-bubble-user .ask-photo-row img {
+  border-color: rgb(255 242 204 / 48%);
+}
+
+.homeowner-ask-action-row button,
+.homeowner-ask-tool-btn,
+.homeowner-ask-send-btn {
+  min-height: 42px;
+  padding: 0.58rem 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 3px 10px rgb(29 65 29 / 16%);
+}
+
+.homeowner-ask-action-row button,
+.homeowner-ask-tool-btn {
+  background: var(--homeowner-ask-card-soft);
+  color: #4a2509;
+  border: 1px solid var(--homeowner-ask-border);
+}
+
+.homeowner-ask-send-btn {
+  background: var(--homeowner-ask-card-bg);
+  border: 1px solid var(--homeowner-ask-border);
+  color: #fff2cc;
+}
+
+.homeowner-ask-action-row button:hover,
+.homeowner-ask-tool-btn:hover,
+.homeowner-ask-send-btn:hover,
+.homeowner-ask-back-button:hover {
+  transform: translateY(-1px);
+}
+
+.homeowner-ask-action-row button:disabled,
+.homeowner-ask-tool-btn:disabled,
+.homeowner-ask-send-btn:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.homeowner-ask-composer {
+  border-top: 1px solid rgb(29 65 29 / 28%);
+  background: linear-gradient(180deg, rgb(245 238 207 / 90%), rgb(246 240 208 / 98%));
+}
+
+.homeowner-ask-composer-note {
+  margin-bottom: 0.8rem;
+  border: 1px solid var(--homeowner-ask-border);
+  border-left: 4px solid var(--homeowner-green-dark);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: rgb(255 247 220 / 82%);
+  color: #4a2509;
+  font-size: 0.88rem;
+}
+
+.homeowner-ask-input-row {
+  gap: 0.8rem;
+}
+
+.homeowner-ask-textarea {
+  min-height: 88px;
+  border: 2px solid rgb(29 65 29 / 24%);
+  background: rgb(255 251 236 / 94%);
+  color: #4a2509;
+}
+
+.homeowner-ask-textarea::placeholder {
+  color: rgb(29 65 29 / 64%);
+}
+
+.homeowner-ask-textarea:focus {
+  border-color: var(--homeowner-green-dark);
+  box-shadow: 0 0 0 3px rgb(47 92 47 / 10%);
+}
+
+.homeowner-ask-tools {
+  align-items: stretch;
+}
+
+.homeowner-ask-modal-card {
+  background: linear-gradient(180deg, #fffdf2, #f8efc8);
+  border: 1px solid var(--homeowner-ask-border);
+  box-shadow: 0 20px 34px rgb(19 46 19 / 18%);
+}
+
+.homeowner-ask-modal-field select {
+  border: 2px solid rgb(29 65 29 / 22%);
+  background: rgb(255 251 236 / 94%);
+  color: #4a2509;
+}
+
+@media (max-width: 860px) {
+  .homeowner-ask-intro-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .homeowner-ask-page {
+    padding: 0.85rem 0.55rem 1.25rem;
+  }
+
+  .homeowner-ask-back-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .homeowner-ask-header {
+    padding: 1rem;
+  }
+
+  .homeowner-ask-chat,
+  .homeowner-ask-composer {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+}

@@ -1,0 +1,120 @@
+.homeowner-theme,
+:root {
+  --homeowner-green-dark: #1d411d;
+  --homeowner-green-mid: #2f5c2f;
+  --homeowner-green-soft: #3f6b28;
+  --homeowner-lime: #8fbf38;
+  --homeowner-lime-bright: #a3f43f;
+  --homeowner-moss: #8aa848;
+  --homeowner-olive: #657527;
+  --homeowner-cream-soft: #f5eecf;
+  --homeowner-cream-input: #f6f0d0;
+  --homeowner-highlight: #dbe9b0;
+  --homeowner-text-strong: #1d411d;
+  --homeowner-text-body: #244824;
+  --homeowner-text-muted: #1f3f1f;
+  --homeowner-shell-bg: linear-gradient(145deg, var(--homeowner-lime) 0%, var(--homeowner-green-mid) 56%, var(--homeowner-green-dark) 100%);
+  --homeowner-surface-bg: linear-gradient(145deg, rgb(245 231 168 / 95%) 0%, rgb(215 226 154 / 92%) 52%, rgb(138 168 72 / 88%) 100%);
+}
+
+.homeowner-shell {
+  min-height: 100vh;
+  background: var(--homeowner-shell-bg);
+}
+
+.homeowner-surface {
+  border: 1px solid rgb(29 65 29 / 55%);
+  background: var(--homeowner-surface-bg);
+}
+
+.homeowner-heading {
+  color: var(--homeowner-text-strong);
+}
+
+.homeowner-subtext {
+  color: var(--homeowner-text-body);
+}
+
+.homeowner-muted {
+  color: var(--homeowner-text-muted);
+}
+
+.homeowner-input {
+  border: 2px solid var(--homeowner-green-soft);
+  background: var(--homeowner-cream-input);
+  color: var(--homeowner-text-strong);
+}
+
+.homeowner-input:focus {
+  border-color: var(--homeowner-green-dark);
+}
+
+.homeowner-button-secondary {
+  border: 1px solid var(--homeowner-green-dark);
+  color: var(--homeowner-green-dark);
+}
+
+.homeowner-button-secondary:hover {
+  background: var(--homeowner-highlight);
+}
+
+.homeowner-button-primary {
+  background: var(--homeowner-green-dark);
+  color: #fff;
+}
+
+.homeowner-button-primary:hover {
+  background: #173517;
+}
+
+.homeowner-stat-card,
+.homeowner-option-card {
+  border: 1px solid var(--homeowner-green-soft);
+  background: var(--homeowner-cream-soft);
+}
+
+.homeowner-option-card-active {
+  border-color: var(--homeowner-green-dark);
+  background: var(--homeowner-highlight);
+}
+
+.homeowner-alert {
+  margin-top: 1rem;
+  border-radius: 10px;
+  border-left: 4px solid transparent;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.homeowner-alert-error {
+  border-left-color: #8f1d1d;
+  background: #fff0e6;
+  color: #7d1010;
+}
+
+.homeowner-alert-success {
+  border-left-color: #2f5b2f;
+  background: #e8f2cf;
+  color: var(--homeowner-text-strong);
+}
+
+.homeowner-panel {
+  margin-top: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--homeowner-green-soft);
+  padding: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.homeowner-panel-info {
+  background: #e7efc8;
+  color: var(--homeowner-text-strong);
+}
+
+.homeowner-panel-warn {
+  border-color: #7d6a1d;
+  background: #f7ecb8;
+  color: #54420f;
+}

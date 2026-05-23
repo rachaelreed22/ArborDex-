@@ -605,3 +605,8 @@ button:hover {
   border-radius: 8px;
 }
 
+.tree-hazard-flag {
+  color: #c21717;
+  font-weight: 800;
+}
+
