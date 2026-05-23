@@ -4,71 +4,112 @@ import "./Home.css";
 export default function Home() {
   const navigate = useNavigate();
 
+  const buyerSegments = [
+    {
+      title: "Municipalities",
+      outcomes: "Urban forestry inventory, storm response tracking, and transparent public records.",
+    },
+    {
+      title: "Botanical Gardens & Arboretums",
+      outcomes: "Interactive visitor journeys, education overlays, and donor-ready exhibits.",
+    },
+    {
+      title: "Schools & Universities",
+      outcomes: "Field-based learning, sustainability programs, and environmental science projects.",
+    },
+    {
+      title: "Conservation Organizations",
+      outcomes: "Habitat documentation, longitudinal health records, and community participation.",
+    },
+    {
+      title: "Parks & Tourism",
+      outcomes: "Interactive trail experiences, self-guided learning, and engagement analytics.",
+    },
+  ];
+
   return (
     <main className="home-page">
-      <div className="home-background">
-        <div className="home-overlay"></div>
-        
-        <div className="home-container">
-          <div className="home-content-box">
-            <h1 className="home-title">Welcome to ArborTag</h1>
-            <p className="home-subheading">Choose your path</p>
+      <div className="home-background" aria-hidden="true" />
+      <div className="home-overlay" aria-hidden="true" />
 
-            {/* Visit Your Park - Section 1 */}
-            <section className="home-section">
-              <h2 className="section-title">🌳 Visit Your Park</h2>
-              <button 
-                className="btn btn-park"
-                onClick={() => navigate("/parks")}
-                aria-label="Visit Your Park"
-              >
-                View Tree Database
-              </button>
-            </section>
+      <div className="home-container">
+        <section className="hero-panel reveal">
+          <p className="hero-kicker">ArborDex Platform • Powered by ArborTag</p>
+          <h1 className="hero-title">Modern Infrastructure for Urban Forestry</h1>
+          <p className="hero-subheading">
+            Turn every tree into searchable environmental infrastructure with QR identity, public education,
+            and operational data for teams that manage living ecosystems.
+          </p>
 
-            {/* Ask ArborAI and Scan A Tree - Horizontal */}
-            <section className="home-section home-section-duo">
-              <button 
-                className="btn btn-arborai"
-                onClick={() => navigate("/ask-arborai")}
-                aria-label="Ask ArborAI"
-              >
-                🤖 Ask ArborAI
-              </button>
-              <button 
-                className="btn btn-scan"
-                onClick={() => navigate("/scan")}
-                aria-label="Scan a Tree"
-              >
-                📱 Scan A Tree
-              </button>
-            </section>
-
-            {/* Admin Dashboard - Section 2 */}
-            <section className="home-section">
-              <h2 className="section-title">⚙️ Admin Dashboard</h2>
-              <button 
-                className="btn btn-admin"
-                onClick={() => navigate("/staff/login")}
-                aria-label="Admin Dashboard"
-              >
-                Staff Access
-              </button>
-            </section>
-
-            {/* Homeowner's Edition - Section 3 */}
-            <section className="home-section">
-              <h2 className="section-title">🏡 Homeowner's Edition</h2>
-              <button 
-                className="btn btn-homeowner"
-                onClick={() => navigate("/homeowners/login")}
-                aria-label="Homeowner's Edition"
-              >
-                Enter Homeowner Edition
-              </button>
-            </section>
+          <div className="hero-ctas">
+            <button className="home-btn home-btn-primary" onClick={() => navigate("/parks")}>Explore Public Tree Map</button>
+            <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners")}>See Homeowner Edition</button>
           </div>
-        </div>
+
+          <div className="signal-grid">
+            <article className="signal-card">
+              <h2>For Operations</h2>
+              <p>Reduce manual tracking work, standardize records, and improve maintenance decisions.</p>
+            </article>
+            <article className="signal-card">
+              <h2>For Communities</h2>
+              <p>Connect citizens, students, and visitors directly to the living landscape around them.</p>
+            </article>
+            <article className="signal-card">
+              <h2>For Reporting</h2>
+              <p>Build longitudinal data for grants, sustainability targets, and conservation outcomes.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="capability-panel reveal reveal-delay-1">
+          <header className="section-header">
+            <p className="section-eyebrow">Who It Serves</p>
+            <h2>Built For Institutions That Manage Public Green Assets</h2>
+          </header>
+
+          <div className="buyers-grid">
+            {buyerSegments.map((segment) => (
+              <article key={segment.title} className="buyer-card">
+                <h3>{segment.title}</h3>
+                <p>{segment.outcomes}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="capability-panel reveal reveal-delay-2">
+          <header className="section-header">
+            <p className="section-eyebrow">Platform Model</p>
+            <h2>One Ecosystem, Multiple Revenue Paths</h2>
+          </header>
+
+          <div className="business-grid">
+            <article className="business-card">
+              <h3>SaaS & Dashboard Access</h3>
+              <p>Subscription access for municipal, campus, and conservation operations teams.</p>
+            </article>
+            <article className="business-card">
+              <h3>QR + Deployment Services</h3>
+              <p>ArborTag hardware layer, onboarding, and implementation support for partner sites.</p>
+            </article>
+            <article className="business-card">
+              <h3>Data & Intelligence Layer</h3>
+              <p>Long-term ecosystem analytics supporting grants, planning, and policy reporting.</p>
+            </article>
+          </div>
+
+          <div className="action-lanes">
+            <button className="home-btn home-btn-accent" onClick={() => navigate("/staff/login")}>Staff & Partner Access</button>
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/scan")}>Scan A Tree</button>
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/ask-arborai")}>Ask ArborAI</button>
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/homeowners/login")}>Homeowner Login</button>
+          </div>
+
+          <p className="trust-note">
+            Pilot-ready for cities, schools, parks, and gardens. Request partnership onboarding to launch your first site.
+          </p>
+        </section>
       </div>
     </main>
   );
