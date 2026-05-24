@@ -27,6 +27,58 @@ function extractHistoricalUsesFromLogs(logs) {
   return "";
 }
 
+function extractLatestDiagnosticsFromLogs(logs) {
+  if (!Array.isArray(logs)) return null;
+
+  for (const entry of logs) {
+    if (entry?.source === "staff-measurements") continue;
+
+    let diagnosticsObj = entry?.diagnostics;
+    if (typeof diagnosticsObj === "string") {
+      try {
+        diagnosticsObj = JSON.parse(diagnosticsObj);
+      } catch {
+        diagnosticsObj = null;
+      }
+    }
+
+    if (diagnosticsObj && typeof diagnosticsObj === "object") {
+      return diagnosticsObj;
+    }
+  }
+
+  return null;
+}
+
+function extractLatestStaffMeasurementsFromLogs(logs) {
+  if (!Array.isArray(logs)) {
+    return { trunkDiameterInches: "", heightEstimateFeet: "" };
+  }
+
+  for (const entry of logs) {
+    if (entry?.source !== "staff-measurements") continue;
+
+    let diagnosticsObj = entry?.diagnostics;
+    if (typeof diagnosticsObj === "string") {
+      try {
+        diagnosticsObj = JSON.parse(diagnosticsObj);
+      } catch {
+        diagnosticsObj = null;
+      }
+    }
+
+    const measurements = diagnosticsObj?.staff_measurements || diagnosticsObj;
+    if (!measurements || typeof measurements !== "object") continue;
+
+    return {
+      trunkDiameterInches: measurements.trunk_diameter_inches?.toString() || "",
+      heightEstimateFeet: measurements.height_estimate_feet?.toString() || "",
+    };
+  }
+
+  return { trunkDiameterInches: "", heightEstimateFeet: "" };
+}
+
 export default function TreeDetail() {
   const { id } = useParams();
   const { mode } = useMode();
@@ -58,6 +110,12 @@ export default function TreeDetail() {
   const [diagnosticsStatus, setDiagnosticsStatus] = useState("idle");
   const [diagnosticsError, setDiagnosticsError] = useState("");
   const [diagnosticsLogs, setDiagnosticsLogs] = useState([]);
+  const [measurementForm, setMeasurementForm] = useState({
+    trunkDiameterInches: "",
+    heightEstimateFeet: "",
+  });
+  const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [measurementsMessage, setMeasurementsMessage] = useState("");
 
   const isStaff = mode === "dex";
   const needsAttention = isStaff && getNeedsAttention(diagnostics);
@@ -68,27 +126,11 @@ export default function TreeDetail() {
     async function loadTreeData() {
       const data = await fetchListing();
       if (!data || cancelled) return;
-
       const logs = await fetchDiagnosticsLogs();
-
-      const hasDescription = typeof data.description === "string" && data.description.trim().length > 0;
-      const hasHistoricalUses = Boolean(extractHistoricalUsesFromLogs(logs));
-      const shouldRunDiagnostics = mode === "dex" || !hasDescription || !hasHistoricalUses;
-
-      if (!shouldRunDiagnostics) {
-        setDiagnostics(null);
-        setDiagnosticsStatus("idle");
-        setDiagnosticsError("");
-        return;
-      }
-
-      await fetchDiagnostics();
-
-      // If public description was missing, refresh listing once after diagnostics
-      // so persisted friendly copy appears in the About section.
-      if (!hasDescription && !cancelled) {
-        await fetchListing();
-      }
+      const latestDiagnostics = extractLatestDiagnosticsFromLogs(logs);
+      setDiagnostics(latestDiagnostics);
+      setDiagnosticsStatus(latestDiagnostics ? "success" : "idle");
+      setDiagnosticsError("");
     }
 
     loadTreeData();
@@ -134,9 +176,11 @@ export default function TreeDetail() {
       const data = await res.json();
       const logs = Array.isArray(data) ? data : [];
       setDiagnosticsLogs(logs);
+      setMeasurementForm(extractLatestStaffMeasurementsFromLogs(logs));
       return logs;
     } catch {
       setDiagnosticsLogs([]);
+      setMeasurementForm({ trunkDiameterInches: "", heightEstimateFeet: "" });
       return [];
     }
   }
@@ -162,6 +206,68 @@ export default function TreeDetail() {
       setDiagnosticsStatus("error");
       setDiagnosticsError(err?.message || "Network error");
       console.error("Error fetching diagnostics:", err);
+    }
+  }
+
+  async function handleRunDiagnostics() {
+    setMeasurementsMessage("");
+    await fetchDiagnostics();
+
+    // If diagnostics generated public copy, refresh listing once so About text updates.
+    if (!listing?.description || !listing.description.toString().trim()) {
+      await fetchListing();
+    }
+
+    await fetchDiagnosticsLogs();
+  }
+
+  async function handleSaveMeasurements() {
+    setSavingMeasurements(true);
+    setMeasurementsMessage("");
+
+    try {
+      const trunkRaw = measurementForm.trunkDiameterInches.trim();
+      const heightRaw = measurementForm.heightEstimateFeet.trim();
+      const trunkValue = trunkRaw ? Number(trunkRaw) : null;
+      const heightValue = heightRaw ? Number(heightRaw) : null;
+
+      if ((trunkRaw && !Number.isFinite(trunkValue)) || (heightRaw && !Number.isFinite(heightValue))) {
+        throw new Error("Measurements must be valid numbers.");
+      }
+
+      if ((trunkValue !== null && trunkValue <= 0) || (heightValue !== null && heightValue <= 0)) {
+        throw new Error("Measurements must be greater than zero.");
+      }
+
+      const res = await fetch(apiUrl(`/api/listings/${id}/diagnostics-log`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getStaffHeaders(),
+        },
+        body: JSON.stringify({
+          source: "staff-measurements",
+          diagnostics: {
+            staff_measurements: {
+              trunk_diameter_inches: trunkValue,
+              height_estimate_feet: heightValue,
+            },
+          },
+          notes: "Manual staff measurements for age estimation.",
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || `Failed to save measurements (${res.status})`);
+      }
+
+      await fetchDiagnosticsLogs();
+      setMeasurementsMessage("Measurements saved. Run Diagnostics to refresh the public age estimate.");
+    } catch (err) {
+      setMeasurementsMessage(err?.message || "Could not save measurements.");
+    } finally {
+      setSavingMeasurements(false);
     }
   }
 
@@ -364,6 +470,10 @@ export default function TreeDetail() {
     (typeof diagnostics?.uses_throughout_history === "string" && diagnostics.uses_throughout_history.trim()) ||
     extractHistoricalUsesFromLogs(diagnosticsLogs) ||
     "";
+  const estimatedAgeText =
+    (typeof diagnostics?.estimated_age === "string" && diagnostics.estimated_age.trim()) ||
+    "";
+  const staffMeasurements = diagnostics?.staff_measurements || null;
   const diagnosticsChipLabel = !isStaff
     ? "Public mode"
     : diagnosticsStatus === "loading"
@@ -445,6 +555,13 @@ return (
             disabled={regeneratingQr}
           >
             {regeneratingQr ? "Regenerating QR..." : "Regenerate QR"}
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleRunDiagnostics}
+            disabled={diagnosticsStatus === "loading"}
+          >
+            {diagnosticsStatus === "loading" ? "Running Diagnostics..." : "Run Diagnostics"}
           </button>
           <button className="btn btn-secondary" onClick={() => setEditing(true)}>
             ✏️ Edit Details
@@ -627,6 +744,64 @@ return (
   <section className="card section-history">
     <h2>Uses Throughout History</h2>
     <p>{usesThroughoutHistoryText}</p>
+  </section>
+)}
+
+{(estimatedAgeText || staffMeasurements?.trunk_diameter_inches || staffMeasurements?.height_estimate_feet) && (
+  <section className="card section-age-estimate">
+    <h2>Estimated Age</h2>
+    {estimatedAgeText && <p>{estimatedAgeText}</p>}
+    {(staffMeasurements?.trunk_diameter_inches || staffMeasurements?.height_estimate_feet) && (
+      <div className="tree-measurements-public">
+        {staffMeasurements?.trunk_diameter_inches && (
+          <p><strong>Trunk Diameter:</strong> {staffMeasurements.trunk_diameter_inches} inches</p>
+        )}
+        {staffMeasurements?.height_estimate_feet && (
+          <p><strong>Height Estimate:</strong> {staffMeasurements.height_estimate_feet} ft</p>
+        )}
+      </div>
+    )}
+  </section>
+)}
+
+{diagnostics?.health_score && (
+  <section className="card section-health-public">
+    <h2>Health Rating</h2>
+    <p className="health-rating-value">{diagnostics.health_score}</p>
+  </section>
+)}
+
+{diagnostics?.hazards_detected !== undefined && (
+  <section className="card section-hazards-public">
+    <h2>Hazards Detected</h2>
+    <p className="hazards-value">
+      {diagnostics.hazards_detected === "Yes" || diagnostics.hazards_detected === "yes" || diagnostics.hazards_detected === true
+        ? "Yes"
+        : diagnostics.hazards_detected === "No" || diagnostics.hazards_detected === "no" || diagnostics.hazards_detected === false
+        ? "No"
+        : diagnostics.hazards_detected}
+    </p>
+    {diagnostics.hazard_details?.length > 0 && (
+      <div className="hazard-details-list">
+        <h3>Details</h3>
+        <ul>
+          {diagnostics.hazard_details.map((detail, i) => (
+            <li key={i}>{detail}</li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </section>
+)}
+
+{diagnostics?.recommendations?.length > 0 && (
+  <section className="card section-recommendations-public">
+    <h2>Recommended Actions</h2>
+    <ul className="recommendations-list">
+      {diagnostics.recommendations.map((rec, i) => (
+        <li key={i}>{rec}</li>
+      ))}
+    </ul>
   </section>
 )}
 
@@ -903,6 +1078,40 @@ return (
   {isStaff && (
     <section className="card section-staff">
       <h2>Staff Info</h2>
+      <div className="staff-measurements-panel">
+        <h3>Tree Measurements</h3>
+        <div className="staff-measurements-grid">
+          <div className="form-group">
+            <label>Trunk Diameter (inches)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={measurementForm.trunkDiameterInches}
+              onChange={(e) => setMeasurementForm((prev) => ({ ...prev, trunkDiameterInches: e.target.value }))}
+              placeholder="e.g. 18"
+            />
+          </div>
+          <div className="form-group">
+            <label>Height Estimate (ft)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={measurementForm.heightEstimateFeet}
+              onChange={(e) => setMeasurementForm((prev) => ({ ...prev, heightEstimateFeet: e.target.value }))}
+              placeholder="e.g. 35"
+            />
+          </div>
+        </div>
+        <div className="form-actions">
+          <button className="btn btn-secondary" onClick={handleSaveMeasurements} disabled={savingMeasurements}>
+            {savingMeasurements ? "Saving Measurements..." : "Save Measurements"}
+          </button>
+        </div>
+        {measurementsMessage && <p className="staff-measurements-note">{measurementsMessage}</p>}
+      </div>
+
       <div className="staff-info-grid">
         <div>
           <span className="label">Listing ID</span>

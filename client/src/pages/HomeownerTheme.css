@@ -13,7 +13,7 @@
   --homeowner-text-strong: #153d2b;
   --homeowner-text-body: #2c5640;
   --homeowner-text-muted: #335a45;
-  --homeowner-shell-bg: linear-gradient(145deg, #355f46 0%, #1f4b35 56%, #102d20 100%);
+  --homeowner-shell-bg: linear-gradient(135deg, #103223 0%, #1f5d45 50%, #2d7e5a 100%);
   --homeowner-surface-bg: linear-gradient(155deg, rgb(250 248 241 / 95%) 0%, rgb(237 232 214 / 94%) 52%, rgb(216 224 191 / 90%) 100%);
 }
 

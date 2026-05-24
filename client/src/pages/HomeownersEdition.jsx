@@ -6,7 +6,7 @@ export default function HomeownersEdition() {
   const navigate = useNavigate();
 
   return (
-    <main className="page homeowners-page">
+    <main className="homeowners-page">
       <div className="homeowners-container">
         <div className="coming-soon-card">
           <h1>Homeowner's Edition</h1>

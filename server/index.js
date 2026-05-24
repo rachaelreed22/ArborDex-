@@ -170,6 +170,52 @@ function stripOptionalPhotographerFields(row) {
   return legacyRow;
 }
 
+function normalizeStaffMeasurements(input = {}) {
+  const trunkDiameterInchesRaw = Number(input?.trunk_diameter_inches);
+  const heightEstimateFeetRaw = Number(input?.height_estimate_feet);
+
+  const trunk_diameter_inches = Number.isFinite(trunkDiameterInchesRaw) && trunkDiameterInchesRaw > 0
+    ? Number(trunkDiameterInchesRaw.toFixed(2))
+    : null;
+
+  const height_estimate_feet = Number.isFinite(heightEstimateFeetRaw) && heightEstimateFeetRaw > 0
+    ? Number(heightEstimateFeetRaw.toFixed(2))
+    : null;
+
+  return {
+    trunk_diameter_inches,
+    height_estimate_feet,
+  };
+}
+
+async function getLatestStaffMeasurementsForListing(listingId) {
+  const { data, error } = await writeSupabase
+    .from('tree_diagnostics_logs')
+    .select('diagnostics, run_at, created_at')
+    .eq('listing_id', listingId)
+    .eq('source', 'staff-measurements')
+    .order('run_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Failed to fetch latest staff measurements:', error);
+    return null;
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row?.diagnostics || typeof row.diagnostics !== 'object') {
+    return null;
+  }
+
+  const normalized = normalizeStaffMeasurements(row.diagnostics.staff_measurements || row.diagnostics);
+  if (!normalized.trunk_diameter_inches && !normalized.height_estimate_feet) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function parseDateBoundary(value, endOfDay = false) {
   const raw = (value || '').toString().trim();
   if (!raw) return null;
@@ -2542,6 +2588,8 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
       : uniquePhotos.length;
     const photosToAnalyze = uniquePhotos.slice(0, photosToAnalyzeCount);
 
+    const staffMeasurements = await getLatestStaffMeasurementsForListing(id);
+
     const treeSummary = `
 Tree ID: ${listing.id}
 Title: ${listing.title || "Untitled"}
@@ -2549,6 +2597,8 @@ Location: ${listing.location || "Unknown"}
 Latitude: ${listing.latitude ?? "Unknown"}
 Longitude: ${listing.longitude ?? "Unknown"}
 Description: ${listing.description || "No description provided."}
+  Trunk Diameter (inches): ${staffMeasurements?.trunk_diameter_inches ?? "Unknown"}
+  Height Estimate (feet): ${staffMeasurements?.height_estimate_feet ?? "Unknown"}
 Total Photos: ${photos.length}
 Photos Sent For AI Analysis: ${photosToAnalyze.length}
     `.trim();
@@ -2572,6 +2622,9 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
         ],
         public_about: publicAbout,
         uses_throughout_history: `${speciesGuess} has long served communities through shade, habitat support, and practical material use. Historical uses vary by species, but many trees have been valued for woodworking, fuel, and cultural gathering places.`,
+        estimated_age: staffMeasurements?.trunk_diameter_inches
+          ? `Best guess unavailable right now. Recorded trunk diameter is ${staffMeasurements.trunk_diameter_inches} inches${staffMeasurements?.height_estimate_feet ? ` and height is about ${staffMeasurements.height_estimate_feet} feet` : ''}.`
+          : 'Best guess unavailable right now. Add trunk diameter and height estimate for a stronger age estimate.',
         photo_summaries: photosToAnalyze.map((_, index) => `Photo ${index + 1}: AI photo insight is temporarily unavailable due to service limits.`),
         alerts: ['Diagnostics temporarily unavailable'],
         health_score: 'Pending',
@@ -2619,6 +2672,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 - recommendations: array of strings (actionable care steps)
 - public_about: string (friendly, upbeat, non-technical public-facing description with one fun fact)
 - uses_throughout_history: string (public-facing historical or cultural uses of this species, concise and educational)
+- estimated_age: string (best-guess age estimate using visible maturity plus any provided trunk diameter and height measurements; explain uncertainty briefly)
 - photo_summaries: array of strings (one brief observation per photo)
 - alerts: array of strings (urgent issues requiring human attention, empty array if none)
 - health_score: string (e.g. "Good", "Fair", "Poor", or a score like "7/10")
@@ -2773,6 +2827,18 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
     }
 
     diagnostics.uses_throughout_history = historicalUses;
+
+    let estimatedAge = (diagnostics?.estimated_age || '').toString().trim();
+    if (!estimatedAge) {
+      if (staffMeasurements?.trunk_diameter_inches || staffMeasurements?.height_estimate_feet) {
+        estimatedAge = `${speciesName} appears mature. Based on the recorded measurements${staffMeasurements?.trunk_diameter_inches ? `, including a trunk diameter of ${staffMeasurements.trunk_diameter_inches} inches` : ''}${staffMeasurements?.height_estimate_feet ? `${staffMeasurements?.trunk_diameter_inches ? ' and' : ', including'} a height of about ${staffMeasurements.height_estimate_feet} feet` : ''}, ArborAI should treat any age estimate as a best guess rather than an exact age.`;
+      } else {
+        estimatedAge = `ArborAI can make only a rough age estimate from photos alone. Adding trunk diameter and height estimate will improve this best guess.`;
+      }
+    }
+
+    diagnostics.estimated_age = estimatedAge;
+    diagnostics.staff_measurements = staffMeasurements || null;
 
     await persistPublicAboutIfMissing(publicAbout);
 

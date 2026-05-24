@@ -47,11 +47,14 @@ export default function TreeList() {
   const [deletingId, setDeletingId] = useState(null);
   const [attentionByListingId, setAttentionByListingId] = useState({});
   const [hazardByListingId, setHazardByListingId] = useState({});
+  const [usingAllListingsFallback, setUsingAllListingsFallback] = useState(false);
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   const listingsEndpoint = selectedParkName
     ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
     : "/api/listings";
+
+  const activeListingsEndpoint = usingAllListingsFallback ? "/api/listings" : listingsEndpoint;
 
   useEffect(() => {
     fetchListings();
@@ -75,7 +78,27 @@ export default function TreeList() {
         headers: { Accept: "application/json" },
       });
       const data = await res.json();
-      const nextListings = Array.isArray(data) ? data : [];
+      let nextListings = Array.isArray(data) ? data : [];
+
+      // If a park is selected but no listings are tagged to it, show all listings
+      // so previously saved tree profiles remain visible.
+      if (selectedParkName && nextListings.length === 0) {
+        const allRes = await fetch(apiUrl("/api/listings"), {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        const allData = await allRes.json().catch(() => []);
+        const allListings = Array.isArray(allData) ? allData : [];
+        if (allListings.length > 0) {
+          nextListings = allListings;
+          setUsingAllListingsFallback(true);
+        } else {
+          setUsingAllListingsFallback(false);
+        }
+      } else {
+        setUsingAllListingsFallback(false);
+      }
+
       setListings(nextListings);
       setLoading(false); // show cards immediately
 
@@ -172,7 +195,7 @@ export default function TreeList() {
         throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      const verifyRes = await fetch(apiUrl(listingsEndpoint), {
+      const verifyRes = await fetch(apiUrl(activeListingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
@@ -208,7 +231,9 @@ export default function TreeList() {
           <p className="tree-list-kicker">Tree Database</p>
           <h1>{selectedParkName ? `${selectedParkName} Listings` : "All Tree Listings"}</h1>
           <p className="tree-list-subtitle">
-            Browse, search, and manage tree profiles for the active park.
+            {usingAllListingsFallback
+              ? `No trees are currently tagged to ${selectedParkName}. Showing all saved trees instead.`
+              : "Browse, search, and manage tree profiles for the active park."}
           </p>
         </div>
         <button className="btn btn-secondary" onClick={() => navigate("/parks")}>
