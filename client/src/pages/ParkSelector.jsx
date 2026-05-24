@@ -57,6 +57,7 @@ export default function ParkSelector() {
   return (
     <main className="page park-selector-page">
       <section className="park-selector-card">
+        <p className="park-selector-kicker">Step 1</p>
         <h1>Select Your Park</h1>
         <p className="park-selector-subtitle">
           Choose which park you'd like to manage

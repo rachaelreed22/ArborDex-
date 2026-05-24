@@ -322,6 +322,22 @@
   color: #2d5340;
 }
 
+.addtree-park-context {
+  display: inline-flex;
+  margin: 0 0 1rem;
+  padding: 0.38rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(235, 242, 219, 0.96);
+  border: 1px solid rgba(20, 58, 40, 0.2);
+  color: #234935;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.addtree-park-context strong {
+  margin-left: 0.3rem;
+}
+
 .addtree-phase-card,
 .addtree-form,
 .addtree-page .card,

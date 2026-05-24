@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
+import "./PendingPhotos.css";
 
 export default function PendingPhotos() {
   const navigate = useNavigate();
   const [pendingItems, setPendingItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   useEffect(() => {
     loadPendingPhotos();
@@ -14,7 +16,10 @@ export default function PendingPhotos() {
 
   async function loadPendingPhotos() {
     try {
-      const res = await fetch(apiUrl("/api/listings"));
+      const endpoint = selectedParkName
+        ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
+        : "/api/listings";
+      const res = await fetch(apiUrl(endpoint));
       const data = await res.json();
       const listings = Array.isArray(data) ? data : [];
 
@@ -69,9 +74,23 @@ export default function PendingPhotos() {
 
   return (
     <div className="page tree-list-page">
+      <section className="pending-photos-flow">
+        <div>
+          <p className="pending-photos-kicker">Photo Moderation</p>
+          <h1>Pending Photos</h1>
+          <p className="pending-photos-subtitle">
+            {selectedParkName
+              ? `Review uploads for ${selectedParkName}.`
+              : "Review uploads waiting for staff approval."}
+          </p>
+        </div>
+      </section>
+
       <div className="tree-list-topbar">
-        <h1>Pending Photos</h1>
         <div className="topbar-actions">
+          <button className="btn btn-secondary" onClick={() => navigate("/parks")}>
+            Change Park
+          </button>
           <button className="btn btn-secondary" onClick={() => navigate("/database")}>
             Back to Database
           </button>

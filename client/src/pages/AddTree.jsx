@@ -10,6 +10,7 @@ export default function AddTree() {
   const location = useLocation();
   const navigate = useNavigate();
   const isStaff = mode === "dex";
+  const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   const scanPrefill = location.state?.fromScan || null;
   const isScanFlow = Boolean(scanPrefill && isStaff);
@@ -514,6 +515,12 @@ export default function AddTree() {
           ? "Step 2: Review and edit details before continuing to confirmation."
           : "Fill in the details to add a tree to the database."}
       </p>
+
+      {selectedParkName && (
+        <p className="addtree-park-context">
+          Adding to <strong>{selectedParkName}</strong>
+        </p>
+      )}
 
       {isScanFlow && (
         <div className="scan-step-banner">
