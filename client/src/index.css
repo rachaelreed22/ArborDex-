@@ -23,7 +23,7 @@ body,
 }
 
 html {
-  background: linear-gradient(135deg, #31bb4a, #b1b53b);
+  background: linear-gradient(135deg, #103223 0%, #1f5d45 50%, #2d7e5a 100%);
   background-repeat: no-repeat;
   background-size: cover;
 }
