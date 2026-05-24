@@ -49,7 +49,11 @@ export default function HomeownerAskArborAI() {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
+  const [activeProfiles, setActiveProfiles] = useState(0);
+  const [profileLimit, setProfileLimit] = useState(3);
   const bottomRef = useRef(null);
+
+  const atProfileLimit = activeProfiles >= profileLimit;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,6 +87,18 @@ export default function HomeownerAskArborAI() {
 
     return payload;
   }
+
+  async function refreshHomeownerStatus() {
+    const payload = await authJsonFetch('/api/homeowners/plants');
+    setActiveProfiles(Number(payload.active_profiles) || 0);
+    setProfileLimit(Number(payload.profile_limit) || 3);
+  }
+
+  useEffect(() => {
+    void refreshHomeownerStatus().catch(() => {
+      // Ignore background status fetch failures on initial load.
+    });
+  }, []);
 
   const handleFilesSelected = (event) => {
     const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
@@ -264,6 +280,11 @@ export default function HomeownerAskArborAI() {
       return;
     }
 
+    if (atProfileLimit) {
+      appendAssistantMessage(`Create Plant ID blocked: profile limit reached (${activeProfiles}/${profileLimit}).`);
+      return;
+    }
+
     setIsActionLoading(true);
     setActionError('');
     try {
@@ -275,6 +296,7 @@ export default function HomeownerAskArborAI() {
 
       markActionCompleted(message.id);
       appendAssistantMessage(`Created a new Plant ID and attached ${payload.added_photos || 0} photo(s).`);
+      await refreshHomeownerStatus();
       navigate(`/homeowners/plants/${payload.plant.id}`);
     } catch (error) {
       setActionError(error.message);
@@ -444,6 +466,9 @@ export default function HomeownerAskArborAI() {
               <p className="homeowner-ask-kicker">Homeowner's Edition</p>
               <h1>Ask ArborAI</h1>
               <p>Scan a plant first, then choose whether to create a new Plant ID or add the scan to an existing one.</p>
+              <div className={`homeowner-limit-badge mt-2 ${atProfileLimit ? 'homeowner-limit-badge-hit' : ''}`}>
+                {atProfileLimit ? `Limit Reached ${activeProfiles}/${profileLimit}` : `Capacity ${activeProfiles}/${profileLimit}`}
+              </div>
             </div>
             <button className="homeowner-button-secondary homeowner-ask-back-button" onClick={() => navigate('/homeowners/account')}>
               Back to Account
@@ -490,8 +515,8 @@ export default function HomeownerAskArborAI() {
 
                 {message.showActions && !message.actionCompleted && (
                   <div className="ask-action-row homeowner-ask-action-row">
-                    <button type="button" onClick={() => createPlantFromScan(message)} disabled={isActionLoading}>
-                      Create New Plant ID
+                    <button type="button" onClick={() => createPlantFromScan(message)} disabled={isActionLoading || atProfileLimit}>
+                      {atProfileLimit ? 'Create New Plant ID (Limit Reached)' : 'Create New Plant ID'}
                     </button>
                     <button type="button" onClick={() => openAttachDialog(message)} disabled={isActionLoading}>
                       Add to Existing Plant ID

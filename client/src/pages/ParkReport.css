@@ -138,3 +138,104 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Homepage visual alignment overrides */
+.park-report-page {
+  max-width: 1180px;
+  padding: 1rem;
+  color: #153726;
+}
+
+.park-report-card {
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(8, 25, 17, 0.14);
+}
+
+.park-report-card h1,
+.park-report-card h2,
+.park-report-card h3 {
+  color: #103223;
+  font-family: "Fraunces", "Cambria", serif;
+}
+
+.park-report-form input,
+.park-report-form textarea {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  color: #153726;
+}
+
+.park-report-page .btn,
+.btn-export {
+  border-radius: 12px;
+  border: 1px solid rgba(20, 58, 40, 0.22);
+}
+
+.park-report-page .btn-primary {
+  background: linear-gradient(120deg, #144a33, #245e44);
+  color: #f5f7f1;
+  border-color: transparent;
+}
+
+.btn-csv,
+.btn-pdf {
+  background: linear-gradient(120deg, #ddd4b6, #efe8d1);
+  color: #183726;
+}
+
+.btn-csv:hover:not(:disabled),
+.btn-pdf:hover:not(:disabled) {
+  background: #e8dfc3;
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .park-report-page {
+    padding: 0.75rem;
+  }
+
+  .park-report-card {
+    border-radius: 12px;
+    padding: 0.85rem;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.park-report-card h1,
+.park-report-card h2,
+.park-report-card h3 {
+  line-height: 1.25;
+}
+
+.park-report-page .btn,
+.park-report-page button,
+.park-report-page input,
+.park-report-page textarea {
+  min-height: 44px;
+}
+
+.park-report-page .btn,
+.park-report-page button {
+  font-weight: 700;
+}
+
+.park-report-card p,
+.park-report-card li {
+  line-height: 1.55;
+}
+
+.park-report-page ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.park-report-page input:focus-visible,
+.park-report-page textarea:focus-visible,
+.park-report-page button:focus-visible,
+.park-report-page .btn:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}

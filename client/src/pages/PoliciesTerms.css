@@ -194,3 +194,118 @@
     text-align: center;
   }
 }
+
+/* Homepage visual alignment overrides */
+.policies-page {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(236, 232, 214, 0.38), transparent 36%),
+    radial-gradient(circle at 86% 14%, rgba(171, 193, 147, 0.3), transparent 34%),
+    linear-gradient(145deg, #103223 0%, #184732 45%, #1f5d45 100%);
+}
+
+.policies-header,
+.policies-card,
+.policies-footer {
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 14px 30px rgba(8, 25, 17, 0.2);
+}
+
+.policies-card-tos {
+  border-color: rgba(20, 56, 38, 0.36);
+}
+
+.policies-header h1,
+.policies-card h2 {
+  color: #103223;
+  font-family: "Fraunces", "Cambria", serif;
+}
+
+.policies-subheading,
+.policies-meta,
+.policies-footer p,
+.policies-section p,
+.policies-section ul {
+  color: #2d5340;
+}
+
+.policies-section {
+  border-bottom-color: rgba(20, 56, 38, 0.12);
+}
+
+.policies-section h3,
+.policies-section h4,
+.policies-section a {
+  color: #1d4a32;
+}
+
+.policies-highlight {
+  background: #edf3dc;
+  border-left-color: #1f5d45;
+  color: #153726 !important;
+}
+
+.policies-section-critical {
+  background: #f6edd6;
+  border-color: #ceb777;
+}
+
+.policies-section-critical h3 {
+  color: #6a4f18;
+}
+
+.policies-tos-badge {
+  background: linear-gradient(120deg, #144a33, #245e44);
+  color: #f4f8ec;
+}
+
+@media (max-width: 700px) {
+  .policies-page {
+    padding: 1rem 0.75rem;
+  }
+
+  .policies-header,
+  .policies-card,
+  .policies-footer {
+    border-radius: 12px;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.policies-header h1,
+.policies-card h2 {
+  line-height: 1.2;
+}
+
+.policies-subheading,
+.policies-meta,
+.policies-footer p,
+.policies-section p,
+.policies-section li {
+  line-height: 1.6;
+}
+
+.policies-section h3,
+.policies-section h4 {
+  line-height: 1.3;
+}
+
+.policies-section ul {
+  padding-left: 1.1rem;
+}
+
+.policies-page .btn,
+.policies-page button,
+.policies-back-btn {
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.policies-page a:focus-visible,
+.policies-page button:focus-visible,
+.policies-page .btn:focus-visible,
+.policies-back-btn:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}

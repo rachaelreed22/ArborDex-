@@ -1,20 +1,20 @@
 .homeowner-theme,
 :root {
-  --homeowner-green-dark: #1d411d;
-  --homeowner-green-mid: #2f5c2f;
-  --homeowner-green-soft: #3f6b28;
-  --homeowner-lime: #8fbf38;
-  --homeowner-lime-bright: #a3f43f;
-  --homeowner-moss: #8aa848;
-  --homeowner-olive: #657527;
-  --homeowner-cream-soft: #f5eecf;
-  --homeowner-cream-input: #f6f0d0;
-  --homeowner-highlight: #dbe9b0;
-  --homeowner-text-strong: #1d411d;
-  --homeowner-text-body: #244824;
-  --homeowner-text-muted: #1f3f1f;
-  --homeowner-shell-bg: linear-gradient(145deg, var(--homeowner-lime) 0%, var(--homeowner-green-mid) 56%, var(--homeowner-green-dark) 100%);
-  --homeowner-surface-bg: linear-gradient(145deg, rgb(245 231 168 / 95%) 0%, rgb(215 226 154 / 92%) 52%, rgb(138 168 72 / 88%) 100%);
+  --homeowner-green-dark: #153d2b;
+  --homeowner-green-mid: #2a5d45;
+  --homeowner-green-soft: #406c52;
+  --homeowner-lime: #6b8f4f;
+  --homeowner-lime-bright: #8ca85f;
+  --homeowner-moss: #9fb37b;
+  --homeowner-olive: #6b7547;
+  --homeowner-cream-soft: #f6f2e4;
+  --homeowner-cream-input: #f3efdf;
+  --homeowner-highlight: #e3ecd0;
+  --homeowner-text-strong: #153d2b;
+  --homeowner-text-body: #2c5640;
+  --homeowner-text-muted: #335a45;
+  --homeowner-shell-bg: linear-gradient(145deg, #355f46 0%, #1f4b35 56%, #102d20 100%);
+  --homeowner-surface-bg: linear-gradient(155deg, rgb(250 248 241 / 95%) 0%, rgb(237 232 214 / 94%) 52%, rgb(216 224 191 / 90%) 100%);
 }
 
 .homeowner-shell {
@@ -99,6 +99,12 @@
   color: var(--homeowner-text-strong);
 }
 
+.homeowner-alert-warn {
+  border-left-color: #7a611e;
+  background: #fbf1cb;
+  color: #5c4613;
+}
+
 .homeowner-panel {
   margin-top: 1rem;
   border-radius: 12px;
@@ -117,4 +123,42 @@
   border-color: #7d6a1d;
   background: #f7ecb8;
   color: #54420f;
+}
+
+.homeowner-limit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--homeowner-green-soft);
+  background: #edf3dc;
+  color: var(--homeowner-text-strong);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.homeowner-limit-badge::before {
+  content: 'i';
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--homeowner-green-mid);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.homeowner-limit-badge-hit {
+  border-color: #7a611e;
+  background: #fbf1cb;
+  color: #5c4613;
+}
+
+.homeowner-limit-badge-hit::before {
+  content: '!';
+  background: #8a6a1e;
 }

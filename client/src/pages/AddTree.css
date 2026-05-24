@@ -305,3 +305,127 @@
   overflow: hidden !important;
 }
 
+/* Homepage visual alignment overrides */
+.addtree-page {
+  max-width: 980px;
+  padding: 1rem;
+  color: #153726;
+}
+
+.addtree-title {
+  color: #103223;
+  font-family: "Fraunces", "Cambria", serif;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+}
+
+.addtree-subtitle {
+  color: #2d5340;
+}
+
+.addtree-phase-card,
+.addtree-form,
+.addtree-page .card,
+.addtree-page .empty-state {
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(8, 25, 17, 0.14);
+}
+
+.step-chip {
+  border-color: rgba(20, 58, 40, 0.24);
+  background: #edf3dc;
+  color: #1d4a32;
+}
+
+.step-chip.active {
+  background: linear-gradient(125deg, #1f5d45, #2a6a4f);
+  border-color: #1f5d45;
+  color: #f5f7ef;
+}
+
+.addtree-page input,
+.addtree-page textarea,
+.addtree-page select,
+.phase-attach-block select {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  color: #153726;
+  border-radius: 10px;
+}
+
+.upload-btn,
+.addtree-page .btn-secondary {
+  background: linear-gradient(120deg, #ddd4b6, #efe8d1);
+  border: 1px solid rgba(20, 58, 40, 0.22);
+  color: #183726;
+}
+
+.addtree-page .btn-primary {
+  background: linear-gradient(120deg, #144a33, #245e44);
+  color: #f5f7f1;
+  border: 1px solid transparent;
+}
+
+.addtree-page .btn-danger {
+  background: linear-gradient(120deg, #c55454, #a72e2e);
+  color: #fff8f8;
+  border: 1px solid transparent;
+}
+
+.phase-scanner-view {
+  border: 1px solid rgba(20, 56, 38, 0.16);
+  border-radius: 12px;
+  background: rgba(232, 239, 216, 0.85);
+}
+
+@media (max-width: 720px) {
+  .addtree-page {
+    padding: 0.75rem;
+  }
+
+  .addtree-phase-card,
+  .addtree-page .card,
+  .addtree-page .empty-state {
+    border-radius: 12px;
+    padding: 0.85rem;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.addtree-page .btn,
+.addtree-page button,
+.addtree-page input,
+.addtree-page select,
+.addtree-page textarea,
+.upload-btn {
+  min-height: 44px;
+}
+
+.addtree-page .btn,
+.upload-btn {
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.addtree-page .addtree-subtitle,
+.addtree-page .phase-confirm-status,
+.addtree-page .scan-message,
+.addtree-page .upload-hint {
+  line-height: 1.5;
+}
+
+.addtree-page .form-actions {
+  margin-top: 0.9rem;
+}
+
+.addtree-page input:focus-visible,
+.addtree-page select:focus-visible,
+.addtree-page textarea:focus-visible,
+.addtree-page button:focus-visible,
+.addtree-page .btn:focus-visible,
+.upload-btn:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}
+

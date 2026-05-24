@@ -146,3 +146,116 @@
     font-size: 1.5rem;
   }
 }
+
+/* Homepage visual alignment overrides */
+.admin-login-container {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(236, 232, 214, 0.4), transparent 38%),
+    radial-gradient(circle at 88% 16%, rgba(171, 193, 147, 0.3), transparent 34%),
+    linear-gradient(145deg, #103223 0%, #184732 46%, #1f5d45 100%);
+}
+
+.admin-login-box {
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 20px 44px rgba(7, 24, 16, 0.26);
+}
+
+.admin-login-box h1 {
+  color: #103223;
+  font-family: "Fraunces", "Cambria", serif;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+}
+
+.login-subtitle,
+.login-help {
+  color: #2d5340;
+}
+
+.form-group label,
+.terms-check-label {
+  color: #194732;
+}
+
+.form-group input {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  border-radius: 10px;
+  color: #153726;
+}
+
+.form-group input:focus {
+  border-color: #1f5d45;
+  box-shadow: 0 0 0 3px rgba(31, 93, 69, 0.16);
+}
+
+.terms-check-row {
+  background: #edf3dc;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 10px;
+}
+
+.terms-check-row input[type='checkbox'] {
+  accent-color: #1f5d45;
+}
+
+.terms-check-label a {
+  color: #144a33;
+}
+
+.login-button {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: linear-gradient(120deg, #144a33, #245e44);
+  color: #f5f7f1;
+}
+
+.login-button:hover:not(:disabled) {
+  background: linear-gradient(120deg, #1a5a3f, #2e6f51);
+  box-shadow: 0 12px 24px rgba(20, 74, 51, 0.34);
+}
+
+.login-error {
+  background: #fbe5e1;
+  color: #8f1d1d;
+  border-left-color: #b24444;
+}
+
+@media (max-width: 600px) {
+  .admin-login-container {
+    padding: 0.75rem;
+  }
+
+  .admin-login-box {
+    border-radius: 14px;
+    box-shadow: 0 14px 26px rgba(7, 24, 16, 0.26);
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.admin-login-box h1 {
+  line-height: 1.2;
+}
+
+.login-subtitle,
+.login-help,
+.terms-check-label {
+  line-height: 1.5;
+}
+
+.form-group input,
+.login-button {
+  min-height: 44px;
+}
+
+.login-button {
+  font-weight: 700;
+}
+
+.form-group input:focus-visible,
+.login-button:focus-visible,
+.terms-check-row input[type='checkbox']:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}

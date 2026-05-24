@@ -83,3 +83,27 @@
     flex-direction: column;
   }
 }
+
+/* Polish sweep: controls and rhythm */
+.coming-soon-card h1,
+.coming-soon-text {
+  line-height: 1.2;
+}
+
+.coming-soon-description,
+.homeowners-feature-pill {
+  line-height: 1.5;
+}
+
+.homeowners-actions .btn,
+.homeowners-actions button {
+  min-height: 44px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.homeowners-actions .btn:focus-visible,
+.homeowners-actions button:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}

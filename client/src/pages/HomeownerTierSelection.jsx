@@ -16,6 +16,7 @@ export default function HomeownerTierSelection() {
   const { tier, getAccessToken } = useHomeownerAuth();
   const [selectedTier, setSelectedTier] = useState(tier || 'free');
   const [loading, setLoading] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
   const [error, setError] = useState('');
 
   const chosen = useMemo(() => PLANS.find((p) => p.key === selectedTier), [selectedTier]);
@@ -46,6 +47,29 @@ export default function HomeownerTierSelection() {
       setError(err.message || 'Checkout failed');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function openPortal() {
+    try {
+      setBillingLoading(true);
+      setError('');
+      const token = await getAccessToken();
+      const res = await fetch(apiUrl('/api/stripe/create-portal-session'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload.url) throw new Error(payload.error || 'Unable to open billing portal');
+      window.location.href = payload.url;
+    } catch (err) {
+      setError(err.message || 'Billing portal error');
+    } finally {
+      setBillingLoading(false);
     }
   }
 
@@ -94,6 +118,13 @@ export default function HomeownerTierSelection() {
             className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"
           >
             Cancel
+          </button>
+          <button
+            onClick={openPortal}
+            disabled={billingLoading}
+            className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {billingLoading ? 'Opening billing...' : 'Manage Billing'}
           </button>
         </div>
       </div>

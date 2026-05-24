@@ -1,25 +1,26 @@
 .ask-page {
   min-height: calc(100vh - 72px);
-  padding: 1.25rem;
+  padding: 1rem;
+  color: #103223;
 }
 
 .ask-shell {
-  max-width: 980px;
+  max-width: 1080px;
   margin: 0 auto;
-  border-radius: 20px;
+  border-radius: 22px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(242, 252, 243, 0.92));
-  border: 1px solid rgba(46, 94, 46, 0.22);
-  box-shadow: 0 20px 40px rgba(24, 60, 24, 0.2);
-  -webkit-backdrop-filter: blur(4px); /* iPhone + Safari */
-  backdrop-filter: blur(4px);         /* Chrome, Edge, Firefox */
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 48, 33, 0.2);
+  box-shadow: 0 24px 46px rgba(8, 25, 17, 0.2);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 
 }
 
 .ask-header {
-  padding: 1.2rem 1.4rem;
-  background: linear-gradient(135deg, #1d5d2a, #3e9b47);
-  color: #f6fff1;
+  padding: 1.15rem 1.3rem;
+  background: linear-gradient(125deg, #103223, #214b36);
+  color: #f6f3e8;
 }
 
 .ask-header-row {
@@ -31,7 +32,8 @@
 
 .ask-header h1 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.46rem;
+  font-family: "Fraunces", "Cambria", serif;
 }
 
 .ask-header p {
@@ -40,7 +42,7 @@
 }
 
 .ask-chat {
-  padding: 1rem;
+  padding: 0.95rem;
   max-height: 60vh;
   overflow-y: auto;
   display: flex;
@@ -64,15 +66,15 @@
   max-width: min(760px, 92%);
   border-radius: 16px;
   padding: 0.85rem 1rem;
-  background: #ffffff;
-  border: 1px solid #cde6c9;
-  color: #244127;
+  background: rgba(255, 253, 246, 0.96);
+  border: 1px solid rgba(20, 56, 38, 0.18);
+  color: #274935;
 }
 
 .ask-user .ask-bubble {
-  background: linear-gradient(135deg, #2f6d34, #4a8e3f);
-  color: #f6fff3;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(125deg, #1f5d45, #2a6a4f);
+  color: #f5f7ef;
+  border: 1px solid rgba(245, 247, 239, 0.26);
 }
 
 .ask-bubble p {
@@ -97,11 +99,11 @@
 
 .ask-diagnostics {
   margin-top: 0.9rem;
-  background: rgba(246, 255, 242, 0.92);
+  background: rgba(250, 248, 241, 0.92);
   border-radius: 12px;
-  border: 1px solid #c4dfbf;
+  border: 1px solid rgba(20, 56, 38, 0.16);
   padding: 0.8rem;
-  color: #234527;
+  color: #274935;
 }
 
 .ask-diag-grid {
@@ -111,8 +113,8 @@
 }
 
 .ask-diag-card {
-  background: #ffffff;
-  border: 1px solid #d6ead2;
+  background: rgba(255, 253, 246, 0.96);
+  border: 1px solid rgba(20, 56, 38, 0.16);
   border-radius: 10px;
   padding: 0.5rem;
 }
@@ -127,7 +129,7 @@
   letter-spacing: 0.07em;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #3f6c42;
+  color: #2d5b43;
   margin-bottom: 0.2rem;
 }
 
@@ -159,14 +161,14 @@
 
 .ask-action-row button,
 .ask-tool-btn {
-  background: #e8f7e6;
-  color: #27512c;
-  border: 1px solid #bddab8;
+  background: linear-gradient(120deg, #ddd4b6, #efe8d1);
+  color: #183726;
+  border: 1px solid rgba(20, 50, 34, 0.2);
 }
 
 .ask-send-btn {
-  background: #245f2b;
-  color: #f2fff0;
+  background: linear-gradient(120deg, #144a33, #245e44);
+  color: #f5f7f1;
 }
 
 .ask-send-btn:disabled {
@@ -175,9 +177,9 @@
 }
 
 .ask-composer {
-  border-top: 1px solid #cfe3cc;
+  border-top: 1px solid rgba(20, 56, 38, 0.16);
   padding: 0.9rem;
-  background: rgba(255, 255, 255, 0.93);
+  background: rgba(248, 246, 238, 0.94);
 }
 
 .ask-error {
@@ -202,7 +204,7 @@
   height: 74px;
   object-fit: cover;
   border-radius: 9px;
-  border: 1px solid #bfd8bc;
+  border: 1px solid rgba(20, 56, 38, 0.2);
 }
 
 .ask-selected-photo button {
@@ -228,16 +230,18 @@
 .ask-input-row textarea {
   width: 100%;
   resize: none;
-  border: 1px solid #b7d1b4;
+  border: 1px solid rgba(20, 56, 38, 0.24);
   border-radius: 12px;
   padding: 0.7rem 0.8rem;
   font: inherit;
+  background: #f8f6ee;
+  color: #163726;
 }
 
 .ask-input-row textarea:focus {
   outline: none;
-  border-color: #4e9153;
-  box-shadow: 0 0 0 3px rgba(78, 145, 83, 0.15);
+  border-color: #1f5d45;
+  box-shadow: 0 0 0 3px rgba(31, 93, 69, 0.15);
 }
 
 .ask-tools {
@@ -258,7 +262,7 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #3f6f42;
+  background: #2c5a43;
   animation: askPulse 1s infinite ease-in-out;
 }
 
@@ -273,7 +277,7 @@
 .ask-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(7, 22, 14, 0.36);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -282,9 +286,9 @@
 
 .ask-modal-card {
   width: min(560px, 96vw);
-  background: #fff;
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.98));
   border-radius: 14px;
-  border: 1px solid #bfd8bc;
+  border: 1px solid rgba(20, 56, 38, 0.2);
   padding: 1rem;
   color: #254429;
 }
@@ -302,10 +306,12 @@
 }
 
 .ask-modal-field select {
-  border: 1px solid #b7d1b4;
+  border: 1px solid rgba(20, 56, 38, 0.25);
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
   font: inherit;
+  background: #f8f6ee;
+  color: #173927;
 }
 
 .ask-modal-actions {

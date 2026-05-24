@@ -551,12 +551,12 @@ async function getHomeownerTierAndCount(userId) {
     .eq('user_id', userId);
 
   if (countError) {
-    console.error('Homeowner plant count lookup error, defaulting to 0:', countError.message || countError);
+    console.error('Homeowner plant count lookup error:', countError.message || countError);
     return {
       tier,
       profileLimit,
       activeProfiles: 0,
-      error: null,
+      error: countError,
     };
   }
 
@@ -1799,7 +1799,9 @@ api.post('/listings/:id/diagnostics-log', requireStaffAction, async (req, res) =
 // ===========================
 api.get('/listings', async (req, res) => {
   try {
-    const { data, error } = await writeSupabase
+    const parkName = (req.query?.parkName || '').toString().trim();
+
+    let query = writeSupabase
       .from('listings')
       .select(`
         id,
@@ -1809,9 +1811,15 @@ api.get('/listings', async (req, res) => {
         latitude,
         longitude,
         qr_url,
-        photos(*)
+        photos(id, url, is_main, winner)
       `)
       .order('created_at', { ascending: false });
+
+    if (parkName) {
+      query = query.ilike('location', `%${parkName}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching listings:", error);

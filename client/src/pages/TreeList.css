@@ -19,7 +19,9 @@
   min-width: 240px;
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid #e7f581;
+  border: 1px solid rgba(25, 61, 43, 0.25);
+  background: rgba(248, 246, 238, 0.96);
+  color: #1e3d2c;
   font-size: 1rem;
 }
 
@@ -31,11 +33,12 @@
 }
 
 .mode-indicator {
-  background: #9fe59c;
+  background: rgba(221, 232, 198, 0.95);
   padding: 0.4rem 0.75rem;
   border-radius: 6px;
   font-size: 0.85rem;
-  color: #740d0d;
+  color: #1f4b33;
+  border: 1px solid rgba(20, 58, 40, 0.2);
 }
 
 /* Grid */
@@ -56,11 +59,12 @@
 /* Tree Card */
 
 .tree-card {
-  background: #9fe59c;
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(242, 238, 126, 0.984);
+  border: 1px solid rgba(20, 56, 38, 0.16);
+  box-shadow: 0 8px 18px rgba(8, 27, 18, 0.16);
   display: flex;
   flex-direction: column;
   transition: transform 0.15s ease;
@@ -83,7 +87,7 @@
 .tree-card-photo-wrapper {
   position: relative;
   height: 160px;
-  background: #9fe59c;
+  background: rgba(227, 236, 208, 0.9);
   contain: layout;
 }
 
@@ -108,8 +112,8 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  background: #9fe59c;
-  color: #e47011;
+  background: rgba(250, 238, 204, 0.95);
+  color: #6a4c17;
   padding: 0.25rem 0.5rem;
   border-radius: 999px;
   font-size: 0.75rem;
@@ -122,8 +126,8 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: #e0f2ff;
-  color: #0b4f7a;
+  background: rgba(231, 239, 200, 0.96);
+  color: #1f4b34;
   padding: 0.25rem 0.45rem;
   border-radius: 999px;
   font-size: 0.85rem;
@@ -141,12 +145,13 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
+  color: #1d4a32;
 }
 
 .tree-card-location {
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
-  color: #555;
+  color: #3a5a49;
 }
 
 .tree-card-hazards {
@@ -174,7 +179,7 @@
 .tree-card-meta {
   margin: 0.4rem 0 0;
   font-size: 0.85rem;
-  color: #777;
+  color: #486452;
 }
 
 /* Staff Actions */
@@ -183,8 +188,8 @@
   display: flex;
   gap: 0.4rem;
   padding: 0.6rem 0.75rem;
-  border-top: 1px solid #f4e28a;
-  background: #9fe59c;
+  border-top: 1px solid rgba(20, 58, 40, 0.12);
+  background: rgba(245, 240, 222, 0.78);
 }
 
 .btn-sm {
@@ -204,6 +209,50 @@
 
 @media (max-width: 600px) {
   .tree-list-page {
-    padding: 1rem;
+    padding: 0.85rem;
   }
+
+  .tree-list-topbar {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .search-input {
+    min-width: 100%;
+  }
+
+  .tree-grid {
+    gap: 0.9rem;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.tree-list-page .search-input,
+.tree-list-page .btn,
+.tree-list-page button {
+  min-height: 44px;
+}
+
+.tree-list-page .btn,
+.tree-list-page button {
+  font-weight: 700;
+}
+
+.tree-list-page .tree-card-title {
+  line-height: 1.25;
+}
+
+.tree-list-page .tree-card-location,
+.tree-list-page .tree-card-meta,
+.tree-list-page .empty-list,
+.tree-list-page .loading {
+  line-height: 1.5;
+}
+
+.tree-list-page .search-input:focus-visible,
+.tree-list-page .btn:focus-visible,
+.tree-list-page button:focus-visible,
+.tree-card:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
 }

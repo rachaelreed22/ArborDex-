@@ -7,7 +7,7 @@ import './HomeownerTheme.css';
 
 export default function HomeownerAccount() {
   const navigate = useNavigate();
-  const { profile, tier, user, supabase, logout, getAccessToken, refreshProfile } = useHomeownerAuth();
+  const { tier, user, supabase, logout, getAccessToken, refreshProfile } = useHomeownerAuth();
 
   const [activeProfiles, setActiveProfiles] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -68,30 +68,30 @@ export default function HomeownerAccount() {
   const isAtLimit = activeProfiles >= profileLimit;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#8fbf38] via-[#2f5c2f] to-[#1d411d] px-4 py-10">
-      <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[#1d411d]/55 bg-gradient-to-br from-[#f5e7a8]/95 via-[#d7e29a]/92 to-[#8aa848]/88 p-8 shadow-2xl">
+    <main className="homeowner-shell min-h-screen px-4 py-10">
+      <div className="homeowner-surface mx-auto w-full max-w-3xl rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold text-[#1d411d]">Homeowner Account</h1>
-          <button onClick={logout} className="rounded-md border border-[#1d411d] px-4 py-2 text-sm font-semibold text-[#1d411d] hover:bg-[#dbe9b0]">Sign out</button>
+          <h1 className="homeowner-heading text-3xl font-bold">Homeowner Account</h1>
+          <button onClick={logout} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Sign out</button>
         </div>
 
-        <p className="mt-2 text-sm text-[#244824]">Logged in as {user?.email}</p>
+        <p className="homeowner-subtext mt-2 text-sm">Logged in as {user?.email}</p>
 
         {loading ? (
-          <p className="mt-6 text-[#1f3f1f]">Loading account...</p>
+          <p className="homeowner-muted mt-6">Loading account...</p>
         ) : (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-[#3f6b28] bg-[#f5eecf] p-4">
-              <p className="text-xs uppercase tracking-wide text-[#244824]">Current Tier</p>
-              <p className="mt-1 text-lg font-bold text-[#1d411d]">{getTierLabel(tier)}</p>
+            <div className="homeowner-stat-card rounded-xl p-4">
+              <p className="homeowner-subtext text-xs uppercase tracking-wide">Current Tier</p>
+              <p className="homeowner-heading mt-1 text-lg font-bold">{getTierLabel(tier)}</p>
             </div>
-            <div className="rounded-xl border border-[#3f6b28] bg-[#f5eecf] p-4">
-              <p className="text-xs uppercase tracking-wide text-[#244824]">Profile Limit</p>
-              <p className="mt-1 text-lg font-bold text-[#1d411d]">{profileLimit}</p>
+            <div className="homeowner-stat-card rounded-xl p-4">
+              <p className="homeowner-subtext text-xs uppercase tracking-wide">Profile Limit</p>
+              <p className="homeowner-heading mt-1 text-lg font-bold">{profileLimit}</p>
             </div>
-            <div className="rounded-xl border border-[#3f6b28] bg-[#f5eecf] p-4">
-              <p className="text-xs uppercase tracking-wide text-[#244824]">Active Profiles</p>
-              <p className="mt-1 text-lg font-bold text-[#1d411d]">{activeProfiles}</p>
+            <div className="homeowner-stat-card rounded-xl p-4">
+              <p className="homeowner-subtext text-xs uppercase tracking-wide">Active Profiles</p>
+              <p className="homeowner-heading mt-1 text-lg font-bold">{activeProfiles}</p>
             </div>
           </div>
         )}
@@ -114,26 +114,26 @@ export default function HomeownerAccount() {
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             onClick={() => navigate('/homeowners/plants')}
-            className="rounded-md border border-[#1d411d] px-5 py-2.5 text-sm font-semibold text-[#1d411d] hover:bg-[#dbe9b0]"
+            className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"
           >
             Manage Plant Profiles
           </button>
           <button
             onClick={() => navigate('/homeowners/ask-arborai')}
-            className="rounded-md border border-[#1d411d] px-5 py-2.5 text-sm font-semibold text-[#1d411d] hover:bg-[#dbe9b0]"
+            className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"
           >
             Ask ArborAI
           </button>
           <button
             onClick={() => navigate('/homeowners/tiers')}
-            className="rounded-md bg-[#1d411d] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#173517]"
+            className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"
           >
             Upgrade Tier
           </button>
           <button
             onClick={openPortal}
-            disabled={billingLoading || !profile?.stripe_customer_id}
-            className="rounded-md border border-[#1d411d] px-5 py-2.5 text-sm font-semibold text-[#1d411d] hover:bg-[#dbe9b0] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={billingLoading}
+            className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {billingLoading ? 'Opening billing...' : 'Manage Billing'}
           </button>

@@ -610,3 +610,130 @@ button:hover {
   font-weight: 800;
 }
 
+/* Homepage visual alignment overrides */
+.tree-detail-page {
+  color: #153726;
+}
+
+.tree-detail-page .card,
+.tree-detail-page .gallery-card,
+.tree-detail-page .section-coordinates,
+.tree-detail-page .empty-state,
+.tree-detail-page .ai-chat-window {
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  box-shadow: 0 14px 28px rgba(8, 25, 17, 0.14);
+}
+
+.tree-detail-page h1,
+.tree-detail-page h2,
+.tree-detail-page h3,
+.tree-detail-page .detail-title {
+  color: #103223;
+}
+
+.tree-detail-page .header-meta,
+.tree-detail-page .section-qr .qr-hint,
+.tree-detail-page .ai-subtitle,
+.tree-detail-page .empty-hint,
+.tree-detail-page .loading {
+  color: #2d5340;
+}
+
+.tree-detail-page .btn,
+.tree-detail-page button {
+  border-radius: 10px;
+  border: 1px solid rgba(20, 58, 40, 0.22);
+  background: linear-gradient(120deg, #ddd4b6, #efe8d1);
+  color: #183726;
+  box-shadow: none;
+}
+
+.tree-detail-page .btn:hover,
+.tree-detail-page button:hover {
+  background: #e8dfc3;
+}
+
+.tree-detail-page .btn-primary {
+  background: linear-gradient(120deg, #144a33, #245e44);
+  border-color: transparent;
+  color: #f5f7f1;
+}
+
+.tree-detail-page .btn-danger {
+  background: linear-gradient(120deg, #c55454, #a72e2e);
+  border-color: transparent;
+  color: #fff8f8;
+}
+
+.tree-detail-page input,
+.tree-detail-page textarea,
+.tree-detail-page select,
+.tree-detail-page .coord-input,
+.tree-detail-page .ai-input-row input {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  color: #153726;
+}
+
+.tree-detail-page .badge {
+  background: #edf3dc;
+  color: #1d4a32;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+}
+
+@media (max-width: 720px) {
+  .tree-detail-page {
+    padding: 0.8rem;
+  }
+
+  .tree-detail-page .card,
+  .tree-detail-page .gallery-card,
+  .tree-detail-page .section-coordinates,
+  .tree-detail-page .ai-chat-window {
+    border-radius: 12px;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.tree-detail-page .section-header h1,
+.tree-detail-page .section-header h2,
+.tree-detail-page .section-photos h2,
+.tree-detail-page .section-description h2,
+.tree-detail-page .section-history h2,
+.tree-detail-page .section-gallery h2,
+.tree-detail-page .section-qr h2,
+.tree-detail-page .section-ai h2,
+.tree-detail-page .section-staff h2 {
+  margin-bottom: 0.65rem;
+  line-height: 1.25;
+}
+
+.tree-detail-page .btn,
+.tree-detail-page button,
+.tree-detail-page input,
+.tree-detail-page select,
+.tree-detail-page textarea {
+  min-height: 44px;
+}
+
+.tree-detail-page .btn,
+.tree-detail-page button {
+  font-weight: 700;
+}
+
+.tree-detail-page .header-meta,
+.tree-detail-page .ai-message,
+.tree-detail-page .gallery-ai-summary p {
+  line-height: 1.5;
+}
+
+.tree-detail-page input:focus-visible,
+.tree-detail-page select:focus-visible,
+.tree-detail-page textarea:focus-visible,
+.tree-detail-page button:focus-visible,
+.tree-detail-page .btn:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}
+

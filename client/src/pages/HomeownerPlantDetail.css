@@ -182,3 +182,118 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Homepage visual alignment overrides */
+.homeowner-plant-detail-page {
+  --fall-text: #153726;
+  --fall-card-bg: linear-gradient(165deg, rgba(250, 248, 241, 0.97), rgba(237, 232, 214, 0.95));
+  --fall-card-soft: rgba(248, 246, 238, 0.95);
+}
+
+.homeowner-plant-detail-page .card {
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(8, 25, 17, 0.14);
+}
+
+.homeowner-detail-hero .detail-title,
+.homeowner-diag-mini-card h3,
+.homeowner-plant-detail-page h2 {
+  color: #103223;
+}
+
+.homeowner-diag-label,
+.homeowner-detail-photo-gallery p,
+.homeowner-diag-section p,
+.homeowner-diag-section li {
+  color: #2d5340;
+}
+
+.homeowner-diag-mini-card {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+}
+
+.homeowner-detail-photo-link {
+  background: #f8f6ee;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 10px;
+}
+
+.diag-card {
+  border-radius: 12px;
+}
+
+.diag-card h2 {
+  color: #f4f8ec;
+}
+
+.diag-card p,
+.diag-card li {
+  color: #eef6df;
+}
+
+.diag-card-warn {
+  background: linear-gradient(150deg, #b48627 0%, #3d5f2f 52%, #1a3f2a 100%);
+  border-color: rgba(20, 56, 38, 0.5);
+}
+
+.diag-card-note {
+  background: linear-gradient(150deg, #9fa742 0%, #4e6f39 52%, #23432d 100%);
+  border-color: rgba(20, 56, 38, 0.48);
+}
+
+.homeowner-diag-section-warn,
+.homeowner-diag-section-note {
+  background: #edf3dc;
+  border-color: rgba(20, 56, 38, 0.24);
+}
+
+@media (max-width: 720px) {
+  .homeowner-plant-detail-page .card {
+    border-radius: 12px;
+  }
+
+  .homeowner-detail-thumb {
+    height: 112px;
+  }
+}
+
+/* Polish sweep: controls and rhythm */
+.homeowner-plant-detail-page h1,
+.homeowner-plant-detail-page h2,
+.homeowner-plant-detail-page h3,
+.homeowner-detail-hero .detail-title {
+  line-height: 1.24;
+}
+
+.homeowner-detail-photo-gallery p,
+.homeowner-diag-section p,
+.homeowner-diag-section li,
+.diag-card p,
+.diag-card li {
+  line-height: 1.55;
+}
+
+.homeowner-plant-detail-page .btn,
+.homeowner-plant-detail-page button,
+.homeowner-plant-detail-page input,
+.homeowner-plant-detail-page select,
+.homeowner-plant-detail-page textarea {
+  min-height: 44px;
+}
+
+.homeowner-plant-detail-page .btn,
+.homeowner-plant-detail-page button {
+  font-weight: 700;
+}
+
+.homeowner-plant-detail-page a:focus-visible,
+.homeowner-plant-detail-page button:focus-visible,
+.homeowner-plant-detail-page .btn:focus-visible,
+.homeowner-plant-detail-page input:focus-visible,
+.homeowner-plant-detail-page select:focus-visible,
+.homeowner-plant-detail-page textarea:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}

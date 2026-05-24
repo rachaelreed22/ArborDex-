@@ -137,6 +137,12 @@ export default function HomeownerPlants() {
 
   async function handleCreatePlant(e) {
     e.preventDefault();
+
+    if (atLimit) {
+      setError(`Profile limit reached (${activeProfiles}/${profileLimit}). Delete a profile or upgrade tier to continue.`);
+      return;
+    }
+
     if (!createForm.name.trim()) {
       setError('Plant name is required');
       return;
@@ -157,7 +163,8 @@ export default function HomeownerPlants() {
       setSuccess('Plant profile created');
       await loadPlants();
     } catch (err) {
-      setError(err.message || 'Failed to create plant profile');
+      const nextError = err.message || 'Failed to create plant profile';
+      setError(nextError);
     } finally {
       setSubmitting(false);
     }
@@ -326,6 +333,9 @@ export default function HomeownerPlants() {
             <p className="homeowner-subtext mt-2 text-sm">
               {getTierLabel(tier)}: {activeProfiles}/{profileLimit} active profiles
             </p>
+            <div className={`homeowner-limit-badge mt-2 ${atLimit ? 'homeowner-limit-badge-hit' : ''}`}>
+              {atLimit ? `Limit Reached ${activeProfiles}/${profileLimit}` : `Capacity ${activeProfiles}/${profileLimit}`}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -361,20 +371,20 @@ export default function HomeownerPlants() {
               placeholder="Plant name *"
               value={createForm.name}
               onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-              disabled={submitting || atLimit}
+              disabled={submitting}
             />
             <input
               className="homeowner-input rounded-md px-3 py-2 text-sm"
               placeholder="Species (optional)"
               value={createForm.species}
               onChange={(e) => setCreateForm((prev) => ({ ...prev, species: e.target.value }))}
-              disabled={submitting || atLimit}
+              disabled={submitting}
             />
             <select
               className="homeowner-input rounded-md px-3 py-2 text-sm"
               value={createForm.room_or_bed}
               onChange={(e) => setCreateForm((prev) => ({ ...prev, room_or_bed: e.target.value }))}
-              disabled={submitting || atLimit}
+              disabled={submitting}
             >
               <option value="">Indoor/Outdoor (optional)</option>
               {LOCATION_OPTIONS.map((option) => (
@@ -388,7 +398,7 @@ export default function HomeownerPlants() {
               disabled={submitting || atLimit}
               className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? 'Saving...' : 'Create Profile'}
+              {submitting ? 'Saving...' : atLimit ? 'Create Profile (Limit Reached)' : 'Create Profile'}
             </button>
             {atLimit && (
               <button

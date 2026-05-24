@@ -47,6 +47,11 @@ export default function TreeList() {
   const [deletingId, setDeletingId] = useState(null);
   const [attentionByListingId, setAttentionByListingId] = useState({});
   const [hazardByListingId, setHazardByListingId] = useState({});
+  const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
+
+  const listingsEndpoint = selectedParkName
+    ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
+    : "/api/listings";
 
   useEffect(() => {
     fetchListings();
@@ -65,7 +70,7 @@ export default function TreeList() {
 
   async function fetchListings() {
     try {
-      const res = await fetch(apiUrl("/api/listings"), {
+      const res = await fetch(apiUrl(listingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
@@ -167,7 +172,7 @@ export default function TreeList() {
         throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      const verifyRes = await fetch(apiUrl("/api/listings"), {
+      const verifyRes = await fetch(apiUrl(listingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });

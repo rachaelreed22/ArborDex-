@@ -41,9 +41,17 @@ export default function Home() {
             and operational data for teams that manage living ecosystems.
           </p>
 
+          <div className="anchor-moment" aria-label="ArborDex brand anchor">
+            <div className="anchor-core">ArborTag</div>
+            <p>
+              QR-linked field records, diagnostics telemetry, and longitudinal ecosystem intelligence in one
+              operational graph.
+            </p>
+          </div>
+
           <div className="hero-ctas">
-            <button className="home-btn home-btn-primary" onClick={() => navigate("/parks")}>Explore Public Tree Map</button>
-            <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners")}>See Homeowner Edition</button>
+            <button className="home-btn home-btn-primary" onClick={() => navigate("/parks")}>View Public Tree Network</button>
+            <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners")}>Your Digital Garden: HomeOwner's Edition</button>
           </div>
 
           <div className="signal-grid">
@@ -59,6 +67,34 @@ export default function Home() {
               <h2>For Reporting</h2>
               <p>Build longitudinal data for grants, sustainability targets, and conservation outcomes.</p>
             </article>
+          </div>
+        </section>
+
+        <section className="capability-panel reveal reveal-delay-1">
+          <header className="section-header">
+            <p className="section-eyebrow">Homeowner Edition</p>
+            <h2>Technical Plant Intelligence For Personal Ecosystems</h2>
+          </header>
+
+          <div className="business-grid">
+            <article className="business-card">
+              <h3>Persistent Plant IDs</h3>
+              <p>Maintain longitudinal records with image timelines, profile limits by tier, and profile-level metadata.</p>
+            </article>
+            <article className="business-card">
+              <h3>AI Diagnostics Layer</h3>
+              <p>Run structured diagnostics with hazard signal extraction, confidence markers, and actionable care output.</p>
+            </article>
+            <article className="business-card">
+              <h3>Tiered Capacity Controls</h3>
+              <p>Free, Gardener, and Estate plans with active profile enforcement and upgrade-ready billing pathways.</p>
+            </article>
+          </div>
+
+          <div className="action-lanes action-lanes-three">
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/homeowners/login")}>Homeowner Login</button>
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/homeowners/signup")}>Create Homeowner Account</button>
+            <button className="home-btn home-btn-tertiary" onClick={() => navigate("/homeowners/reset-password-request")}>Reset Homeowner Password</button>
           </div>
         </section>
 
