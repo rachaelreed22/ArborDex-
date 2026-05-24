@@ -86,6 +86,16 @@ export default function AddTree() {
   }, []);
 
   useEffect(() => {
+    const selectedParkName = localStorage.getItem('selectedParkName');
+    if (selectedParkName && !form.location) {
+      setForm((prev) => ({
+        ...prev,
+        location: selectedParkName,
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isScanFlow) return;
     if (step !== 3) return;
     if (qrChoice !== "attach") return;
