@@ -90,6 +90,13 @@ export default function HomeownerPlantDetail() {
   const diagnostics = plant?.last_diagnostics || null;
   const diagnosticsStatus = readDiagnosticsStatus(diagnostics, runningDiagnostics, diagnosticsError);
   const hazardState = useMemo(() => computeHazardState(diagnostics), [diagnostics]);
+    const [editingDetails, setEditingDetails] = useState(false);
+    const [savingDetails, setSavingDetails] = useState(false);
+    const [detailForm, setDetailForm] = useState({
+      name: '',
+      species: '',
+      room_or_bed: '',
+    });
 
   async function authFetch(path, options = {}) {
     const token = await getAccessToken();
@@ -114,7 +121,13 @@ export default function HomeownerPlantDetail() {
       setLoading(true);
       setError('');
       const payload = await authFetch(`/api/homeowners/plants/${id}`);
-      setPlant(payload.plant || null);
+      const nextPlant = payload.plant || null;
+      setPlant(nextPlant);
+      setDetailForm({
+        name: nextPlant?.name || '',
+        species: nextPlant?.species || '',
+        room_or_bed: nextPlant?.room_or_bed || '',
+      });
     } catch (err) {
       setError(err.message || 'Failed to load plant profile');
       setPlant(null);
@@ -140,6 +153,49 @@ export default function HomeownerPlantDetail() {
       setDiagnosticsError(err.message || 'Failed to run diagnostics');
     } finally {
       setRunningDiagnostics(false);
+    }
+  }
+
+  function startEditDetails() {
+    setDetailForm({
+      name: plant?.name || '',
+      species: plant?.species || '',
+      room_or_bed: plant?.room_or_bed || '',
+    });
+    setEditingDetails(true);
+    setError('');
+  }
+
+  function cancelEditDetails() {
+    setEditingDetails(false);
+    setDetailForm({
+      name: plant?.name || '',
+      species: plant?.species || '',
+      room_or_bed: plant?.room_or_bed || '',
+    });
+  }
+
+  async function saveDetails() {
+    if (!detailForm.name.trim()) {
+      setError('Plant name is required');
+      return;
+    }
+
+    try {
+      setSavingDetails(true);
+      setError('');
+      const payload = await authFetch(`/api/homeowners/plants/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(detailForm),
+      });
+      const nextPlant = payload.plant || null;
+      setPlant(nextPlant);
+      setEditingDetails(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save plant details');
+    } finally {
+      setSavingDetails(false);
     }
   }
 
@@ -183,6 +239,20 @@ export default function HomeownerPlantDetail() {
           Back to Plant Profiles
         </button>
         <div className="topbar-actions">
+          {editingDetails ? (
+            <>
+              <button className="btn btn-primary" onClick={saveDetails} disabled={savingDetails}>
+                {savingDetails ? 'Saving...' : 'Save Details'}
+              </button>
+              <button className="btn btn-secondary" onClick={cancelEditDetails} disabled={savingDetails}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-secondary" onClick={startEditDetails}>
+              Edit Details
+            </button>
+          )}
           <span className={`diagnostics-chip diagnostics-chip-${diagnosticsStatus}`} title={diagnosticsError || diagnosticsChipLabel}>
             {diagnosticsChipLabel}
           </span>
@@ -200,10 +270,49 @@ export default function HomeownerPlantDetail() {
           <section className="card section-photos homeowner-detail-hero">
             <div className="section-header-row">
               <div>
-                <h1 className="detail-title">{plant.name}</h1>
-                <p className="detail-location">Species: {plant.species || 'Not set'}</p>
-                <p className="detail-location">Indoor / Outdoor: {getLocationLabel(plant.room_or_bed)}</p>
-                <p className="detail-coords">Plant ID: {plant.id}</p>
+                {editingDetails ? (
+                  <div className="homeowner-detail-edit-grid">
+                    <label className="homeowner-detail-label">
+                      Plant Name
+                      <input
+                        className="homeowner-detail-input"
+                        value={detailForm.name}
+                        onChange={(e) => setDetailForm((prev) => ({ ...prev, name: e.target.value }))}
+                        disabled={savingDetails}
+                      />
+                    </label>
+                    <label className="homeowner-detail-label">
+                      Species
+                      <input
+                        className="homeowner-detail-input"
+                        value={detailForm.species}
+                        onChange={(e) => setDetailForm((prev) => ({ ...prev, species: e.target.value }))}
+                        disabled={savingDetails}
+                      />
+                    </label>
+                    <label className="homeowner-detail-label">
+                      Indoor / Outdoor
+                      <select
+                        className="homeowner-detail-input"
+                        value={detailForm.room_or_bed}
+                        onChange={(e) => setDetailForm((prev) => ({ ...prev, room_or_bed: e.target.value }))}
+                        disabled={savingDetails}
+                      >
+                        <option value="">Not set</option>
+                        <option value="indoor">Indoor</option>
+                        <option value="outdoor">Outdoor</option>
+                      </select>
+                    </label>
+                    <p className="detail-coords">Plant ID: {plant.id}</p>
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="detail-title">{plant.name}</h1>
+                    <p className="detail-location">Species: {plant.species || 'Not set'}</p>
+                    <p className="detail-location">Indoor / Outdoor: {getLocationLabel(plant.room_or_bed)}</p>
+                    <p className="detail-coords">Plant ID: {plant.id}</p>
+                  </>
+                )}
               </div>
             </div>
 

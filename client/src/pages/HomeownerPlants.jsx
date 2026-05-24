@@ -430,7 +430,11 @@ export default function HomeownerPlants() {
                 <article
                   key={plant.id}
                   className="tree-card homeowner-plant-card"
-                  onClick={() => navigate(`/homeowners/plants/${plant.id}`)}
+                  onClick={() => {
+                    if (!isEditing) {
+                      navigate(`/homeowners/plants/${plant.id}`);
+                    }
+                  }}
                 >
                   <div className="tree-card-photo-wrapper homeowner-plant-main-photo">
                     {mainPhoto ? (
@@ -443,7 +447,7 @@ export default function HomeownerPlants() {
 
                   <div className="tree-card-info homeowner-plant-info">
                     {isEditing ? (
-                      <div className="homeowner-plant-edit-grid">
+                      <div className="homeowner-plant-edit-grid" onClick={(e) => e.stopPropagation()}>
                         <input
                           className="homeowner-plant-input"
                           value={editForm.name}

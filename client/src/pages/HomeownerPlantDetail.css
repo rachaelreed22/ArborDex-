@@ -169,7 +169,7 @@
 }
 
 .homeowner-hazard-flag {
-  color: #ff6b6b !important;
+  color: #b61616 !important;
   font-weight: 800;
 }
 
@@ -222,25 +222,31 @@
 
 .diag-card {
   border-radius: 12px;
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
+  border: 1px solid rgba(20, 56, 38, 0.2);
 }
 
 .diag-card h2 {
-  color: #f4f8ec;
+  color: #103223;
 }
 
 .diag-card p,
 .diag-card li {
-  color: #eef6df;
+  color: #1f3f2e;
+}
+
+.diag-card li::marker {
+  color: #2d6a4f;
 }
 
 .diag-card-warn {
-  background: linear-gradient(150deg, #b48627 0%, #3d5f2f 52%, #1a3f2a 100%);
-  border-color: rgba(20, 56, 38, 0.5);
+  background: linear-gradient(165deg, rgba(247, 236, 198, 0.97), rgba(228, 213, 165, 0.95));
+  border-color: rgba(121, 86, 18, 0.3);
 }
 
 .diag-card-note {
-  background: linear-gradient(150deg, #9fa742 0%, #4e6f39 52%, #23432d 100%);
-  border-color: rgba(20, 56, 38, 0.48);
+  background: linear-gradient(165deg, rgba(236, 242, 216, 0.96), rgba(217, 231, 188, 0.94));
+  border-color: rgba(56, 91, 43, 0.28);
 }
 
 .homeowner-diag-section-warn,
@@ -249,9 +255,42 @@
   border-color: rgba(20, 56, 38, 0.24);
 }
 
+.homeowner-detail-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 0.9rem;
+}
+
+.homeowner-detail-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #2d5340;
+  font-weight: 600;
+}
+
+.homeowner-detail-input {
+  border: 1px solid rgba(20, 56, 38, 0.28);
+  background: #fcfbf6;
+  color: #153726;
+  border-radius: 8px;
+  padding: 0.48rem 0.58rem;
+  font-size: 0.92rem;
+}
+
+.homeowner-detail-input:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.28);
+  outline-offset: 1px;
+}
+
 @media (max-width: 720px) {
   .homeowner-plant-detail-page .card {
     border-radius: 12px;
+  }
+
+  .homeowner-detail-edit-grid {
+    grid-template-columns: 1fr;
   }
 
   .homeowner-detail-thumb {
