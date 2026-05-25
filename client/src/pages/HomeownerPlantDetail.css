@@ -75,7 +75,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #f7e39b;
+  color: #2d5340;
   font-weight: 700;
 }
 
@@ -92,6 +92,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.9rem;
+  overflow-x: clip;
 }
 
 .diag-card {
@@ -100,13 +101,15 @@
 
 .diag-card h2 {
   margin: 0;
-  color: #fff7d8;
+  color: #103223;
 }
 
 .diag-card p {
   margin: 0.35rem 0 0;
   line-height: 1.45;
-  color: #fff2cc;
+  color: #1f3f2e;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .diag-card ul {
@@ -116,11 +119,13 @@
 
 .diag-card li {
   margin-bottom: 0.35rem;
-  color: #fff2cc;
+  color: #1f3f2e;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .diag-card li::marker {
-  color: #ffe388;
+  color: #2d6a4f;
 }
 
 .diag-card-span-full {
@@ -180,6 +185,13 @@
 
   .homeowner-diagnostics-board {
     grid-template-columns: 1fr;
+  }
+
+  .homeowner-diag-label,
+  .diag-card h2,
+  .diag-card p,
+  .diag-card li {
+    color: #123426 !important;
   }
 }
 

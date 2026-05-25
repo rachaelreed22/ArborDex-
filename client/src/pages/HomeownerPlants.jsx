@@ -227,6 +227,7 @@ export default function HomeownerPlants() {
         method: 'DELETE',
       });
 
+      setPlants((prev) => prev.filter((plant) => plant.id !== plantId));
       setSuccess('Plant profile deleted');
       await loadPlants();
     } catch (err) {
@@ -430,7 +431,15 @@ export default function HomeownerPlants() {
                 <article
                   key={plant.id}
                   className="tree-card homeowner-plant-card"
-                  onClick={() => {
+                  onClick={(event) => {
+                    const target = event.target;
+                    if (
+                      target instanceof Element &&
+                      target.closest('button, input, select, label, a, textarea')
+                    ) {
+                      return;
+                    }
+
                     if (!isEditing) {
                       navigate(`/homeowners/plants/${plant.id}`);
                     }
@@ -491,14 +500,24 @@ export default function HomeownerPlants() {
                     {isEditing ? (
                       <>
                         <button
-                          onClick={() => saveEdit(plant.id)}
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void saveEdit(plant.id);
+                          }}
                           disabled={submitting}
                           className="btn btn-sm btn-secondary"
                         >
                           Save
                         </button>
                         <button
-                          onClick={cancelEdit}
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            cancelEdit();
+                          }}
                           disabled={submitting}
                           className="btn btn-sm btn-secondary"
                         >
@@ -507,7 +526,12 @@ export default function HomeownerPlants() {
                       </>
                     ) : (
                       <button
-                        onClick={() => startEdit(plant)}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startEdit(plant);
+                        }}
                         disabled={submitting}
                         className="btn btn-sm btn-secondary"
                       >
@@ -516,14 +540,23 @@ export default function HomeownerPlants() {
                     )}
 
                     <button
-                      onClick={() => deletePlant(plant.id)}
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void deletePlant(plant.id);
+                      }}
                       disabled={submitting}
                       className="btn btn-sm btn-danger"
                     >
                       Delete Plant
                     </button>
 
-                    <label className="btn btn-sm btn-secondary homeowner-upload-label">
+                    <label
+                      className="btn btn-sm btn-secondary homeowner-upload-label"
+                      onClick={(event) => event.stopPropagation()}
+                      onTouchStart={(event) => event.stopPropagation()}
+                    >
                       {uploadingId === plant.id ? 'Uploading...' : 'Add Photo'}
                       <input
                         type="file"
@@ -566,7 +599,12 @@ export default function HomeownerPlants() {
                                 />
                               </label>
                               <button
-                                onClick={() => deletePhoto(plant.id, index)}
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void deletePhoto(plant.id, index);
+                                }}
                                 disabled={photoBusy || Boolean(uploadingId) || submitting}
                                 className="homeowner-thumb-button homeowner-thumb-button-danger"
                               >

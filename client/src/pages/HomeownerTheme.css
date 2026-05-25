@@ -20,11 +20,14 @@
 .homeowner-shell {
   min-height: 100vh;
   background: var(--homeowner-shell-bg);
+  overflow-x: hidden;
 }
 
 .homeowner-surface {
   border: 1px solid rgb(29 65 29 / 55%);
   background: var(--homeowner-surface-bg);
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .homeowner-heading {
