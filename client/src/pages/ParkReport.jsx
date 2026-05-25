@@ -25,6 +25,8 @@ export default function ParkReport() {
   const [adminGoal, setAdminGoal] = useState(
     "Evaluate the pilot period and justify park expenses, staffing, and contracted arbor services."
   );
+  const [includePriorReports, setIncludePriorReports] = useState(false);
+  const [reportScope, setReportScope] = useState("park");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,7 +48,15 @@ export default function ParkReport() {
       const res = await fetch(apiUrl("/api/ai/park-report"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getStaffHeaders() },
-        body: JSON.stringify({ park: park.trim(), startDate, endDate, adminGoal: adminGoal.trim() }),
+        body: JSON.stringify({
+          park: park.trim(),
+          parkId: localStorage.getItem("selectedParkId") || null,
+          startDate,
+          endDate,
+          adminGoal: adminGoal.trim(),
+          includePriorReports,
+          reportScope,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Report generation failed (${res.status})`);
@@ -164,6 +174,21 @@ export default function ParkReport() {
             <label>End Date<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
           </div>
           <label>Administrator Goal<textarea rows={3} value={adminGoal} onChange={(e) => setAdminGoal(e.target.value)} /></label>
+          <label className="park-report-checkbox-row">
+            <input
+              type="checkbox"
+              checked={includePriorReports}
+              onChange={(e) => setIncludePriorReports(e.target.checked)}
+            />
+            Include prior reports / trend mode
+          </label>
+          <label>
+            Report Scope
+            <select value={reportScope} onChange={(e) => setReportScope(e.target.value)}>
+              <option value="park">Per Park (default)</option>
+              <option value="system-wide">System-wide summary (optional)</option>
+            </select>
+          </label>
           <button className="btn btn-primary" type="submit" disabled={loading}>
             {loading ? "Generating Report..." : "Generate Report"}
           </button>
@@ -181,6 +206,12 @@ export default function ParkReport() {
             <article className="park-report-card">
               <h2>{report.title || "Pilot Impact Report"}</h2>
               <p>{report.executive_summary || "No executive summary returned."}</p>
+              {payload?.readiness_mode && (
+                <p><strong>Mode:</strong> Pre-pilot readiness mode</p>
+              )}
+              {typeof payload?.history_used_count === "number" && (
+                <p><strong>Prior Reports Used:</strong> {payload.history_used_count}</p>
+              )}
             </article>
             {metrics && (
               <article className="park-report-card">

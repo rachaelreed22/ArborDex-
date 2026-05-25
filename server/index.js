@@ -230,6 +230,24 @@ function parseDateBoundary(value, endOfDay = false) {
   return parsed.toISOString();
 }
 
+function parseBooleanFlag(value, defaultValue = false) {
+  if (value == null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+
+  const normalized = value.toString().trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return defaultValue;
+}
+
+function normalizeReportScope(value) {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  if (normalized === 'system-wide' || normalized === 'system' || normalized === 'global') {
+    return 'system-wide';
+  }
+  return 'park';
+}
+
 const HAZARD_SIGNAL_KEYWORDS = [
   'decay',
   'decaying',
@@ -2349,9 +2367,13 @@ api.post('/ai/park-report', requireStaffAction, async (req, res) => {
     }
 
     const park = (req.body?.park || '').toString().trim();
+    const parkId = (req.body?.parkId || req.body?.park_id || '').toString().trim() || null;
     const startDateInput = (req.body?.startDate || req.body?.start_date || '').toString().trim();
     const endDateInput = (req.body?.endDate || req.body?.end_date || '').toString().trim();
     const adminGoal = (req.body?.adminGoal || '').toString().trim();
+    const includePriorReports = parseBooleanFlag(req.body?.includePriorReports, false);
+    const reportScope = normalizeReportScope(req.body?.reportScope);
+    const adminUserId = (req.body?.adminUserId || req.headers['x-admin-user-id'] || '').toString().trim() || null;
 
     const startIso = parseDateBoundary(startDateInput, false);
     const endIso = parseDateBoundary(endDateInput, true);
@@ -2397,6 +2419,26 @@ api.post('/ai/park-report', requireStaffAction, async (req, res) => {
 
     const rows = Array.isArray(listings) ? listings : [];
     const photoRows = rows.flatMap((row) => (Array.isArray(row.photos) ? row.photos : []));
+    const listingIds = rows.map((row) => row?.id).filter(Boolean);
+
+    let diagnosticsLogs = [];
+    if (listingIds.length > 0) {
+      const { data: diagnosticsRows, error: diagnosticsError } = await writeSupabase
+        .from('tree_diagnostics_logs')
+        .select('listing_id, run_at, created_at')
+        .in('listing_id', listingIds)
+        .limit(5000);
+
+      if (diagnosticsError) {
+        console.error('Park report diagnostics query error:', diagnosticsError);
+      } else {
+        diagnosticsLogs = Array.isArray(diagnosticsRows) ? diagnosticsRows : [];
+      }
+    }
+
+    const treesWithConditionNotes = rows.filter((row) => (row?.description || '').toString().trim().length > 0).length;
+    const diagnosticsRuns = diagnosticsLogs.length;
+    const treesWithDiagnostics = new Set(diagnosticsLogs.map((row) => row?.listing_id).filter(Boolean)).size;
 
     const metrics = {
       total_trees: rows.length,
@@ -2407,7 +2449,59 @@ api.post('/ai/park-report', requireStaffAction, async (req, res) => {
       winner_photos: photoRows.filter((photo) => Boolean(photo?.winner)).length,
       geotagged_trees: rows.filter((row) => row?.latitude !== null || row?.longitude !== null).length,
       trees_missing_location: rows.filter((row) => !(row?.location || '').toString().trim()).length,
+      trees_with_condition_notes: treesWithConditionNotes,
+      trees_with_diagnostics: treesWithDiagnostics,
+      diagnostics_runs: diagnosticsRuns,
     };
+
+    const insufficientOperationalData =
+      metrics.total_trees === 0 ||
+      (metrics.trees_with_photos === 0 && metrics.trees_with_diagnostics === 0 && metrics.trees_with_condition_notes === 0);
+
+    let priorReports = [];
+    if (includePriorReports) {
+      let priorReportsQuery = writeSupabase
+        .from('park_ai_reports')
+        .select('id, generated_at, park_id, park_name, report_scope, report_type, metrics_json, report_json, include_prior_reports')
+        .order('generated_at', { ascending: false })
+        .limit(12);
+
+      if (reportScope === 'park') {
+        if (parkId) {
+          priorReportsQuery = priorReportsQuery.eq('report_scope', 'park').eq('park_id', parkId);
+        } else if (park) {
+          priorReportsQuery = priorReportsQuery.eq('report_scope', 'park').eq('park_name', park);
+        } else {
+          priorReportsQuery = priorReportsQuery.eq('report_scope', 'park');
+        }
+      } else {
+        priorReportsQuery = priorReportsQuery.eq('report_scope', 'system-wide');
+      }
+
+      const { data: previousRows, error: previousError } = await priorReportsQuery;
+      if (previousError) {
+        console.error('Park report history query error:', previousError);
+      } else {
+        priorReports = Array.isArray(previousRows)
+          ? previousRows
+              .filter((row) => row?.report_json && row?.generated_at)
+              .map((row) => ({
+                id: row.id,
+                generated_at: row.generated_at,
+                report_type: row.report_type || 'pilot-impact',
+                report_scope: row.report_scope || 'park',
+                park_id: row.park_id || null,
+                park_name: row.park_name || null,
+                include_prior_reports: Boolean(row.include_prior_reports),
+                key_metrics: row.metrics_json || null,
+                title: row.report_json?.title || null,
+                executive_summary: row.report_json?.executive_summary || null,
+                budget_justification: Array.isArray(row.report_json?.budget_justification) ? row.report_json.budget_justification.slice(0, 4) : [],
+                pilot_period_findings: Array.isArray(row.report_json?.pilot_period_findings) ? row.report_json.pilot_period_findings.slice(0, 4) : [],
+              }))
+          : [];
+      }
+    }
 
     const treeSnapshot = rows.slice(0, 150).map((row) => ({
       id: row.id,
@@ -2427,6 +2521,118 @@ api.post('/ai/park-report', requireStaffAction, async (req, res) => {
       ? `${startDateInput || 'beginning'} to ${endDateInput || 'present'}`
       : 'All-time records';
 
+    const reportType = insufficientOperationalData ? 'pre-pilot-readiness' : 'pilot-impact';
+
+    if (insufficientOperationalData) {
+      const report = {
+        title: 'Pre-Pilot ArborTag Readiness Report',
+        executive_summary: `This report establishes a starting framework for ${scopeLabel} before tree tagging begins. Because no tree records with diagnostics/photo/condition evidence are available yet, findings are limited to implementation planning, community value framing, and recommended first steps.`,
+        kpi_snapshot: [
+          {
+            metric: 'Tree Inventory Coverage',
+            value: `${metrics.total_trees}`,
+            why_it_matters: 'No operational baseline exists until initial records are entered.',
+          },
+          {
+            metric: 'Diagnostics Coverage',
+            value: `${metrics.trees_with_diagnostics}`,
+            why_it_matters: 'Risk-informed maintenance planning requires diagnostic records.',
+          },
+          {
+            metric: 'Photo Documentation Coverage',
+            value: `${metrics.trees_with_photos}`,
+            why_it_matters: 'Photos are needed for auditability, public communication, and AI quality control.',
+          },
+        ],
+        public_impact: [
+          'Initial tagging creates public transparency for tree stewardship and local education.',
+          'Early QR coverage turns environmental assets into visible community infrastructure.',
+          'Community events can be linked to high-value tagged trees for measurable engagement.',
+        ],
+        operational_impact: [
+          'A standardized inventory reduces manual tracking and one-off field documentation.',
+          'Consistent diagnostics and photo capture establish defensible maintenance records.',
+          'Baseline data quality controls should be set before scale-up.',
+        ],
+        budget_justification: [
+          'Current cost savings are not yet measurable from recorded operations; baseline data collection is required first.',
+          'Initial spend should be framed as implementation readiness to unlock future measurable efficiency gains.',
+          'Funding can be justified as digital infrastructure for risk tracking, auditability, and service planning.',
+        ],
+        arborist_service_value: [
+          'Arborist input is highest value when tied to tagged assets with repeatable condition history.',
+          'Structured diagnostics reduce ambiguity in contracted service scope and follow-up verification.',
+          'Arborist recommendations become more defensible when linked to geotagged records and images.',
+        ],
+        pilot_period_findings: [
+          'No current operational findings are available because the pilot data baseline is incomplete.',
+          'Primary finding: readiness actions are required before outcomes can be measured.',
+        ],
+        next_period_recommendations: [
+          'Tag mature shade trees near pavilion/event areas first.',
+          'Record photos, species, condition notes, and location for each priority tree.',
+          'Use ArborAI reports after the first 10-20 trees are logged.',
+          'Export PDF/CSV reports for council review, maintenance planning, and budget discussions.',
+          'Track trees tied to public events like Howdy Neighbor Days as high community-value assets.',
+        ],
+        cautionary_notes: [
+          'Any savings estimate before baseline data capture should be labeled not yet measurable.',
+          'Do not use readiness-stage summaries as proof of performance outcomes.',
+        ],
+      };
+
+      if (includePriorReports && priorReports.length > 0) {
+        report.pilot_period_findings.unshift(
+          `Trend mode included ${priorReports.length} prior report snapshot(s) for context; however, current-period readiness conditions still limit measurable findings.`
+        );
+      }
+
+      const persistencePayload = {
+        park_id: reportScope === 'park' ? parkId : null,
+        park_name: reportScope === 'park' ? (park || null) : null,
+        report_scope: reportScope,
+        report_type: reportType,
+        admin_user_id: adminUserId,
+        include_prior_reports: includePriorReports,
+        input_filters: {
+          park: park || null,
+          park_id: parkId,
+          start_date: startDateInput || null,
+          end_date: endDateInput || null,
+          admin_goal: adminGoal || null,
+          include_prior_reports: includePriorReports,
+          report_scope: reportScope,
+        },
+        metrics_json: metrics,
+        report_json: report,
+      };
+
+      const { error: persistenceError } = await writeSupabase
+        .from('park_ai_reports')
+        .insert([persistencePayload]);
+
+      if (persistenceError) {
+        console.error('Failed to persist park report history:', persistenceError);
+      }
+
+      return res.json({
+        generated_at: new Date().toISOString(),
+        filters: {
+          park: park || null,
+          park_id: parkId,
+          start_date: startDateInput || null,
+          end_date: endDateInput || null,
+          report_scope: reportScope,
+          include_prior_reports: includePriorReports,
+        },
+        report_type: reportType,
+        readiness_mode: true,
+        history_used_count: priorReports.length,
+        metrics,
+        report,
+      });
+    }
+
     const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
 
 You are generating a municipal-grade performance report for ArborTag/ArborDex pilot evaluation.
@@ -2442,6 +2648,12 @@ Return ONLY valid JSON (no markdown) with these exact keys:
 - next_period_recommendations: array of strings
 - cautionary_notes: array of strings
 
+Rules:
+- Use supplied data only. Never fabricate savings, avoided costs, or ROI.
+- If a value cannot be quantified from supplied data, explicitly label it as "estimated", "not yet measurable", or "requires more data".
+- Translate environmental assets into operational and community value with municipal language.
+- Keep findings auditable and decision-ready for administrators.
+
 The output should help a mayor or city administrator justify park expenses and contracted arbor services using the supplied data only.`;
 
     const reportContext = {
@@ -2450,6 +2662,9 @@ The output should help a mayor or city administrator justify park expenses and c
       admin_goal: adminGoal || 'Evaluate pilot period value and budget justification for parks and arbor services.',
       metrics,
       tree_snapshot: treeSnapshot,
+      trend_mode: includePriorReports,
+      report_scope: reportScope,
+      prior_reports: includePriorReports ? priorReports : [],
     };
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2499,13 +2714,47 @@ The output should help a mayor or city administrator justify park expenses and c
       };
     }
 
+    const persistencePayload = {
+      park_id: reportScope === 'park' ? parkId : null,
+      park_name: reportScope === 'park' ? (park || null) : null,
+      report_scope: reportScope,
+      report_type: reportType,
+      admin_user_id: adminUserId,
+      include_prior_reports: includePriorReports,
+      input_filters: {
+        park: park || null,
+        park_id: parkId,
+        start_date: startDateInput || null,
+        end_date: endDateInput || null,
+        admin_goal: adminGoal || null,
+        include_prior_reports: includePriorReports,
+        report_scope: reportScope,
+      },
+      metrics_json: metrics,
+      report_json: parsedReport,
+    };
+
+    const { error: persistenceError } = await writeSupabase
+      .from('park_ai_reports')
+      .insert([persistencePayload]);
+
+    if (persistenceError) {
+      console.error('Failed to persist park report history:', persistenceError);
+    }
+
     return res.json({
       generated_at: new Date().toISOString(),
       filters: {
         park: park || null,
+        park_id: parkId,
         start_date: startDateInput || null,
         end_date: endDateInput || null,
+        report_scope: reportScope,
+        include_prior_reports: includePriorReports,
       },
+      report_type: reportType,
+      readiness_mode: false,
+      history_used_count: priorReports.length,
       metrics,
       report: parsedReport,
     });
