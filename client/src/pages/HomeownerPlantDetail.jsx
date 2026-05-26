@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { useHomeownerAuth } from '../context/HomeownerAuthContext';
 import './HomeownerTheme.css';
@@ -78,11 +78,17 @@ function computeHazardState(diagnostics) {
 
 export default function HomeownerPlantDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { getAccessToken } = useHomeownerAuth();
+  const previewPlant =
+    location.state?.plantPreview && location.state.plantPreview.id === id
+      ? location.state.plantPreview
+      : null;
 
-  const [plant, setPlant] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [plant, setPlant] = useState(previewPlant || null);
+  const [loading, setLoading] = useState(!previewPlant);
+  const [refreshing, setRefreshing] = useState(Boolean(previewPlant));
   const [error, setError] = useState('');
   const [runningDiagnostics, setRunningDiagnostics] = useState(false);
   const [diagnosticsError, setDiagnosticsError] = useState('');
@@ -90,13 +96,13 @@ export default function HomeownerPlantDetail() {
   const diagnostics = plant?.last_diagnostics || null;
   const diagnosticsStatus = readDiagnosticsStatus(diagnostics, runningDiagnostics, diagnosticsError);
   const hazardState = useMemo(() => computeHazardState(diagnostics), [diagnostics]);
-    const [editingDetails, setEditingDetails] = useState(false);
-    const [savingDetails, setSavingDetails] = useState(false);
-    const [detailForm, setDetailForm] = useState({
-      name: '',
-      species: '',
-      room_or_bed: '',
-    });
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailForm, setDetailForm] = useState({
+    name: previewPlant?.name || '',
+    species: previewPlant?.species || '',
+    room_or_bed: previewPlant?.room_or_bed || '',
+  });
 
   async function authFetch(path, options = {}) {
     const token = await getAccessToken();
@@ -116,9 +122,15 @@ export default function HomeownerPlantDetail() {
     return payload;
   }
 
-  async function loadPlant() {
+  async function loadPlant(options = {}) {
+    const background = Boolean(options.background);
+
     try {
-      setLoading(true);
+      if (background) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError('');
       const payload = await authFetch(`/api/homeowners/plants/${id}`);
       const nextPlant = payload.plant || null;
@@ -133,13 +145,25 @@ export default function HomeownerPlantDetail() {
       setPlant(null);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPlant();
-  }, [id]);
+    if (previewPlant) {
+      setPlant(previewPlant);
+      setDetailForm({
+        name: previewPlant.name || '',
+        species: previewPlant.species || '',
+        room_or_bed: previewPlant.room_or_bed || '',
+      });
+      setLoading(false);
+      void loadPlant({ background: true });
+      return;
+    }
+
+    void loadPlant();
+  }, [id, previewPlant]);
 
   async function runDiagnostics() {
     try {
@@ -205,7 +229,12 @@ export default function HomeownerPlantDetail() {
   }, [plant]);
 
   if (loading) {
-    return <div className="loading">Loading plant profile...</div>;
+    return (
+      <div className="homeowner-detail-loading" role="status" aria-live="polite">
+        <span className="homeowner-spinner" aria-hidden="true" />
+        <span>Loading plant profile...</span>
+      </div>
+    );
   }
 
   if (!plant) {
@@ -239,6 +268,12 @@ export default function HomeownerPlantDetail() {
           Back to Plant Profiles
         </button>
         <div className="topbar-actions">
+          {refreshing && (
+            <span className="homeowner-inline-status" title="Refreshing latest plant details">
+              <span className="homeowner-spinner homeowner-spinner-sm" aria-hidden="true" />
+              Refreshing
+            </span>
+          )}
           {editingDetails ? (
             <>
               <button className="btn btn-primary" onClick={saveDetails} disabled={savingDetails}>
@@ -257,7 +292,12 @@ export default function HomeownerPlantDetail() {
             {diagnosticsChipLabel}
           </span>
           <button className="btn btn-primary" onClick={runDiagnostics} disabled={runningDiagnostics}>
-            {runningDiagnostics ? 'Running Diagnostics...' : 'Run Diagnostics'}
+            {runningDiagnostics ? (
+              <>
+                <span className="homeowner-spinner homeowner-spinner-sm" aria-hidden="true" />
+                Running Diagnostics...
+              </>
+            ) : 'Run Diagnostics'}
           </button>
         </div>
       </div>
@@ -318,7 +358,7 @@ export default function HomeownerPlantDetail() {
 
             <div className="main-photo-wrapper">
               {mainPhoto ? (
-                <img src={mainPhoto} alt={plant.name} className="main-photo" />
+                <img src={mainPhoto} alt={plant.name} className="main-photo" decoding="async" />
               ) : (
                 <div className="detail-no-photo">
                   <span>🪴</span>
@@ -336,7 +376,7 @@ export default function HomeownerPlantDetail() {
               <div className="homeowner-detail-photo-grid">
                 {photos.map((url, index) => (
                   <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="homeowner-detail-photo-link">
-                    <img src={url} alt={`${plant.name} ${index + 1}`} className="homeowner-detail-thumb" />
+                    <img src={url} alt={`${plant.name} ${index + 1}`} className="homeowner-detail-thumb" loading="lazy" decoding="async" />
                   </a>
                 ))}
               </div>

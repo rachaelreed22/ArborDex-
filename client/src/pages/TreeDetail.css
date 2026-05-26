@@ -78,6 +78,7 @@
 
 .section-header h1,
 .section-header h2,
+.section-tree-record h2,
 .section-photos h2,
 .section-description h2,
 .section-history h2,
@@ -153,6 +154,62 @@
 .form-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.tree-record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+}
+
+.tree-record-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.tree-record-header h2 {
+  margin: 0;
+}
+
+.record-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 56, 38, 0.14);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.record-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #2d5340;
+}
+
+.record-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #103223;
+}
+
+.record-input {
+  border-radius: 6px;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  padding: 0.4rem 0.5rem;
+  font-size: 0.92rem;
+  background: #fcfbf6;
+  color: #153726;
+}
+
+.tree-record-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
 }
 .tree-measurements-public {
   margin-top: 0.7rem;
@@ -663,6 +720,10 @@ button:hover {
   }
 
   .edit-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tree-record-grid {
     grid-template-columns: 1fr;
   }
 }

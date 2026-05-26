@@ -360,6 +360,12 @@ export default function HomeownerPlants() {
             ? 'You are at your profile limit for this tier. Upgrade or delete a profile to add more.'
             : 'Add and manage plant profiles here. You can attach up to 5 photos per profile.'}
         </div>
+        {loading && (
+          <div className="homeowner-plants-loading" role="status" aria-live="polite">
+            <span className="homeowner-spinner" aria-hidden="true" />
+            <span>Loading plant profiles...</span>
+          </div>
+        )}
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
         {success && <p className="homeowner-alert homeowner-alert-success">{success}</p>}
@@ -441,7 +447,9 @@ export default function HomeownerPlants() {
                     }
 
                     if (!isEditing) {
-                      navigate(`/homeowners/plants/${plant.id}`);
+                      navigate(`/homeowners/plants/${plant.id}`, {
+                        state: { plantPreview: plant },
+                      });
                     }
                   }}
                 >

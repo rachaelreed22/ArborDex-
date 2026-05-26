@@ -1907,13 +1907,7 @@ api.get('/listings/:id', async (req, res) => {
     const { data, error } = await writeSupabase
       .from('listings')
       .select(`
-        id,
-        title,
-        description,
-        location,
-        latitude,
-        longitude,
-        qr_url,
+        *,
         photos(*)
       `)
       .eq('id', id)

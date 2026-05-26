@@ -113,7 +113,45 @@
   background: #fff2f2;
 }
 
+.homeowner-plants-loading {
+  margin-top: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  color: #1f3f2e;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 999px;
+  background: rgba(248, 246, 238, 0.94);
+  padding: 0.35rem 0.7rem;
+}
+
+.homeowner-spinner {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  border: 2px solid rgba(20, 56, 38, 0.25);
+  border-top-color: #1f5d45;
+  animation: homeowner-plant-spin 0.75s linear infinite;
+}
+
+@keyframes homeowner-plant-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 720px) {
+  .homeowner-shell,
+  .homeowner-surface,
+  .homeowner-plant-grid {
+    overflow-x: clip;
+  }
+
+  .homeowner-plant-card {
+    min-width: 0;
+  }
+
   .homeowner-plant-main-photo {
     height: 150px;
   }

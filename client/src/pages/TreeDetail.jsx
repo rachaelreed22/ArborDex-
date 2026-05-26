@@ -31,7 +31,7 @@ function extractLatestDiagnosticsFromLogs(logs) {
   if (!Array.isArray(logs)) return null;
 
   for (const entry of logs) {
-    if (entry?.source === "staff-measurements") continue;
+    if (entry?.source === "staff-measurements" || entry?.source === "record-metadata") continue;
 
     let diagnosticsObj = entry?.diagnostics;
     if (typeof diagnosticsObj === "string") {
@@ -79,6 +79,126 @@ function extractLatestStaffMeasurementsFromLogs(logs) {
   return { trunkDiameterInches: "", heightEstimateFeet: "" };
 }
 
+function parseDiagnosticsObject(input) {
+  if (!input) return null;
+  if (typeof input === "object") return input;
+  if (typeof input !== "string") return null;
+
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
+}
+
+function extractLatestRecordMetadataFromLogs(logs) {
+  if (!Array.isArray(logs)) return null;
+
+  for (const entry of logs) {
+    if (entry?.source !== "record-metadata") continue;
+    const diagnosticsObj = parseDiagnosticsObject(entry?.diagnostics);
+    const metadata = diagnosticsObj?.record_metadata || diagnosticsObj;
+    if (metadata && typeof metadata === "object") {
+      return metadata;
+    }
+  }
+
+  return null;
+}
+
+function findEarliestTimestamp(listing, logs) {
+  const timestamps = [];
+
+  if (Array.isArray(listing?.photos)) {
+    for (const photo of listing.photos) {
+      if (photo?.created_at) timestamps.push(photo.created_at);
+    }
+  }
+
+  if (Array.isArray(logs)) {
+    for (const entry of logs) {
+      if (entry?.run_at) timestamps.push(entry.run_at);
+      if (entry?.created_at) timestamps.push(entry.created_at);
+    }
+  }
+
+  const parsed = timestamps
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  return parsed[0]?.toISOString() || null;
+}
+
+function findLatestTimestamp(listing, logs) {
+  const timestamps = [];
+
+  if (Array.isArray(listing?.photos)) {
+    for (const photo of listing.photos) {
+      if (photo?.created_at) timestamps.push(photo.created_at);
+    }
+  }
+
+  if (Array.isArray(logs)) {
+    for (const entry of logs) {
+      if (entry?.run_at) timestamps.push(entry.run_at);
+      if (entry?.created_at) timestamps.push(entry.created_at);
+    }
+  }
+
+  const parsed = timestamps
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  return parsed[0]?.toISOString() || null;
+}
+
+function toLocalDatetimeInputValue(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function parseQrCodeIdFromQrUrl(url) {
+  const value = (url || "").toString().trim();
+  if (!value) return "";
+
+  const fileName = value.split("/").pop() || "";
+  const withoutExt = fileName.replace(/\.[a-z0-9]+$/i, "");
+  return withoutExt || "";
+}
+
+function formatDateLabel(value) {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleString();
+}
+
+function buildShortInternalId(listing) {
+  const candidates = [
+    listing?.tree_id,
+    listing?.short_id,
+    listing?.internal_id,
+    listing?.internal_tree_id,
+    listing?.id,
+  ];
+
+  const picked = candidates.find((item) => typeof item === "string" && item.trim());
+  if (!picked) return "-";
+
+  const cleaned = picked.trim();
+  if (cleaned.includes("-")) {
+    return cleaned.split("-")[0].toUpperCase();
+  }
+
+  return cleaned.slice(0, 8).toUpperCase();
+}
+
 export default function TreeDetail() {
   const { id } = useParams();
   const { mode } = useMode();
@@ -116,6 +236,15 @@ export default function TreeDetail() {
   });
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   const [measurementsMessage, setMeasurementsMessage] = useState("");
+  const [recordEditing, setRecordEditing] = useState(false);
+  const [savingRecord, setSavingRecord] = useState(false);
+  const [recordMessage, setRecordMessage] = useState("");
+  const [recordForm, setRecordForm] = useState({
+    treeAddedAt: "",
+    treeId: "",
+    managedBy: "",
+    inspectionStatus: "",
+  });
 
   const isStaff = mode === "dex";
   const needsAttention = isStaff && getNeedsAttention(diagnostics);
@@ -268,6 +397,57 @@ export default function TreeDetail() {
       setMeasurementsMessage(err?.message || "Could not save measurements.");
     } finally {
       setSavingMeasurements(false);
+    }
+  }
+
+  async function handleSaveRecordMetadata() {
+    setSavingRecord(true);
+    setRecordMessage("");
+
+    try {
+      const treeAddedAtIso = recordForm.treeAddedAt
+        ? new Date(recordForm.treeAddedAt).toISOString()
+        : null;
+
+      if (recordForm.treeAddedAt && Number.isNaN(new Date(recordForm.treeAddedAt).getTime())) {
+        throw new Error("Tree Added date must be a valid date/time.");
+      }
+
+      const payload = {
+        tree_id: recordForm.treeId.trim() || null,
+        managed_by: recordForm.managedBy.trim() || null,
+        inspection_status: recordForm.inspectionStatus.trim() || null,
+        tree_added_at: treeAddedAtIso,
+        last_updated_at: new Date().toISOString(),
+      };
+
+      const res = await fetch(apiUrl(`/api/listings/${id}/diagnostics-log`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getStaffHeaders(),
+        },
+        body: JSON.stringify({
+          source: "record-metadata",
+          diagnostics: {
+            record_metadata: payload,
+          },
+          notes: "Manual tree record metadata update from Tree Detail.",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `Failed to save tree record metadata (${res.status})`);
+      }
+
+      await fetchDiagnosticsLogs();
+      setRecordEditing(false);
+      setRecordMessage("Tree record fields updated.");
+    } catch (err) {
+      setRecordMessage(err?.message || "Could not save record metadata.");
+    } finally {
+      setSavingRecord(false);
     }
   }
 
@@ -531,6 +711,68 @@ export default function TreeDetail() {
     return hasDecay && hasTrunkBaseRoot && !hasNegatedRisk;
   })();
 
+  const recordMetadata = extractLatestRecordMetadataFromLogs(diagnosticsLogs) || {};
+  const derivedTreeAddedIso =
+    recordMetadata.tree_added_at ||
+    listing.created_at ||
+    listing.createdAt ||
+    findEarliestTimestamp(listing, diagnosticsLogs);
+  const derivedLastUpdatedIso =
+    recordMetadata.last_updated_at ||
+    listing.updated_at ||
+    listing.updatedAt ||
+    listing.modified_at ||
+    findLatestTimestamp(listing, diagnosticsLogs);
+
+  const treeAddedLabel = formatDateLabel(derivedTreeAddedIso);
+  const lastUpdatedLabel = formatDateLabel(derivedLastUpdatedIso);
+  const shortInternalId =
+    (recordMetadata.tree_id || "").toString().trim() || buildShortInternalId(listing);
+  const qrCodeId =
+    (recordMetadata.qr_code_id || "").toString().trim() ||
+    (typeof listing.qr_code_id === "string" && listing.qr_code_id.trim()) ||
+    (typeof listing.qr_id === "string" && listing.qr_id.trim()) ||
+    (typeof listing.tag_code === "string" && listing.tag_code.trim()) ||
+    parseQrCodeIdFromQrUrl(listing.qr_url) ||
+    shortInternalId;
+
+  const managedBy =
+    (recordMetadata.managed_by || "").toString().trim() ||
+    (typeof listing.managed_by === "string" && listing.managed_by.trim()) ||
+    (typeof listing.owner_team === "string" && listing.owner_team.trim()) ||
+    "ArborDex Staff";
+
+  const inspectionStatus = (() => {
+    const explicitStatus =
+      (recordMetadata.inspection_status || "").toString().trim() ||
+      (typeof listing.inspection_status === "string" && listing.inspection_status.trim()) ||
+      (typeof listing.inspectionStatus === "string" && listing.inspectionStatus.trim()) ||
+      "";
+    if (explicitStatus) return explicitStatus;
+    return diagnosticsLogs.length > 0 ? "Inspected" : "Pending Inspection";
+  })();
+
+  const healthStatus = (() => {
+    if (hazardsDetected || needsAttention) return "Needs Attention";
+
+    const score = (diagnostics?.health_score ?? "").toString().trim().toLowerCase();
+    if (!score) return "Monitor";
+    if (/(excellent|good|healthy|low risk|stable|low)/i.test(score)) return "Healthy";
+    if (/(poor|declin|high|critical|severe|unsafe)/i.test(score)) return "Needs Attention";
+    return "Monitor";
+  })();
+
+  function handleStartEditRecord() {
+    setRecordMessage("");
+    setRecordForm({
+      treeAddedAt: toLocalDatetimeInputValue(derivedTreeAddedIso),
+      treeId: shortInternalId === "-" ? "" : shortInternalId,
+      managedBy: managedBy === "ArborDex Staff" ? "" : managedBy,
+      inspectionStatus,
+    });
+    setRecordEditing(true);
+  }
+
 return (
   <div className="page tree-detail-page">
     {/* Top bar */}
@@ -645,6 +887,119 @@ return (
               </div>
             </div>
           )}
+        </section>
+
+        <section className="card section-tree-record">
+          <div className="tree-record-header">
+            <h2>Tree Record</h2>
+            {isStaff && !recordEditing && (
+              <button className="btn btn-secondary btn-sm" onClick={handleStartEditRecord}>
+                Edit Record Fields
+              </button>
+            )}
+          </div>
+
+          {recordEditing ? (
+            <div className="tree-record-grid">
+              <div className="record-item">
+                <span className="record-label">Tree Added</span>
+                <input
+                  type="datetime-local"
+                  className="record-input"
+                  value={recordForm.treeAddedAt}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, treeAddedAt: e.target.value }))}
+                />
+              </div>
+              <div className="record-item">
+                <span className="record-label">Last Updated</span>
+                <span className="record-value">{lastUpdatedLabel}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Tree ID</span>
+                <input
+                  type="text"
+                  className="record-input mono"
+                  value={recordForm.treeId}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, treeId: e.target.value }))}
+                  placeholder="Internal ID"
+                />
+              </div>
+              <div className="record-item">
+                <span className="record-label">Health Status</span>
+                <span className="record-value">{healthStatus}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">QR Code ID</span>
+                <span className="record-value mono">{qrCodeId}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Managed By</span>
+                <input
+                  type="text"
+                  className="record-input"
+                  value={recordForm.managedBy}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, managedBy: e.target.value }))}
+                  placeholder="ArborDex Staff"
+                />
+              </div>
+              <div className="record-item">
+                <span className="record-label">Inspection Status</span>
+                <select
+                  className="record-input"
+                  value={recordForm.inspectionStatus}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, inspectionStatus: e.target.value }))}
+                >
+                  <option value="Pending Inspection">Pending Inspection</option>
+                  <option value="Inspected">Inspected</option>
+                  <option value="Follow-up Required">Follow-up Required</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="tree-record-grid">
+              <div className="record-item">
+                <span className="record-label">Tree Added</span>
+                <span className="record-value">{treeAddedLabel}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Last Updated</span>
+                <span className="record-value">{lastUpdatedLabel}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Tree ID</span>
+                <span className="record-value mono">{shortInternalId}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Health Status</span>
+                <span className="record-value">{healthStatus}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">QR Code ID</span>
+                <span className="record-value mono">{qrCodeId}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Managed By</span>
+                <span className="record-value">{managedBy}</span>
+              </div>
+              <div className="record-item">
+                <span className="record-label">Inspection Status</span>
+                <span className="record-value">{inspectionStatus}</span>
+              </div>
+            </div>
+          )}
+
+          {isStaff && recordEditing && (
+            <div className="tree-record-actions">
+              <button className="btn btn-primary" onClick={handleSaveRecordMetadata} disabled={savingRecord}>
+                {savingRecord ? "Saving..." : "Save Record"}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setRecordEditing(false)} disabled={savingRecord}>
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {recordMessage && <p className="staff-measurements-note">{recordMessage}</p>}
         </section>
 
 {/* Main photo + winner */}
@@ -1004,26 +1359,6 @@ return (
       </div>
     </section>
   )}
-
-  {/* Sidebar coordinates (quick view) */}
-  <section className="card section-coordinates">
-    <h2>Location Coordinates</h2>
-
-    <p><strong>Latitude:</strong> {listing?.latitude}</p>
-    <p><strong>Longitude:</strong> {listing?.longitude}</p>
-
-    <button
-      className="btn btn-primary"
-      onClick={() =>
-        window.open(
-          `https://www.google.com/maps?q=${listing?.latitude},${listing?.longitude}`,
-          "_blank"
-        )
-      }
-    >
-      View on Map
-    </button>
-  </section>
 
   {/* AI Assistant */}
   <section className="card section-ai">
