@@ -345,6 +345,24 @@
     overflow-x: clip;
   }
 
+  .homeowner-plant-detail-page .tree-detail-layout,
+  .homeowner-plant-detail-page .tree-detail-main,
+  .homeowner-plant-detail-page .tree-detail-sidebar,
+  .homeowner-plant-detail-page .card,
+  .homeowner-plant-detail-page .main-photo-wrapper,
+  .homeowner-plant-detail-page .homeowner-diagnostics-board,
+  .homeowner-plant-detail-page .homeowner-diagnostics-grid,
+  .homeowner-plant-detail-page .homeowner-detail-photo-grid {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .homeowner-plant-detail-page img {
+    max-width: 100%;
+    height: auto;
+  }
+
   .homeowner-plant-detail-page .tree-detail-topbar {
     align-items: stretch;
     gap: 0.65rem;

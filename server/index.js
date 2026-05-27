@@ -34,10 +34,40 @@ const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || PHOTO_BUCK
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = (process.env.CLIENT_URL || 'https://localhost:5173').toString().trim();
 
-const STRIPE_SECRET_KEY = (process.env.STRIPE_SECRET_KEY || '').toString().trim();
-const STRIPE_WEBHOOK_SECRET = (process.env.STRIPE_WEBHOOK_SECRET || '').toString().trim();
-const STRIPE_PRICE_GARDENER = (process.env.STRIPE_PRICE_GARDENER || '').toString().trim();
-const STRIPE_PRICE_ESTATE = (process.env.STRIPE_PRICE_ESTATE || '').toString().trim();
+const STRIPE_MODE = (process.env.STRIPE_MODE || '').toString().trim().toLowerCase();
+
+function normalizeStripeMode(value) {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  if (normalized === 'test' || normalized === 'live') return normalized;
+  return 'live';
+}
+
+function readStripeSetting(baseName, mode = STRIPE_MODE) {
+  const resolvedMode = normalizeStripeMode(mode);
+  const modeSpecificKey = `${baseName}_${resolvedMode.toUpperCase()}`;
+  const modeSpecificValue = (process.env[modeSpecificKey] || '').toString().trim();
+  if (modeSpecificValue) return modeSpecificValue;
+
+  const sharedValue = (process.env[baseName] || '').toString().trim();
+  return sharedValue;
+}
+
+function getStripeConfig(mode = STRIPE_MODE) {
+  const resolvedMode = normalizeStripeMode(mode);
+  return {
+    mode: resolvedMode,
+    secretKey: readStripeSetting('STRIPE_SECRET_KEY', resolvedMode),
+    webhookSecret: readStripeSetting('STRIPE_WEBHOOK_SECRET', resolvedMode),
+    priceGardener: readStripeSetting('STRIPE_PRICE_GARDENER', resolvedMode),
+    priceEstate: readStripeSetting('STRIPE_PRICE_ESTATE', resolvedMode),
+  };
+}
+
+const STRIPE_CONFIG = getStripeConfig();
+const STRIPE_SECRET_KEY = STRIPE_CONFIG.secretKey;
+const STRIPE_WEBHOOK_SECRET = STRIPE_CONFIG.webhookSecret;
+const STRIPE_PRICE_GARDENER = STRIPE_CONFIG.priceGardener;
+const STRIPE_PRICE_ESTATE = STRIPE_CONFIG.priceEstate;
 
 const stripe = STRIPE_SECRET_KEY
   ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
@@ -632,6 +662,67 @@ async function getHomeownerTierAndCount(userId) {
   };
 }
 
+async function getHomeownerPlantAccessState(userId) {
+  const status = await getHomeownerTierAndCount(userId);
+  if (status.error) {
+    return {
+      ...status,
+      orderedPlantIds: [],
+      accessiblePlantIds: new Set(),
+      lockedCount: 0,
+    };
+  }
+
+  const { data: orderedPlants, error: orderedError } = await writeSupabase
+    .from('homeowner_plants')
+    .select('id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (orderedError) {
+    return {
+      ...status,
+      error: orderedError,
+      orderedPlantIds: [],
+      accessiblePlantIds: new Set(),
+      lockedCount: 0,
+    };
+  }
+
+  const orderedPlantIds = Array.isArray(orderedPlants)
+    ? orderedPlants.map((plant) => plant.id).filter(Boolean)
+    : [];
+
+  const accessibleCount = Math.max(0, Math.min(status.profileLimit, orderedPlantIds.length));
+  const accessiblePlantIds = new Set(orderedPlantIds.slice(0, accessibleCount));
+  const lockedCount = Math.max(orderedPlantIds.length - accessibleCount, 0);
+
+  return {
+    ...status,
+    error: null,
+    orderedPlantIds,
+    accessiblePlantIds,
+    lockedCount,
+  };
+}
+
+function isHomeownerPlantLocked(plantId, accessState) {
+  if (!accessState || !plantId) return false;
+  if ((accessState.activeProfiles || 0) <= (accessState.profileLimit || 0)) return false;
+  return !accessState.accessiblePlantIds.has(plantId);
+}
+
+function buildLockedPlantResponse(accessState) {
+  return {
+    error: 'This plant profile is locked for your current tier. Upgrade to unlock it.',
+    tier: accessState.tier,
+    profile_limit: accessState.profileLimit,
+    active_profiles: accessState.activeProfiles,
+    locked_profiles: accessState.lockedCount || 0,
+  };
+}
+
 async function getOwnedHomeownerPlant(userId, plantId) {
   const { data: plant, error } = await writeSupabase
     .from('homeowner_plants')
@@ -772,6 +863,8 @@ api.get('/', (req, res) => {
     has_service_role: HAS_SERVICE_ROLE,
     staff_guard_enabled: Boolean(STAFF_API_KEY),
     winner_email_enabled: Boolean(mailTransporter),
+    stripe_mode: STRIPE_CONFIG.mode,
+    stripe_configured: Boolean(STRIPE_SECRET_KEY && STRIPE_WEBHOOK_SECRET),
   });
 });
 
@@ -885,22 +978,29 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
       console.error('Homeowner plants lookup error, returning empty list:', plantsError.message || plantsError);
     }
 
-    const status = await getHomeownerTierAndCount(userId);
-    if (status.error) {
-      console.error('Homeowner tier/count error, returning safe defaults:', status.error.message || status.error);
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      console.error('Homeowner tier/count error, returning safe defaults:', accessState.error.message || accessState.error);
       return res.json({
-        plants: plantsError ? [] : (plants || []),
+        plants: (plantsError ? [] : (plants || [])).map((plant) => ({ ...plant, is_locked: false })),
         tier: 'free',
         profile_limit: getHomeownerTierLimit('free'),
         active_profiles: Array.isArray(plants) ? plants.length : 0,
+        locked_profiles: 0,
       });
     }
 
+    const serializedPlants = (plantsError ? [] : (plants || [])).map((plant) => ({
+      ...plant,
+      is_locked: isHomeownerPlantLocked(plant.id, accessState),
+    }));
+
     return res.json({
-      plants: plantsError ? [] : (plants || []),
-      tier: status.tier,
-      profile_limit: status.profileLimit,
-      active_profiles: status.activeProfiles,
+      plants: serializedPlants,
+      tier: accessState.tier,
+      profile_limit: accessState.profileLimit,
+      active_profiles: accessState.activeProfiles,
+      locked_profiles: accessState.lockedCount,
     });
   } catch (err) {
     console.error('Unexpected homeowner plants error, returning safe defaults:', err?.message || err);
@@ -921,6 +1021,15 @@ api.get('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
 
     if (error || !plant) {
       return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
     return res.json({ plant });
@@ -1006,6 +1115,20 @@ api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
+    const { plant: existingPlant, error: existingError } = await getOwnedHomeownerPlant(userId, id);
+    if (existingError || !existingPlant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
     const { data: plant, error: updateError } = await writeSupabase
       .from('homeowner_plants')
       .update(updateData)
@@ -1042,6 +1165,15 @@ api.delete('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
 
     if (findError || !plant) {
       return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
     const photos = Array.isArray(plant.photos) ? plant.photos : [];
@@ -1085,6 +1217,15 @@ api.post('/homeowners/plants/:id/photos', requireHomeownerAuth, upload.single('p
 
     if (findError || !plant) {
       return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
     const existingPhotos = Array.isArray(plant.photos) ? plant.photos : [];
@@ -1140,6 +1281,15 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
 
     if (error || !plant) {
       return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
     const photos = Array.isArray(plant.photos) ? plant.photos.filter(Boolean) : [];
@@ -1436,6 +1586,15 @@ api.delete('/homeowners/plants/:id/photos/:photoIndex', requireHomeownerAuth, as
       return res.status(404).json({ error: 'Plant profile not found' });
     }
 
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
     const photos = Array.isArray(plant.photos) ? plant.photos : [];
     if (photoIndex >= photos.length) {
       return res.status(400).json({ error: 'Photo index out of range' });
@@ -1490,6 +1649,15 @@ api.post('/homeowners/plants/:id/photos/:photoIndex/replace', requireHomeownerAu
 
     if (findError || !plant) {
       return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
     const photos = Array.isArray(plant.photos) ? plant.photos : [];

@@ -81,6 +81,7 @@ export default function HomeownerPlants() {
   const [tier, setTier] = useState('free');
   const [profileLimit, setProfileLimit] = useState(getTierLimit('free'));
   const [activeProfiles, setActiveProfiles] = useState(0);
+  const [lockedProfiles, setLockedProfiles] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingId, setUploadingId] = useState('');
@@ -123,6 +124,7 @@ export default function HomeownerPlants() {
       setTier(payload.tier || 'free');
       setProfileLimit(payload.profile_limit || getTierLimit(payload.tier || 'free'));
       setActiveProfiles(payload.active_profiles || 0);
+      setLockedProfiles(payload.locked_profiles || 0);
     } catch (err) {
       setError(err.message || 'Failed to load plant profiles');
     } finally {
@@ -337,8 +339,19 @@ export default function HomeownerPlants() {
             <div className={`homeowner-limit-badge mt-2 ${atLimit ? 'homeowner-limit-badge-hit' : ''}`}>
               {atLimit ? `Limit Reached ${activeProfiles}/${profileLimit}` : `Capacity ${activeProfiles}/${profileLimit}`}
             </div>
+            {lockedProfiles > 0 && (
+              <p className="homeowner-subtext mt-2 text-sm">
+                {lockedProfiles} profile{lockedProfiles === 1 ? '' : 's'} locked by current plan limit.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => navigate('/')}
+              className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+            >
+              Home
+            </button>
             <button
               onClick={() => navigate('/homeowners/ask-arborai')}
               className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
@@ -431,18 +444,24 @@ export default function HomeownerPlants() {
               const photos = Array.isArray(plant.photos) ? plant.photos : [];
               const mainPhoto = photos[0] || null;
               const isEditing = editingId === plant.id;
+              const isLocked = Boolean(plant.is_locked);
               const hasHazard = inferHazardFromDiagnostics(plant.last_diagnostics);
 
               return (
                 <article
                   key={plant.id}
-                  className="tree-card homeowner-plant-card"
+                  className={`tree-card homeowner-plant-card ${isLocked ? 'homeowner-plant-card-locked' : ''}`}
                   onClick={(event) => {
                     const target = event.target;
                     if (
                       target instanceof Element &&
                       target.closest('button, input, select, label, a, textarea')
                     ) {
+                      return;
+                    }
+
+                    if (isLocked) {
+                      setError('This profile is locked by your current plan. Upgrade tier to open it.');
                       return;
                     }
 
@@ -453,6 +472,7 @@ export default function HomeownerPlants() {
                     }
                   }}
                 >
+                  {isLocked && <div className="homeowner-locked-banner">Locked by plan limit</div>}
                   <div className="tree-card-photo-wrapper homeowner-plant-main-photo">
                     {mainPhoto ? (
                       <img src={mainPhoto} alt={plant.name} className="tree-card-photo" />
@@ -540,7 +560,7 @@ export default function HomeownerPlants() {
                           event.stopPropagation();
                           startEdit(plant);
                         }}
-                        disabled={submitting}
+                        disabled={submitting || isLocked}
                         className="btn btn-sm btn-secondary"
                       >
                         Edit
@@ -554,7 +574,7 @@ export default function HomeownerPlants() {
                         event.stopPropagation();
                         void deletePlant(plant.id);
                       }}
-                      disabled={submitting}
+                      disabled={submitting || isLocked}
                       className="btn btn-sm btn-danger"
                     >
                       Delete Plant
@@ -570,7 +590,7 @@ export default function HomeownerPlants() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        disabled={uploadingId === plant.id || photos.length >= 5}
+                        disabled={uploadingId === plant.id || photos.length >= 5 || isLocked}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           void uploadPhoto(plant.id, file);
@@ -598,7 +618,7 @@ export default function HomeownerPlants() {
                                   type="file"
                                   accept="image/*"
                                   className="hidden"
-                                  disabled={photoBusy || Boolean(uploadingId) || submitting}
+                                  disabled={photoBusy || Boolean(uploadingId) || submitting || isLocked}
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
                                     void replacePhoto(plant.id, index, file);
@@ -613,7 +633,7 @@ export default function HomeownerPlants() {
                                   event.stopPropagation();
                                   void deletePhoto(plant.id, index);
                                 }}
-                                disabled={photoBusy || Boolean(uploadingId) || submitting}
+                                  disabled={photoBusy || Boolean(uploadingId) || submitting || isLocked}
                                 className="homeowner-thumb-button homeowner-thumb-button-danger"
                               >
                                 Delete

@@ -32,6 +32,15 @@ export default function HomeownerLogin() {
   return (
     <main className="homeowner-shell min-h-screen px-4 py-10">
       <div className="homeowner-surface mx-auto w-full max-w-md rounded-2xl p-8 shadow-2xl">
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="homeowner-button-secondary rounded-md px-3 py-2 text-sm font-semibold"
+          >
+            Home
+          </button>
+        </div>
         <h1 className="homeowner-heading text-center text-3xl font-bold">Homeowner Login</h1>
         <p className="homeowner-subtext mt-2 text-center text-sm">Access your private plant profiles and plan limits.</p>
 

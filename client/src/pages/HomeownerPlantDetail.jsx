@@ -242,7 +242,7 @@ export default function HomeownerPlantDetail() {
       <div className="page tree-detail-page">
         <div className="empty-state">
           <div className="icon">🪴</div>
-          <p>This plant profile could not be found.</p>
+          <p>{error || 'This plant profile could not be found.'}</p>
           <button className="btn btn-secondary" onClick={() => navigate('/homeowners/plants')}>
             Back to Plant Profiles
           </button>

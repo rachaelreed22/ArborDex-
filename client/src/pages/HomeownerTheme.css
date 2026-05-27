@@ -165,3 +165,17 @@
   content: '!';
   background: #8a6a1e;
 }
+
+@media (max-width: 720px) {
+  .homeowner-shell,
+  .homeowner-surface {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .homeowner-surface {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

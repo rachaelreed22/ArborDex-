@@ -7,6 +7,26 @@
   background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
   border: 1px solid rgba(20, 56, 38, 0.2);
   box-shadow: 0 8px 18px rgba(8, 27, 18, 0.16);
+  position: relative;
+}
+
+.homeowner-plant-card-locked {
+  opacity: 0.62;
+  filter: saturate(0.58);
+}
+
+.homeowner-locked-banner {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 3;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 97, 30, 0.6);
+  background: #fbf1cb;
+  color: #5c4613;
+  padding: 0.16rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .homeowner-plant-main-photo {
@@ -144,12 +164,26 @@
 @media (max-width: 720px) {
   .homeowner-shell,
   .homeowner-surface,
-  .homeowner-plant-grid {
+  .homeowner-plant-grid,
+  .homeowner-plant-card,
+  .homeowner-thumb-grid,
+  .homeowner-plant-actions {
     overflow-x: clip;
+    max-width: 100%;
   }
 
   .homeowner-plant-card {
     min-width: 0;
+  }
+
+  .homeowner-plant-actions .btn,
+  .homeowner-plant-actions .homeowner-upload-label {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .homeowner-thumb-actions {
+    flex-wrap: wrap;
   }
 
   .homeowner-plant-main-photo {
