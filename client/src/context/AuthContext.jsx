@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 
 const AuthContext = createContext(null);
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL =
+  (import.meta.env.VITE_SUPABASE_URL || '').toString().trim()
+  || 'https://oukhegxuzgssyfqogdmg.supabase.co';
+const SUPABASE_ANON_KEY =
+  (import.meta.env.VITE_SUPABASE_ANON_KEY || '').toString().trim()
+  || 'sb_publishable_SUwAmMFR9xGM26BXK7A5oA_XsAvSbGz';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
