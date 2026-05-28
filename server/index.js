@@ -171,6 +171,14 @@ const mailTransporter = hasEmailConfig
     })
   : null;
 
+function getRequestOrigin(req) {
+  const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
+  const forwardedHost = (req.headers['x-forwarded-host'] || '').toString().split(',')[0].trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = forwardedHost || req.get('host') || '';
+  return host ? `${protocol}://${host}` : '';
+}
+
 function extractLikelyEmail(photo) {
   const direct = [
     photo?.photographer_email,
@@ -1866,7 +1874,9 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
     let qrUrl = null;
     if (qrMode === 'generate') {
       const generateQrForTree = require("./utils/generateQrForTree");
-      qrUrl = await generateQrForTree(listing.id);
+      qrUrl = await generateQrForTree(listing.id, {
+        appBaseUrl: process.env.APP_BASE_URL || process.env.CLIENT_URL || getRequestOrigin(req),
+      });
 
       await writeSupabase
         .from("listings")
@@ -3492,7 +3502,9 @@ api.post('/ai/create-tree-from-scan', async (req, res) => {
     }
 
     const generateQrForTree = require('./utils/generateQrForTree');
-    const qrUrl = await generateQrForTree(listing.id);
+    const qrUrl = await generateQrForTree(listing.id, {
+      appBaseUrl: process.env.APP_BASE_URL || process.env.CLIENT_URL || getRequestOrigin(req),
+    });
     await writeSupabase.from('listings').update({ qr_url: qrUrl }).eq('id', listing.id);
 
     const normalizedUrls = Array.from(

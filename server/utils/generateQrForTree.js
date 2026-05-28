@@ -13,10 +13,36 @@ function buildFallbackQrUrl(qrData) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(qrData)}`;
 }
 
-async function generateQrForTree(id) {
+function isValidHttpUrl(value) {
   try {
-    const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
-    const qrData = `${appBaseUrl.replace(/\/$/, "")}/tag/${id}`;
+    const parsed = new URL((value || '').toString().trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (_err) {
+    return false;
+  }
+}
+
+function resolveQrBaseUrl(explicitBaseUrl) {
+  const candidates = [
+    explicitBaseUrl,
+    process.env.APP_BASE_URL,
+    process.env.PUBLIC_APP_URL,
+    process.env.CLIENT_URL,
+  ];
+
+  for (const candidate of candidates) {
+    const next = (candidate || '').toString().trim();
+    if (!next) continue;
+    if (isValidHttpUrl(next)) return next.replace(/\/$/, '');
+  }
+
+  return 'http://localhost:5173';
+}
+
+async function generateQrForTree(id, options = {}) {
+  try {
+    const appBaseUrl = resolveQrBaseUrl(options.appBaseUrl);
+    const qrData = `${appBaseUrl}/tag/${id}`;
     const fallbackQrUrl = buildFallbackQrUrl(qrData);
 
     const qrBuffer = await QRCode.toBuffer(qrData, {
