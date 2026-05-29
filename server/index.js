@@ -873,6 +873,10 @@ api.get('/', (req, res) => {
     winner_email_enabled: Boolean(mailTransporter),
     stripe_mode: STRIPE_CONFIG.mode,
     stripe_configured: Boolean(STRIPE_SECRET_KEY && STRIPE_WEBHOOK_SECRET),
+    stripe_prices_configured: {
+      gardener: Boolean(STRIPE_PRICE_GARDENER),
+      estate: Boolean(STRIPE_PRICE_ESTATE),
+    },
   });
 });
 
@@ -931,8 +935,28 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
 
     return res.json({ url: session.url });
   } catch (err) {
-    console.error('Stripe checkout session error:', err);
-    return res.status(500).json({ error: 'Failed to create checkout session' });
+    console.error('Stripe checkout session error:', {
+      type: err?.type,
+      code: err?.code,
+      param: err?.param,
+      message: err?.message,
+      requestId: err?.requestId,
+    });
+
+    // Most common production failure: wrong mode for price ID (test price with live key).
+    if (err?.code === 'resource_missing' && /price/i.test((err?.param || '').toString())) {
+      return res.status(500).json({
+        error: 'Stripe price not found for current mode. Verify live STRIPE_PRICE_GARDENER_LIVE and STRIPE_PRICE_ESTATE_LIVE values.',
+      });
+    }
+
+    if (err?.type === 'StripeAuthenticationError') {
+      return res.status(500).json({
+        error: 'Stripe authentication failed. Verify STRIPE_SECRET_KEY_LIVE and STRIPE_MODE=live.',
+      });
+    }
+
+    return res.status(500).json({ error: err?.message || 'Failed to create checkout session' });
   }
 });
 
