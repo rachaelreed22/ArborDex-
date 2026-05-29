@@ -552,7 +552,7 @@ async function ensureHomeownerProfileExists(userId) {
   // Check if profile exists
   const { data: existing, error: checkError } = await writeSupabase
     .from('homeowner_profiles')
-    .select('id')
+    .select('id, user_id, tier, stripe_customer_id')
     .eq('user_id', userId)
     .limit(1);
 
