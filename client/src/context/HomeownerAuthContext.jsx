@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { apiUrl } from '../utils/apiUrl';
 
 const HomeownerAuthContext = createContext(null);
 
@@ -215,6 +216,36 @@ export function HomeownerAuthProvider({ children }) {
     return session?.access_token || null;
   }
 
+  async function refreshProfile() {
+    if (!user?.id) return null;
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(apiUrl('/api/homeowners/plants'), {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to refresh homeowner profile');
+      }
+
+      setProfile({
+        id: null,
+        user_id: user.id,
+        tier: payload.tier || 'free',
+        stripe_customer_id: null,
+      });
+
+      return payload;
+    } catch {
+      // Keep the existing profile state if the refresh request fails.
+      return null;
+    }
+  }
+
   const value = useMemo(() => ({
     user,
     profile,
@@ -230,7 +261,7 @@ export function HomeownerAuthProvider({ children }) {
     resetPassword,
     updatePassword,
     getAccessToken,
-    refreshProfile: () => ensureHomeownerProfile(user?.id),
+    refreshProfile,
   }), [user, profile, loading, error]);
 
   return <HomeownerAuthContext.Provider value={value}>{children}</HomeownerAuthContext.Provider>;

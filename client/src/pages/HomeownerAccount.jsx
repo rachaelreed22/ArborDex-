@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { getTierLabel, getTierLimit } from '../utils/homeownerTier';
 import { useHomeownerAuth } from '../context/HomeownerAuthContext';
@@ -7,14 +7,17 @@ import './HomeownerTheme.css';
 
 export default function HomeownerAccount() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { tier, user, supabase, logout, getAccessToken, refreshProfile } = useHomeownerAuth();
 
   const [activeProfiles, setActiveProfiles] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
+  const checkoutSuccess = new URLSearchParams(location.search).get('checkout') === 'success';
 
   const profileLimit = useMemo(() => getTierLimit(tier), [tier]);
+  const title = checkoutSuccess ? "Thank you for choosing ArborTag HomeOwner's Edition" : 'Homeowner Account';
 
   useEffect(() => {
     async function loadAccount() {
@@ -71,14 +74,22 @@ export default function HomeownerAccount() {
     <main className="homeowner-shell min-h-screen px-4 py-10">
       <div className="homeowner-surface mx-auto w-full max-w-3xl rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="homeowner-heading text-3xl font-bold">Homeowner Account</h1>
+          <h1 className="homeowner-heading text-3xl font-bold">{title}</h1>
           <button onClick={logout} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Sign out</button>
         </div>
 
         <p className="homeowner-subtext mt-2 text-sm">Logged in as {user?.email}</p>
 
+        {checkoutSuccess && (
+          <div className="homeowner-panel homeowner-panel-info mt-4">
+            Thank you for choosing ArborTag HomeOwner&apos;s Edition. Your updated profile limit is shown below.
+          </div>
+        )}
+
         {loading ? (
-          <p className="homeowner-muted mt-6">Loading account...</p>
+          <p className="homeowner-muted mt-6">
+            {checkoutSuccess ? 'Refreshing your updated profile limit...' : 'Loading account...'}
+          </p>
         ) : (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <div className="homeowner-stat-card rounded-xl p-4">
@@ -102,7 +113,7 @@ export default function HomeownerAccount() {
             : 'You can replace profiles by deleting older entries. Limits apply to active profiles only.'}
         </div>
 
-        {tier === 'free' && (
+        {!checkoutSuccess && tier === 'free' && (
           <div className="homeowner-panel homeowner-panel-warn mt-4">
             Need more than 3 active plant IDs? Upgrade to Gardener or Estate.
             Over 65 requires B2B custom pricing at <a className="underline font-semibold" href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a>.
@@ -116,7 +127,7 @@ export default function HomeownerAccount() {
             onClick={() => navigate('/homeowners/plants')}
             className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"
           >
-            Manage Plant Profiles
+            Manage Profiles
           </button>
           <button
             onClick={() => navigate('/homeowners/ask-arborai')}
