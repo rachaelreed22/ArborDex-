@@ -3,6 +3,10 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
+const crypto = require('crypto');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { fileTypeFromBuffer } = require('file-type');
+const { imageSize } = require('image-size');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const supabase = require('./db');
@@ -28,6 +32,97 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 10 },
 });
+
+const ALLOWED_PUBLIC_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const IMAGE_EXTENSION_BY_MIME = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+const MAX_IMAGE_WIDTH = 8000;
+const MAX_IMAGE_HEIGHT = 8000;
+const MAX_IMAGE_PIXELS = 32000000;
+
+function getRateLimitKey(req) {
+  const forwardedFor = (req.headers['x-forwarded-for'] || '').toString();
+  const firstForwardedIp = forwardedFor.split(',')[0].trim();
+  const candidateIp = firstForwardedIp || req.ip || '';
+  return ipKeyGenerator(candidateIp);
+}
+
+const publicPhotoUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
+  message: { error: 'Too many upload attempts. Please wait and try again.' },
+});
+
+const publicAiAskLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
+  message: { error: 'Too many ArborAI requests. Please wait and try again.' },
+});
+
+function normalizeStoragePrefix(value, fallback = 'upload') {
+  const normalized = (value || '')
+    .toString()
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 80);
+
+  return normalized || fallback;
+}
+
+function buildGeneratedObjectPath(prefix, mimeType) {
+  const ext = IMAGE_EXTENSION_BY_MIME[mimeType] || 'jpg';
+  return `${normalizeStoragePrefix(prefix)}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+}
+
+async function validateRasterImageFile(file) {
+  if (!file?.buffer || !Buffer.isBuffer(file.buffer)) {
+    throw new Error('Invalid upload payload');
+  }
+
+  const detectedType = await fileTypeFromBuffer(file.buffer);
+  const detectedMime = detectedType?.mime || '';
+
+  if (!ALLOWED_PUBLIC_IMAGE_MIME.has(detectedMime)) {
+    throw new Error('Only JPEG, PNG, and WEBP images are allowed');
+  }
+
+  const declaredMime = (file.mimetype || '').toString().trim().toLowerCase();
+  if (declaredMime && !ALLOWED_PUBLIC_IMAGE_MIME.has(declaredMime)) {
+    throw new Error('Invalid image MIME type');
+  }
+
+  let dimensions;
+  try {
+    dimensions = imageSize(file.buffer);
+  } catch {
+    throw new Error('Unable to read image dimensions');
+  }
+
+  const width = Number(dimensions?.width || 0);
+  const height = Number(dimensions?.height || 0);
+  if (!width || !height) {
+    throw new Error('Image dimensions are required');
+  }
+
+  if (width > MAX_IMAGE_WIDTH || height > MAX_IMAGE_HEIGHT || width * height > MAX_IMAGE_PIXELS) {
+    throw new Error('Image dimensions exceed allowed limits');
+  }
+
+  return {
+    mimeType: detectedMime,
+    width,
+    height,
+  };
+}
 
 const PHOTO_BUCKET = process.env.SUPABASE_PHOTO_BUCKET || 'tree-photos';
 const ASK_ARBORAI_BUCKET = process.env.SUPABASE_ASK_ARBORAI_BUCKET || PHOTO_BUCKET;
@@ -2249,7 +2344,7 @@ api.delete('/listings/:id', async (req, res) => {
 // ===========================
 // PHOTO ROUTES
 // ===========================
-api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
+api.post('/photos/upload', publicPhotoUploadLimiter, upload.array('photos', 10), async (req, res) => {
   try {
     const listingId = decodeURIComponent((req.body?.listingId || '').toString()).trim();
     const files = Array.isArray(req.files) ? req.files : [];
@@ -2303,13 +2398,19 @@ api.post('/photos/upload', upload.array('photos', 10), async (req, res) => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const safeName = (file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = `${listingId}/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeName}`;
+      let validatedImage;
+      try {
+        validatedImage = await validateRasterImageFile(file);
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message || 'Invalid image upload' });
+      }
+
+      const filePath = buildGeneratedObjectPath(listingId, validatedImage.mimeType);
 
       const { error: uploadError } = await writeSupabase.storage
         .from(PHOTO_BUCKET)
         .upload(filePath, file.buffer, {
-          contentType: file.mimetype || 'image/jpeg',
+          contentType: validatedImage.mimeType,
           upsert: false,
         });
 
@@ -3302,7 +3403,7 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
 // ===========================
 // AI ROUTE — Ask ArborAI (Public scanner + chat)
 // ===========================
-api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
+api.post('/ai/ask-arborai', publicAiAskLimiter, upload.array('photos', 6), async (req, res) => {
   try {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
@@ -3315,15 +3416,21 @@ api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
     const uploadedPhotoUrls = [];
     const aiImageUrls = [];
     for (const file of files) {
-      const safeName = (file.originalname || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = `ask-arborai/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeName}`;
+      let validatedImage;
+      try {
+        validatedImage = await validateRasterImageFile(file);
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message || 'Invalid image upload' });
+      }
+
+      const filePath = buildGeneratedObjectPath('ask-arborai', validatedImage.mimeType);
 
       let uploadedBucket = null;
       for (const bucketName of ASK_ARBORAI_BUCKET_CANDIDATES) {
         const { error: uploadError } = await writeSupabase.storage
           .from(bucketName)
           .upload(filePath, file.buffer, {
-            contentType: file.mimetype,
+            contentType: validatedImage.mimeType,
             upsert: false,
           });
 
@@ -3341,7 +3448,7 @@ api.post('/ai/ask-arborai', upload.array('photos', 6), async (req, res) => {
         console.error('Ask ArborAI storage upload failed for all candidate buckets.');
         // Fallback: still send the image to the vision model as inline data URL.
         const base64 = file.buffer.toString('base64');
-        aiImageUrls.push(`data:${file.mimetype || 'image/jpeg'};base64,${base64}`);
+        aiImageUrls.push(`data:${validatedImage.mimeType};base64,${base64}`);
         continue;
       }
 
