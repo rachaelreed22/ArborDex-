@@ -68,6 +68,10 @@ export default function Navbar() {
           Ask ArborAI
         </NavLink>
 
+        <NavLink to="/contact" onClick={() => setMenuOpen(false)}>
+          Contact
+        </NavLink>
+
         {isAuthenticated && isStaff && (
           <NavLink to="/park-report" onClick={() => setMenuOpen(false)}>
             Park Report

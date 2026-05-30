@@ -17,3 +17,4 @@ export const uploadPhoto = (treeId, formData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then(r => r.data);
 export const deletePhoto = (photoId) => api.delete(`/photos/${photoId}`).then(r => r.data);
+export const submitContactSupport = (data) => api.post('/contact', data).then(r => r.data);

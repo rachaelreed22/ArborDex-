@@ -1,0 +1,108 @@
+.public-footer {
+  position: relative;
+  margin-top: 0;
+  padding: 2.2rem 1rem 1.2rem;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(191, 158, 84, 0.14), transparent 24%),
+    linear-gradient(180deg, #102c1f 0%, #0b2117 100%);
+  color: #edf5e8;
+}
+
+.public-footer__shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(240px, 1.1fr) minmax(0, 1.9fr);
+  gap: 1.4rem;
+  padding: 1.4rem;
+  border: 1px solid rgba(235, 245, 232, 0.12);
+  border-radius: 24px;
+  background: rgba(247, 250, 244, 0.05);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.public-footer__eyebrow {
+  margin: 0 0 0.55rem;
+  color: #f1d89a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.public-footer__brand h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.6vw, 2rem);
+  line-height: 1.12;
+  color: #f7fbf4;
+  font-family: "Fraunces", "Cambria", serif;
+}
+
+.public-footer__brand p:last-child {
+  margin: 0.9rem 0 0;
+  color: rgba(237, 245, 232, 0.82);
+  line-height: 1.65;
+}
+
+.public-footer__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.public-footer__section h3 {
+  margin: 0 0 0.7rem;
+  color: #f6edcf;
+  font-size: 0.95rem;
+}
+
+.public-footer__links {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.public-footer__links a {
+  color: rgba(237, 245, 232, 0.84);
+  font-size: 0.92rem;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.public-footer__links a:hover,
+.public-footer__links a:focus-visible {
+  color: #f2d88e;
+  transform: translateX(2px);
+}
+
+.public-footer__bottom {
+  width: min(1180px, 100%);
+  margin: 0.9rem auto 0;
+  color: rgba(237, 245, 232, 0.72);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+@media (max-width: 920px) {
+  .public-footer__shell {
+    grid-template-columns: 1fr;
+  }
+
+  .public-footer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .public-footer {
+    padding-inline: 0.75rem;
+  }
+
+  .public-footer__shell {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .public-footer__grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,23 +1,38 @@
 import { useNavigate } from 'react-router-dom';
 import './PoliciesTerms.css';
 
-export default function PoliciesTerms() {
+export default function PoliciesTerms({ variant = 'all' }) {
   const navigate = useNavigate();
+  const showPrivacy = variant === 'all' || variant === 'privacy';
+  const showLegal = variant === 'all' || variant === 'terms';
+  const showTerms = variant === 'all' || variant === 'terms';
+  const isFocusedView = variant !== 'all';
+  const pageTitle = variant === 'privacy'
+    ? 'ArborTag Privacy Policy'
+    : variant === 'terms'
+      ? 'ArborTag Terms & Conditions'
+      : 'ArborTag Policies & Terms';
+  const pageSubheading = variant === 'privacy'
+    ? 'How ArborTag collects, uses, and protects information across public, homeowner, and municipal use.'
+    : variant === 'terms'
+      ? 'Rules, liability boundaries, and service terms for using ArborTag.'
+      : 'Please read all three sections carefully before using ArborTag.';
+  const backPath = isFocusedView ? '/' : '/staff/login';
+  const backLabel = isFocusedView ? '← Back to Home' : '← Back to Login';
 
   return (
     <div className="policies-page">
       <div className="policies-container">
         <div className="policies-header">
-          <h1>🌿 ArborTag Policies &amp; Terms</h1>
-          <p className="policies-subheading">
-            Please read all three sections carefully before using ArborTag.
-          </p>
-          <button className="btn btn-secondary policies-back-btn" onClick={() => navigate('/staff/login')}>
-            ← Back to Login
+          <h1>🌿 {pageTitle}</h1>
+          <p className="policies-subheading">{pageSubheading}</p>
+          <button className="btn btn-secondary policies-back-btn" onClick={() => navigate(backPath)}>
+            {backLabel}
           </button>
         </div>
 
         {/* ── PRIVACY POLICY ── */}
+        {showPrivacy ? (
         <section className="policies-card">
           <h2>🌿 Privacy Policy</h2>
           <p className="policies-meta">Last updated: May 21, 2026</p>
@@ -130,11 +145,13 @@ export default function PoliciesTerms() {
 
           <div className="policies-section">
             <h3>9. Contact</h3>
-            <p>For privacy questions or requests: <a href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a></p>
+            <p>For privacy questions or requests: <a href="mailto:arbortag_support@rrtech.dev">arbortag_support@rrtech.dev</a></p>
           </div>
         </section>
+        ) : null}
 
         {/* ── LEGAL DISCLAIMER ── */}
+        {showLegal ? (
         <section className="policies-card">
           <h2>🌿 Legal Obligations &amp; Liability Disclaimer</h2>
           <p className="policies-meta">Last updated: May 21, 2026</p>
@@ -242,11 +259,13 @@ export default function PoliciesTerms() {
 
           <div className="policies-section">
             <h3>8. Contact</h3>
-            <p>For legal questions: <a href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a></p>
+            <p>For legal questions: <a href="mailto:arbortag_support@rrtech.dev">arbortag_support@rrtech.dev</a></p>
           </div>
         </section>
+        ) : null}
 
         {/* ── TERMS OF SERVICE ── */}
+        {showTerms ? (
         <section className="policies-card policies-card-tos">
           <div className="policies-tos-badge">Agreement Required</div>
           <h2>🌿 Terms of Service</h2>
@@ -397,13 +416,14 @@ export default function PoliciesTerms() {
 
           <div className="policies-section">
             <h3>15. Contact Information</h3>
-            <p>For questions about these Terms: <a href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a></p>
+            <p>For questions about these Terms: <a href="mailto:arbortag_support@rrtech.dev">arbortag_support@rrtech.dev</a></p>
           </div>
         </section>
+        ) : null}
 
         <div className="policies-footer">
           <p>© 2026 ArborTag / RR Tech. All rights reserved.</p>
-          <button className="btn btn-secondary" onClick={() => navigate('/staff/login')}>← Back to Login</button>
+          <button className="btn btn-secondary" onClick={() => navigate(backPath)}>{backLabel}</button>
         </div>
       </div>
     </div>

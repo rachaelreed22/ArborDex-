@@ -7,6 +7,7 @@ import "./pages/TreeDetail.css";
 
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import PublicFooter from './components/PublicFooter';
 import { ModeProvider } from './context/ModeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { HomeownerAuthProvider, useHomeownerAuth } from './context/HomeownerAuthContext';
@@ -33,6 +34,11 @@ import HomeownerAskArborAI from './pages/HomeownerAskArborAI';
 import HomeownerResetPasswordRequest from './pages/HomeownerResetPasswordRequest';
 import HomeownerResetPassword from './pages/HomeownerResetPassword';
 import StaffSignup from './pages/StaffSignup';
+import ContactSupport from './pages/ContactSupport';
+import PhotoSubmissionPolicy from './pages/PhotoSubmissionPolicy';
+import HelpFaq from './pages/HelpFaq';
+import AboutArborTag from './pages/AboutArborTag';
+import ForParksCities from './pages/ForParksCities';
 
 // Layout with navbar (for most pages)
 function LayoutWithNavbar() {
@@ -44,9 +50,28 @@ function LayoutWithNavbar() {
   );
 }
 
+function LayoutWithNavbarAndFooter() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+      <PublicFooter />
+    </>
+  );
+}
+
 // Layout without navbar (for homepage only)
 function LayoutNoNavbar() {
   return <Outlet />;
+}
+
+function LayoutFooterOnly() {
+  return (
+    <>
+      <Outlet />
+      <PublicFooter />
+    </>
+  );
 }
 
 // Protected route for authenticated users (staff/admin)
@@ -96,17 +121,23 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               {/* Homepage - no navbar */}
-              <Route element={<LayoutNoNavbar />}>
+              <Route element={<LayoutFooterOnly />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/homeowners" element={<HomeownersEdition />} />
               </Route>
 
               {/* Login/Policy routes - no navbar */}
-              <Route element={<LayoutNoNavbar />}>
+              <Route element={<LayoutFooterOnly />}>
                 <Route path="/admin" element={<Navigate to="/staff/login" replace />} />
                 <Route path="/staff/login" element={<AdminLogin />} />
                 <Route path="/staff/signup" element={<StaffSignup />} />
                 <Route path="/policies" element={<PoliciesTerms />} />
+                <Route path="/privacy" element={<PoliciesTerms variant="privacy" />} />
+                <Route path="/terms" element={<PoliciesTerms variant="terms" />} />
+                <Route path="/photo-submission-policy" element={<PhotoSubmissionPolicy />} />
+                <Route path="/help" element={<HelpFaq />} />
+                <Route path="/about" element={<AboutArborTag />} />
+                <Route path="/for-parks-cities" element={<ForParksCities />} />
                 <Route path="/homeowners/login" element={<HomeownerLogin />} />
                 <Route path="/homeowners/signup" element={<HomeownerSignup />} />
                 <Route path="/homeowners/reset-password-request" element={<HomeownerResetPasswordRequest />} />
@@ -128,7 +159,7 @@ export default function App() {
               </Route>
 
               {/* Public routes - with navbar */}
-              <Route element={<LayoutWithNavbar />}>
+              <Route element={<LayoutWithNavbarAndFooter />}>
                 <Route path="/parks" element={<ParkSelector />} />
                 <Route path="/trees" element={<DatabaseEntryRoute />} />
                 <Route path="/database" element={<DatabaseEntryRoute />} />
@@ -137,6 +168,7 @@ export default function App() {
                 <Route path="/tag/:id" element={<TreeDetail />} />
                 <Route path="/scan" element={<Scan />} />
                 <Route path="/ask-arborai" element={<AskArborAI />} />
+                <Route path="/contact" element={<ContactSupport />} />
                 <Route path="/park-report" element={<ProtectedRoute><ParkReport /></ProtectedRoute>} />
                 <Route path="/pending-photos" element={<PendingPhotos />} />
               </Route>

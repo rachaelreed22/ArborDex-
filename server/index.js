@@ -68,6 +68,15 @@ const publicAiAskLimiter = rateLimit({
   message: { error: 'Too many ArborAI requests. Please wait and try again.' },
 });
 
+const publicContactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
+  message: { error: 'Too many contact requests. Please wait and try again.' },
+});
+
 function normalizeStoragePrefix(value, fallback = 'upload') {
   const normalized = (value || '')
     .toString()
@@ -252,6 +261,7 @@ const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = (process.env.SMTP_USER || '').toString().trim();
 const SMTP_PASS = (process.env.SMTP_PASS || '').toString().trim();
 const SMTP_FROM = (process.env.SMTP_FROM || SMTP_USER || '').toString().trim();
+const SUPPORT_CONTACT_EMAIL = (process.env.SUPPORT_CONTACT_EMAIL || 'arbortag_support@rrtech.dev').toString().trim();
 
 const hasEmailConfig = Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS && SMTP_FROM);
 const mailTransporter = hasEmailConfig
@@ -272,6 +282,14 @@ function getRequestOrigin(req) {
   const protocol = forwardedProto || req.protocol || 'http';
   const host = forwardedHost || req.get('host') || '';
   return host ? `${protocol}://${host}` : '';
+}
+
+function cleanContactField(value, maxLength = 5000) {
+  return (value || '')
+    .toString()
+    .replace(/\r/g, '')
+    .trim()
+    .slice(0, maxLength);
 }
 
 function extractLikelyEmail(photo) {
@@ -973,6 +991,77 @@ api.get('/', (req, res) => {
       estate: Boolean(STRIPE_PRICE_ESTATE),
     },
   });
+});
+
+api.post('/contact', publicContactLimiter, async (req, res) => {
+  if (!mailTransporter) {
+    return res.status(503).json({ error: 'Contact email is not configured on the server' });
+  }
+
+  const name = cleanContactField(req.body?.name, 120);
+  const email = cleanContactField(req.body?.email, 254).toLowerCase();
+  const organization = cleanContactField(req.body?.organization, 160);
+  const subject = cleanContactField(req.body?.subject, 180);
+  const message = cleanContactField(req.body?.message, 5000);
+
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'Name, email, subject, and message are required' });
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
+    return res.status(400).json({ error: 'A valid email address is required' });
+  }
+
+  const supportText = [
+    'New ArborTag support request',
+    '',
+    `Name: ${name}`,
+    `Email: ${email}`,
+    `Organization / City / Park: ${organization || 'Not provided'}`,
+    `Subject: ${subject}`,
+    '',
+    'Message:',
+    message,
+  ].join('\n');
+
+  const confirmationText = [
+    `Hi ${name},`,
+    '',
+    'Thank you for contacting ArborTag support.',
+    'We received your message and will respond as quickly as possible.',
+    '',
+    '— ArborTag Support',
+    'RR Tech',
+  ].join('\n');
+
+  try {
+    await mailTransporter.sendMail({
+      from: SMTP_FROM,
+      to: SUPPORT_CONTACT_EMAIL,
+      replyTo: email,
+      subject: `[Support] ${subject}`,
+      text: supportText,
+    });
+
+    let confirmationSent = true;
+    try {
+      await mailTransporter.sendMail({
+        from: SMTP_FROM,
+        to: email,
+        subject: 'We received your ArborTag support message',
+        text: confirmationText,
+      });
+    } catch (confirmationError) {
+      confirmationSent = false;
+      console.error('Failed to send contact confirmation email:', confirmationError);
+    }
+
+    return res.status(201).json({ success: true, confirmationSent });
+  } catch (error) {
+    console.error('Failed to send contact request email:', error);
+    return res.status(500).json({ error: 'Failed to send your message. Please try again later.' });
+  }
 });
 
 // ===========================
