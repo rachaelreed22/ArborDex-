@@ -35,10 +35,10 @@ export default function Home() {
       <div className="home-container">
         <section className="hero-panel reveal">
           <p className="hero-kicker">ArborDex Platform • Powered by ArborTag</p>
-          <h1 className="hero-title">Modern Infrastructure for Urban Forestry</h1>
+          <h1 className="hero-title">Turn Every Tree Into a Story, a Record, and a Resource</h1>
           <p className="hero-subheading">
-            Turn every tree into searchable environmental infrastructure with QR identity, public education,
-            and operational data for teams that manage living ecosystems.
+            ArborTag uses QR codes to help park visitors learn about local trees while giving staff
+            a simple way to build useful tree records over time.
           </p>
 
           <div className="anchor-moment" aria-label="ArborDex brand anchor">

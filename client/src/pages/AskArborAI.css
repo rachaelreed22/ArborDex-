@@ -2,6 +2,7 @@
   min-height: calc(100vh - 72px);
   padding: 1rem;
   color: #103223;
+  overscroll-behavior-y: contain;
 }
 
 .ask-shell {
@@ -45,6 +46,7 @@
   padding: 0.95rem;
   max-height: 60vh;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;

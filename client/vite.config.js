@@ -42,14 +42,14 @@ export default defineConfig(({ command }) => ({
       '/api': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
-        timeout: 300000,
-        proxyTimeout: 300000,
+        timeout: 30000,
+        proxyTimeout: 30000,
       },
       '/uploads': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
-        timeout: 300000,
-        proxyTimeout: 300000,
+        timeout: 30000,
+        proxyTimeout: 30000,
       },
     },
   },

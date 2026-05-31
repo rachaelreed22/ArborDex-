@@ -4,6 +4,30 @@ import { useMode } from '../context/ModeContext';
 import { apiUrl } from '../utils/apiUrl';
 import './AskArborAI.css';
 
+const ASK_ARBOR_AI_STORAGE_KEY = 'arbortag.askArborAi.session.v1';
+
+function getInitialAssistantMessage() {
+  return createMessage({
+    role: 'assistant',
+    text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
+  });
+}
+
+function sanitizeMessageForStorage(message) {
+  return {
+    id: message.id,
+    role: message.role,
+    text: message.text,
+    photos: [],
+    photoFiles: [],
+    diagnostics: message.diagnostics || null,
+    showActions: false,
+    scanPayload: message.scanPayload || null,
+    actionCompleted: true,
+    createdAt: message.createdAt || Date.now(),
+  };
+}
+
 function createMessage({
   role,
   text = '',
@@ -32,12 +56,7 @@ export default function AskArborAI() {
   const { mode } = useMode();
   const isStaff = mode === 'dex';
   const navigate = useNavigate();
-  const [messages, setMessages] = useState([
-    createMessage({
-      role: 'assistant',
-      text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
-    }),
-  ]);
+  const [messages, setMessages] = useState([getInitialAssistantMessage()]);
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +67,9 @@ export default function AskArborAI() {
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
+  const [hasHydratedSession, setHasHydratedSession] = useState(false);
+  const chatRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
   const bottomRef = useRef(null);
 
   const buildPrefillDescription = ({ summary, confidence, healthScore, recommendations, assistantText }) => {
@@ -65,12 +87,7 @@ export default function AskArborAI() {
   };
 
   const resetConversation = () => {
-    setMessages([
-      createMessage({
-        role: 'assistant',
-        text: 'Hi! I am ArborAI. Upload or take a tree photo and ask anything about species, health, risk, or care.',
-      }),
-    ]);
+    setMessages([getInitialAssistantMessage()]);
     setQuestion('');
     setUploadedPhotos([]);
     setActionError('');
@@ -81,11 +98,74 @@ export default function AskArborAI() {
     setAttachDialogOpen(false);
     setSelectedListingId('');
     setAttachMessageId('');
+    shouldAutoScrollRef.current = true;
+    try {
+      localStorage.removeItem(ASK_ARBOR_AI_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors in private mode.
+    }
   };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (!hasHydratedSession) return;
+
+    const payload = {
+      messages: messages.map(sanitizeMessageForStorage),
+      question,
+    };
+
+    try {
+      localStorage.setItem(ASK_ARBOR_AI_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors in private mode.
+    }
+  }, [messages, question, hasHydratedSession]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ASK_ARBOR_AI_STORAGE_KEY);
+      if (!raw) {
+        setHasHydratedSession(true);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const savedMessages = Array.isArray(parsed?.messages) ? parsed.messages : [];
+      const normalized = savedMessages
+        .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
+        .map((item) => ({
+          ...createMessage({ role: item.role, text: item.text || '' }),
+          id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          diagnostics: item.diagnostics || null,
+          scanPayload: item.scanPayload || null,
+          showActions: false,
+          actionCompleted: true,
+          photos: [],
+          photoFiles: [],
+          createdAt: item.createdAt || Date.now(),
+        }));
+
+      setMessages(normalized.length > 0 ? normalized : [getInitialAssistantMessage()]);
+      setQuestion((parsed?.question || '').toString());
+    } catch {
+      setMessages([getInitialAssistantMessage()]);
+      setQuestion('');
+    } finally {
+      setHasHydratedSession(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedSession || !shouldAutoScrollRef.current) return;
+    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+  }, [messages.length, isLoading, hasHydratedSession]);
+
+  const handleChatScroll = () => {
+    const chat = chatRef.current;
+    if (!chat) return;
+    const distanceFromBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 72;
+  };
 
   const photoPreviews = useMemo(
     () => uploadedPhotos.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
@@ -471,7 +551,7 @@ export default function AskArborAI() {
           <p>Snap, upload, ask, and get species plus health diagnostics instantly.</p>
         </header>
 
-        <section className="ask-chat" aria-live="polite">
+        <section className="ask-chat" aria-live="polite" ref={chatRef} onScroll={handleChatScroll}>
           {messages.map((message) => (
             <article
               key={message.id}

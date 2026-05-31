@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import { API_BASE_URL, apiUrl } from "../utils/apiUrl";
 import { getNeedsAttention } from "../utils/attentionRules";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import "./TreeList.css";
 
 function inferHazardsFromDiagnostics(diagnostics) {
@@ -45,6 +46,7 @@ export default function TreeList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [attentionByListingId, setAttentionByListingId] = useState({});
   const [hazardByListingId, setHazardByListingId] = useState({});
   const [usingAllListingsFallback, setUsingAllListingsFallback] = useState(false);
@@ -73,20 +75,21 @@ export default function TreeList() {
 
   async function fetchListings() {
     try {
-      const res = await fetch(apiUrl(listingsEndpoint), {
+      setLoadError("");
+      const res = await fetchWithTimeout(apiUrl(listingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
-      });
+      }, 15000);
       const data = await res.json();
       let nextListings = Array.isArray(data) ? data : [];
 
       // If a park is selected but no listings are tagged to it, show all listings
       // so previously saved tree profiles remain visible.
       if (selectedParkName && nextListings.length === 0) {
-        const allRes = await fetch(apiUrl("/api/listings"), {
+        const allRes = await fetchWithTimeout(apiUrl("/api/listings"), {
           cache: "no-store",
           headers: { Accept: "application/json" },
-        });
+        }, 15000);
         const allData = await allRes.json().catch(() => []);
         const allListings = Array.isArray(allData) ? allData : [];
         if (allListings.length > 0) {
@@ -110,6 +113,11 @@ export default function TreeList() {
       }
     } catch (err) {
       console.error("Error fetching listings:", err);
+      if (err?.name === "AbortError") {
+        setLoadError("Tree listings request timed out. Please check API availability and try again.");
+      } else {
+        setLoadError("Unable to load tree listings right now.");
+      }
       setAttentionByListingId({});
       setHazardByListingId({});
       setLoading(false);
@@ -119,12 +127,12 @@ export default function TreeList() {
   async function fetchAttentionFlags(listingRows) {
     try {
       const listingIds = listingRows.map((l) => l.id);
-      const res = await fetch(apiUrl("/api/diagnostics-logs/bulk-latest"), {
+      const res = await fetchWithTimeout(apiUrl("/api/diagnostics-logs/bulk-latest"), {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ listingIds }),
-      });
+      }, 12000);
 
       if (!res.ok) {
         setAttentionByListingId({});
@@ -176,10 +184,10 @@ export default function TreeList() {
     setDeletingId(normalizedId);
 
     try {
-      const res = await fetch(apiUrl(`/api/listings/${encodeURIComponent(normalizedId)}`), {
+      const res = await fetchWithTimeout(apiUrl(`/api/listings/${encodeURIComponent(normalizedId)}`), {
         method: "DELETE",
         headers: { Accept: "application/json" },
-      });
+      }, 15000);
 
       if (!res.ok) {
         const contentType = res.headers.get("content-type") || "";
@@ -195,10 +203,10 @@ export default function TreeList() {
         throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      const verifyRes = await fetch(apiUrl(activeListingsEndpoint), {
+      const verifyRes = await fetchWithTimeout(apiUrl(activeListingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
-      });
+      }, 15000);
       const verifyData = await verifyRes.json().catch(() => []);
       const nextListings = Array.isArray(verifyData) ? verifyData : [];
 
@@ -282,6 +290,12 @@ export default function TreeList() {
           </div>
         </div>
       </div>
+
+      {loadError ? (
+        <div className="empty-list">
+          <p>{loadError}</p>
+        </div>
+      ) : null}
 
       {/* Grid */}
       <div className="tree-grid">

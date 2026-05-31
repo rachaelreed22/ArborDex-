@@ -4,6 +4,7 @@ import { useMode } from "../context/ModeContext";
 import { getNeedsAttention } from "../utils/attentionRules";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import "./TreeDetail.css";
 
 function extractHistoricalUsesFromLogs(logs) {
@@ -206,6 +207,7 @@ export default function TreeDetail() {
 
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState(false);
   const [regeneratingQr, setRegeneratingQr] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -272,9 +274,11 @@ export default function TreeDetail() {
 
   async function fetchListing() {
     try {
-      const res = await fetch(apiUrl(`/api/listings/${id}`));
+      setLoadError("");
+      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}`), {}, 15000);
       if (!res.ok) {
         setListing(null);
+        setLoadError("Tree record could not be loaded.");
         return null;
       }
       const data = await res.json();
@@ -289,6 +293,11 @@ export default function TreeDetail() {
       return data;
     } catch (err) {
       console.error("Error fetching listing:", err);
+      if (err?.name === "AbortError") {
+        setLoadError("Tree details request timed out. Please try again.");
+      } else {
+        setLoadError("Unable to load tree details right now.");
+      }
       return null;
     } finally {
       setLoading(false);
@@ -297,7 +306,7 @@ export default function TreeDetail() {
 
   async function fetchDiagnosticsLogs() {
     try {
-      const res = await fetch(apiUrl(`/api/listings/${id}/diagnostics-logs`));
+      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}/diagnostics-logs`), {}, 12000);
       if (!res.ok) {
         setDiagnosticsLogs([]);
         return [];
@@ -613,6 +622,7 @@ export default function TreeDetail() {
   };
 
   if (loading) return <div className="loading">Loading tree...</div>;
+  if (loadError && !listing) return <div className="loading">{loadError}</div>;
 
   if (!listing) {
     return (

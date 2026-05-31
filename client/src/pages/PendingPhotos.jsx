@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import "./PendingPhotos.css";
 
 export default function PendingPhotos() {
   const navigate = useNavigate();
   const [pendingItems, setPendingItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   useEffect(() => {
@@ -16,10 +18,11 @@ export default function PendingPhotos() {
 
   async function loadPendingPhotos() {
     try {
+      setLoadError("");
       const endpoint = selectedParkName
         ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
         : "/api/listings";
-      const res = await fetch(apiUrl(endpoint));
+      const res = await fetchWithTimeout(apiUrl(endpoint), {}, 15000);
       const data = await res.json();
       const listings = Array.isArray(data) ? data : [];
 
@@ -37,6 +40,11 @@ export default function PendingPhotos() {
       setPendingItems(flattened);
     } catch (err) {
       console.error("Failed to load pending photos:", err);
+      if (err?.name === "AbortError") {
+        setLoadError("Pending photos request timed out. Please try again.");
+      } else {
+        setLoadError("Failed to load pending photos.");
+      }
       setPendingItems([]);
     } finally {
       setLoading(false);
@@ -96,6 +104,12 @@ export default function PendingPhotos() {
           </button>
         </div>
       </div>
+
+      {loadError ? (
+        <div className="empty-list">
+          <p>{loadError}</p>
+        </div>
+      ) : null}
 
       {pendingItems.length === 0 ? (
         <div className="empty-list">
