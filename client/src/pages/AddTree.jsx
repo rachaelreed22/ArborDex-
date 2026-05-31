@@ -5,6 +5,14 @@ import { useMode } from "../context/ModeContext";
 import { apiUrl } from "../utils/apiUrl";
 import "./AddTree.css";
 
+const INSPECTION_STATUS_OPTIONS = [
+  "Pending Inspection",
+  "Inspected",
+  "Monitor",
+  "Needs Attention",
+  "Cleared",
+];
+
 export default function AddTree() {
   const { mode } = useMode();
   const location = useLocation();
@@ -21,6 +29,12 @@ export default function AddTree() {
     location: "",
     latitude: "",
     longitude: "",
+    trunkDiameterInches: "",
+    heightEstimateFeet: "",
+    treeAddedAt: "",
+    treeId: "",
+    managedBy: "",
+    inspectionStatus: "Pending Inspection",
   });
 
   const [photos, setPhotos] = useState([]);
@@ -138,6 +152,30 @@ export default function AddTree() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const validateStructuredFields = () => {
+    const trunkRaw = form.trunkDiameterInches.trim();
+    const heightRaw = form.heightEstimateFeet.trim();
+    const trunkValue = trunkRaw ? Number(trunkRaw) : null;
+    const heightValue = heightRaw ? Number(heightRaw) : null;
+
+    if ((trunkRaw && !Number.isFinite(trunkValue)) || (heightRaw && !Number.isFinite(heightValue))) {
+      return "Measurements must be valid numbers.";
+    }
+
+    if ((trunkValue !== null && trunkValue <= 0) || (heightValue !== null && heightValue <= 0)) {
+      return "Measurements must be greater than zero.";
+    }
+
+    if (form.treeAddedAt.trim()) {
+      const parsed = new Date(form.treeAddedAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return "Tree Added date must be a valid date/time.";
+      }
+    }
+
+    return "";
   };
 
   const handlePhotoSelect = (e) => {
@@ -370,6 +408,12 @@ export default function AddTree() {
       return;
     }
 
+    const structuredFieldsError = validateStructuredFields();
+    if (structuredFieldsError) {
+      setError(structuredFieldsError);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -405,6 +449,12 @@ export default function AddTree() {
       formData.append("location", form.location.trim());
       formData.append("latitude", form.latitude.trim());
       formData.append("longitude", form.longitude.trim());
+      formData.append("trunk_diameter_inches", form.trunkDiameterInches.trim());
+      formData.append("height_estimate_feet", form.heightEstimateFeet.trim());
+      formData.append("tree_added_at", form.treeAddedAt.trim());
+      formData.append("tree_id", form.treeId.trim());
+      formData.append("managed_by", form.managedBy.trim());
+      formData.append("inspection_status", form.inspectionStatus.trim());
       formData.append("qr_mode", qrChoice === "scan-new" ? "scanned" : "generate");
 
       if (qrChoice === "scan-new") {
@@ -454,6 +504,12 @@ export default function AddTree() {
       return;
     }
 
+    const structuredFieldsError = validateStructuredFields();
+    if (structuredFieldsError) {
+      setError(structuredFieldsError);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -463,6 +519,12 @@ export default function AddTree() {
       formData.append("location", form.location.trim());
       formData.append("latitude", form.latitude.trim());
       formData.append("longitude", form.longitude.trim());
+      formData.append("trunk_diameter_inches", form.trunkDiameterInches.trim());
+      formData.append("height_estimate_feet", form.heightEstimateFeet.trim());
+      formData.append("tree_added_at", form.treeAddedAt.trim());
+      formData.append("tree_id", form.treeId.trim());
+      formData.append("managed_by", form.managedBy.trim());
+      formData.append("inspection_status", form.inspectionStatus.trim());
 
       photos.forEach((photo) => {
         formData.append("photos", photo);
@@ -590,6 +652,85 @@ export default function AddTree() {
             onChange={handleChange}
             rows={4}
           />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="trunkDiameterInches">Trunk Diameter (inches)</label>
+          <input
+            id="trunkDiameterInches"
+            name="trunkDiameterInches"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="e.g. 18.5"
+            value={form.trunkDiameterInches}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="heightEstimateFeet">Height Estimate (ft)</label>
+          <input
+            id="heightEstimateFeet"
+            name="heightEstimateFeet"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="e.g. 42"
+            value={form.heightEstimateFeet}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="treeAddedAt">Tree Added Date</label>
+          <input
+            id="treeAddedAt"
+            name="treeAddedAt"
+            type="datetime-local"
+            value={form.treeAddedAt}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="treeId">Internal Tree ID</label>
+          <input
+            id="treeId"
+            name="treeId"
+            type="text"
+            placeholder="e.g. F0A3CDFC"
+            value={form.treeId}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="managedBy">Managed By</label>
+          <input
+            id="managedBy"
+            name="managedBy"
+            type="text"
+            placeholder="e.g. ArborDex Staff"
+            value={form.managedBy}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="inspectionStatus">Inspection Status</label>
+          <select
+            id="inspectionStatus"
+            name="inspectionStatus"
+            value={form.inspectionStatus}
+            onChange={handleChange}
+          >
+            {INSPECTION_STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="form-group full-width">

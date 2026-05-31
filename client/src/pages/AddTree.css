@@ -1,123 +1,196 @@
 /* ===========================
-   ADD TREE FORM PAGE
+   ADD TREE PAGE (CLEAN)
    =========================== */
 
 .addtree-page {
-  max-width: 700px;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 1rem;
+  color: #153726;
 }
 
 .back-btn {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .addtree-title {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: #2e5e2e;
-  margin-bottom: 0.25rem;
+  margin: 0;
+  color: #103223;
+  font-family: "Fraunces", "Cambria", serif;
+  font-size: clamp(1.6rem, 3.8vw, 2.4rem);
+  line-height: 1.1;
 }
 
 .addtree-subtitle {
-  color: #5a7a5a;
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
+  margin: 0.55rem 0 1rem;
+  color: #2d5340;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.addtree-park-context {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: 0.36rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 58, 40, 0.2);
+  background: rgba(235, 242, 219, 0.96);
+  color: #234935;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.addtree-park-context strong {
+  margin-left: 0.32rem;
 }
 
 .scan-step-banner {
   display: flex;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
 }
 
 .step-chip {
   display: inline-flex;
   align-items: center;
-  padding: 0.35rem 0.75rem;
   border-radius: 999px;
-  font-weight: 700;
+  padding: 0.36rem 0.78rem;
+  border: 1px solid rgba(20, 58, 40, 0.24);
+  background: #edf3dc;
+  color: #1d4a32;
   font-size: 0.82rem;
-  border: 1px solid #9fbe9f;
-  background: #eef8ee;
-  color: #2e5e2e;
+  font-weight: 700;
 }
 
 .step-chip.active {
-  background: #2e5e2e;
-  color: #f5fff3;
-  border-color: #2e5e2e;
+  background: linear-gradient(125deg, #1f5d45, #2a6a4f);
+  border-color: #1f5d45;
+  color: #f5f7ef;
 }
 
 .step-chip.done {
   background: #d7edd8;
 }
 
-/* — Form Layout — */
+.form-error {
+  margin: 0 0 0.95rem;
+  padding: 0.72rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid #efb4b4;
+  background: #fdeaea;
+  color: #9d1717;
+  font-size: 0.91rem;
+  font-weight: 700;
+}
+
+.addtree-form,
+.addtree-phase-card {
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 18px;
+  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
+  box-shadow: 0 16px 28px rgba(8, 25, 17, 0.14);
+}
+
 .addtree-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.15rem;
 }
 
 .addtree-form .full-width {
   grid-column: 1 / -1;
 }
 
-/* — Error Banner — */
-.form-error {
-  background: #fdecea;
-  color: #b71c1c;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-  border: 1px solid #f5c6cb;
+.addtree-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-/* — Photo Upload — */
+.addtree-form label {
+  color: #1c472f;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.addtree-form input,
+.addtree-form textarea,
+.addtree-form select,
+.phase-attach-block select {
+  width: 100%;
+  border: 1px solid rgba(20, 56, 38, 0.24);
+  border-radius: 12px;
+  padding: 0.68rem 0.78rem;
+  background: #f8f6ee;
+  color: #183726;
+  font: inherit;
+}
+
+.addtree-form textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.addtree-form input:focus,
+.addtree-form textarea:focus,
+.addtree-form select:focus,
+.phase-attach-block select:focus {
+  outline: none;
+  border-color: #1f5d45;
+  box-shadow: 0 0 0 3px rgba(31, 93, 69, 0.14);
+}
+
 .photo-upload-area {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 0.25rem;
+  gap: 0.85rem;
+  flex-wrap: wrap;
 }
 
 .upload-btn {
-  background: rgba(46, 94, 46, 0.1);
-  border: 2px dashed #4a7a4a;
-  color: #2e5e2e;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px dashed rgba(20, 58, 40, 0.4);
+  border-radius: 12px;
+  padding: 0.56rem 0.92rem;
+  background: rgba(223, 218, 192, 0.78);
+  color: #1b472f;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
 .upload-btn:hover {
-  background: rgba(46, 94, 46, 0.2);
+  transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
 .upload-hint {
-  color: #6a896a;
-  font-size: 0.85rem;
+  color: #43644c;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
-/* — Photo Previews — */
 .photo-previews {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 120px));
-  gap: 0.75rem;
-  margin-top: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 120px));
+  gap: 0.7rem;
+  margin-top: 0.72rem;
 }
 
 .preview-card {
   position: relative;
   width: 120px;
   height: 100px;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(20, 58, 40, 0.2);
+  box-shadow: 0 4px 10px rgba(8, 25, 17, 0.12);
 }
 
 .preview-card img {
@@ -129,151 +202,128 @@
 
 .preview-remove {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  font-size: 0.7rem;
+  border-radius: 999px;
+  background: rgba(163, 40, 40, 0.88);
+  color: #fff;
+  font-size: 0.76rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
 }
 
-.preview-remove:hover {
-  background: rgba(183, 28, 28, 0.85);
-}
-
-/* — Photo Credit — */
-.photo-credit {
-  font-style: italic;
-  color: #6a896a;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-}
-
-/* — Form Actions — */
 .form-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+  gap: 0.65rem;
+  margin-top: 0.2rem;
 }
 
 .addtree-phase-card {
-  margin-top: 0.25rem;
-  border-radius: 10px;
-  border: 1px solid #b4d4b1;
-  background: #f6fff4;
-  padding: 0.95rem;
+  margin-top: 0.8rem;
+  padding: 1rem;
 }
 
 .addtree-phase-card h2 {
-  margin: 0 0 0.4rem;
-  color: #244a24;
-  font-size: 1.1rem;
+  margin: 0 0 0.35rem;
+  color: #163f2a;
+  font-size: 1.16rem;
 }
 
 .addtree-phase-card p {
   margin: 0;
-  color: #416941;
+  color: #355845;
 }
 
 .qr-choice-grid {
-  margin-top: 0.85rem;
+  margin-top: 0.86rem;
   display: grid;
   gap: 0.55rem;
 }
 
 .qr-choice-item {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  border: 1px solid #c5dec2;
-  border-radius: 8px;
+  gap: 0.55rem;
+  border: 1px solid rgba(20, 58, 40, 0.2);
+  border-radius: 10px;
   background: #ffffff;
-  padding: 0.55rem 0.65rem;
+  padding: 0.58rem 0.68rem;
+  color: #1f4a33;
   font-weight: 600;
 }
 
 .phase-scan-block {
-  margin-top: 0.8rem;
-  border-top: 1px solid #d4e8d1;
+  margin-top: 0.85rem;
   padding-top: 0.8rem;
+  border-top: 1px solid rgba(20, 58, 40, 0.14);
 }
 
 .phase-scan-actions {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.58rem;
   flex-wrap: wrap;
 }
 
 .phase-scanner-view {
   margin-top: 0.7rem;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  background: #e2f2dd;
+  border: 1px solid rgba(20, 58, 40, 0.16);
+  background: rgba(226, 242, 221, 0.85);
 }
 
 .phase-scanner-video {
   display: block;
   width: 100%;
-  max-height: 270px;
+  max-height: 300px;
   object-fit: cover;
 }
 
 .phase-scan-message {
   margin-top: 0.55rem;
-  font-weight: 600;
-  color: #2a562a;
+  color: #254f35;
+  font-weight: 700;
 }
 
 .phase-attach-block {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
+  margin-top: 0.78rem;
+  display: grid;
   gap: 0.4rem;
 }
 
 .phase-attach-block label {
-  font-size: 0.86rem;
+  color: #2c5338;
+  font-size: 0.88rem;
   font-weight: 700;
-  color: #3b663b;
-}
-
-.phase-attach-block select {
-  border: 1px solid #b7d1b4;
-  border-radius: 8px;
-  padding: 0.5rem 0.65rem;
-  font: inherit;
 }
 
 .phase-confirm-row {
-  margin-top: 0.9rem;
+  margin-top: 0.95rem;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.46rem;
 }
 
 .phase-confirm-status {
-  color: #2f5f31;
-  font-size: 0.86rem;
+  color: #2b5a3e;
+  font-size: 0.87rem;
   font-weight: 600;
 }
 
-/* ===========================
-   MOBILE
-   =========================== */
-@media (max-width: 600px) {
+@media (max-width: 740px) {
   .addtree-form {
     grid-template-columns: 1fr;
+    padding: 0.95rem;
   }
 
   .addtree-title {
-    font-size: 1.4rem;
+    font-size: clamp(1.35rem, 7vw, 1.95rem);
+  }
+
+  .photo-upload-area {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .form-actions {
@@ -284,164 +334,4 @@
     width: 100%;
     justify-content: center;
   }
-
-  .photo-upload-area {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
-.addtree-form .preview-card img {
-  width: 120px !important;
-  height: 100px !important;
-  max-width: 120px !important;
-  max-height: 100px !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-.addtree-form .preview-card {
-  width: 120px !important;
-  height: 100px !important;
-  overflow: hidden !important;
-}
-
-/* Homepage visual alignment overrides */
-.addtree-page {
-  max-width: 980px;
-  padding: 1rem;
-  color: #153726;
-}
-
-.addtree-title {
-  color: #103223;
-  font-family: "Fraunces", "Cambria", serif;
-  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
-}
-
-.addtree-subtitle {
-  color: #2d5340;
-}
-
-.addtree-park-context {
-  display: inline-flex;
-  margin: 0 0 1rem;
-  padding: 0.38rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(235, 242, 219, 0.96);
-  border: 1px solid rgba(20, 58, 40, 0.2);
-  color: #234935;
-  font-size: 0.84rem;
-  font-weight: 600;
-}
-
-.addtree-park-context strong {
-  margin-left: 0.3rem;
-}
-
-.addtree-phase-card,
-.addtree-form,
-.addtree-page .card,
-.addtree-page .empty-state {
-  background: linear-gradient(165deg, rgba(250, 248, 241, 0.96), rgba(237, 232, 214, 0.96));
-  border: 1px solid rgba(20, 56, 38, 0.2);
-  border-radius: 16px;
-  box-shadow: 0 14px 28px rgba(8, 25, 17, 0.14);
-}
-
-.step-chip {
-  border-color: rgba(20, 58, 40, 0.24);
-  background: #edf3dc;
-  color: #1d4a32;
-}
-
-.step-chip.active {
-  background: linear-gradient(125deg, #1f5d45, #2a6a4f);
-  border-color: #1f5d45;
-  color: #f5f7ef;
-}
-
-.addtree-page input,
-.addtree-page textarea,
-.addtree-page select,
-.phase-attach-block select {
-  background: #f8f6ee;
-  border: 1px solid rgba(20, 56, 38, 0.24);
-  color: #153726;
-  border-radius: 10px;
-}
-
-.upload-btn,
-.addtree-page .btn-secondary {
-  background: linear-gradient(120deg, #ddd4b6, #efe8d1);
-  border: 1px solid rgba(20, 58, 40, 0.22);
-  color: #183726;
-}
-
-.addtree-page .btn-primary {
-  background: linear-gradient(120deg, #144a33, #245e44);
-  color: #f5f7f1;
-  border: 1px solid transparent;
-}
-
-.addtree-page .btn-danger {
-  background: linear-gradient(120deg, #c55454, #a72e2e);
-  color: #fff8f8;
-  border: 1px solid transparent;
-}
-
-.phase-scanner-view {
-  border: 1px solid rgba(20, 56, 38, 0.16);
-  border-radius: 12px;
-  background: rgba(232, 239, 216, 0.85);
-}
-
-@media (max-width: 720px) {
-  .addtree-page {
-    padding: 0.75rem;
-  }
-
-  .addtree-phase-card,
-  .addtree-page .card,
-  .addtree-page .empty-state {
-    border-radius: 12px;
-    padding: 0.85rem;
-  }
-}
-
-/* Polish sweep: controls and rhythm */
-.addtree-page .btn,
-.addtree-page button,
-.addtree-page input,
-.addtree-page select,
-.addtree-page textarea,
-.upload-btn {
-  min-height: 44px;
-}
-
-.addtree-page .btn,
-.upload-btn {
-  border-radius: 12px;
-  font-weight: 700;
-}
-
-.addtree-page .addtree-subtitle,
-.addtree-page .phase-confirm-status,
-.addtree-page .scan-message,
-.addtree-page .upload-hint {
-  line-height: 1.5;
-}
-
-.addtree-page .form-actions {
-  margin-top: 0.9rem;
-}
-
-.addtree-page input:focus-visible,
-.addtree-page select:focus-visible,
-.addtree-page textarea:focus-visible,
-.addtree-page button:focus-visible,
-.addtree-page .btn:focus-visible,
-.upload-btn:focus-visible {
-  outline: 3px solid rgba(31, 93, 69, 0.3);
-  outline-offset: 2px;
-}
-

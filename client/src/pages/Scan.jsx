@@ -5,6 +5,17 @@ import { useMode } from "../context/ModeContext";
 import { apiUrl } from "../utils/apiUrl";
 import "./Scan.css";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function extractArborTagListingId(rawValue) {
+  const raw = (rawValue || "").toString().trim();
+  if (!raw) return "";
+
+  const pathMatch = raw.match(/\/(?:tag|tree|listing)\/([A-Za-z0-9-]{8,})/i);
+  const candidate = (pathMatch?.[1] || raw).trim();
+  return UUID_PATTERN.test(candidate) ? candidate : "";
+}
+
 export default function Scan() {
   const { mode } = useMode();
   const isStaff = mode === "dex";
@@ -21,6 +32,7 @@ export default function Scan() {
   const [listingId, setListingId] = useState(null);
 
   const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [qrUploadDecoding, setQrUploadDecoding] = useState(false);
 
   const [photographerInfo, setPhotographerInfo] = useState({
     firstName: "",
@@ -101,10 +113,9 @@ export default function Scan() {
 
       if (code) {
         const scanned = code.data.trim();
-        const match = scanned.match(/\/(?:tag|tree)\/([A-Za-z0-9-]+)/);
+        const id = extractArborTagListingId(scanned);
 
-        if (match) {
-          const id = match[1];
+        if (id) {
           stopCamera();
           callback(id);
           return;
@@ -127,8 +138,58 @@ export default function Scan() {
 
   const handleScanNewTree = () => {
     startCamera((id) => {
-      navigate("/tree/" + id);
+      navigate(`/tag/${id}`);
     });
+  };
+
+  const decodeQrFromImageFile = async (file) => {
+    const imageUrl = URL.createObjectURL(file);
+
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(image, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+      if (!code?.data) return "";
+
+      return extractArborTagListingId(code.data);
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const handleQrImageSelect = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setQrUploadDecoding(true);
+    try {
+      const decodedId = await decodeQrFromImageFile(file);
+      if (!decodedId) {
+        setMessage("QR image was read, but no valid ArborTag tree ID was found.");
+        return;
+      }
+
+      setListingId(decodedId);
+      setMessage(`Tree identified from image: #${decodedId}`);
+    } catch (err) {
+      console.error("QR image decode error:", err);
+      setMessage("Could not decode QR from image.");
+    } finally {
+      setQrUploadDecoding(false);
+    }
   };
 
   /* PHOTO SELECTION */
@@ -280,6 +341,9 @@ export default function Scan() {
       {/* ACTIONS */}
       <section className="scan-card">
         <h2>Scan Actions</h2>
+        <p className="scan-tip">
+          If the QR code is displayed on this same phone, use Upload QR Image with a screenshot.
+        </p>
         <div className="scan-actions">
           <button className="btn btn-primary" onClick={handleScanForUpload}>
             Scan QR for Upload
@@ -287,6 +351,16 @@ export default function Scan() {
           <button className="btn btn-secondary" onClick={handleScanNewTree}>
             Scan to View Tree
           </button>
+          <label className="btn btn-secondary file-btn" htmlFor="qr-image-input">
+            {qrUploadDecoding ? "Reading QR Image..." : "Upload QR Image"}
+          </label>
+          <input
+            id="qr-image-input"
+            type="file"
+            accept="image/*"
+            onChange={handleQrImageSelect}
+            hidden
+          />
         </div>
       </section>
 

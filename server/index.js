@@ -2043,6 +2043,12 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
       qr_mode,
       scanned_qr_url,
       custom_id,
+      trunk_diameter_inches,
+      height_estimate_feet,
+      tree_added_at,
+      tree_id,
+      managed_by,
+      inspection_status,
     } = req.body;
 
     const qrMode = qr_mode === 'scanned' ? 'scanned' : 'generate';
@@ -2052,6 +2058,29 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
     if (!title || !title.toString().trim()) {
       return res.status(400).json({ error: "Tree name is required" });
     }
+
+    const trunkRaw = (trunk_diameter_inches || '').toString().trim();
+    const heightRaw = (height_estimate_feet || '').toString().trim();
+    const trunkValue = trunkRaw ? Number(trunkRaw) : null;
+    const heightValue = heightRaw ? Number(heightRaw) : null;
+
+    if ((trunkRaw && !Number.isFinite(trunkValue)) || (heightRaw && !Number.isFinite(heightValue))) {
+      return res.status(400).json({ error: 'Measurements must be valid numbers' });
+    }
+
+    if ((trunkValue !== null && trunkValue <= 0) || (heightValue !== null && heightValue <= 0)) {
+      return res.status(400).json({ error: 'Measurements must be greater than zero' });
+    }
+
+    const treeAddedRaw = (tree_added_at || '').toString().trim();
+    const parsedTreeAddedAt = treeAddedRaw ? new Date(treeAddedRaw) : null;
+    if (treeAddedRaw && Number.isNaN(parsedTreeAddedAt.getTime())) {
+      return res.status(400).json({ error: 'Tree Added date must be valid' });
+    }
+
+    const treeIdValue = (tree_id || '').toString().trim() || null;
+    const managedByValue = (managed_by || '').toString().trim() || null;
+    const inspectionStatusValue = (inspection_status || '').toString().trim() || null;
 
     const listingInsert = {
       title: title.toString().trim(),
@@ -2133,6 +2162,51 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
             },
           ]);
         }
+      }
+    }
+
+    const logRows = [];
+
+    if (trunkValue !== null || heightValue !== null) {
+      logRows.push({
+        listing_id: listing.id,
+        run_at: new Date().toISOString(),
+        source: 'staff-measurements',
+        diagnostics: {
+          staff_measurements: {
+            trunk_diameter_inches: trunkValue,
+            height_estimate_feet: heightValue,
+          },
+        },
+        notes: 'Initial measurements captured during Add Tree.',
+      });
+    }
+
+    if (treeIdValue || managedByValue || inspectionStatusValue || treeAddedRaw) {
+      logRows.push({
+        listing_id: listing.id,
+        run_at: new Date().toISOString(),
+        source: 'record-metadata',
+        diagnostics: {
+          record_metadata: {
+            tree_id: treeIdValue,
+            managed_by: managedByValue,
+            inspection_status: inspectionStatusValue,
+            tree_added_at: parsedTreeAddedAt ? parsedTreeAddedAt.toISOString() : null,
+            last_updated_at: new Date().toISOString(),
+          },
+        },
+        notes: 'Initial tree record metadata captured during Add Tree.',
+      });
+    }
+
+    if (logRows.length > 0) {
+      const { error: logInsertError } = await writeSupabase
+        .from('tree_diagnostics_logs')
+        .insert(logRows);
+
+      if (logInsertError) {
+        console.error('Failed to create initial tree diagnostics logs:', logInsertError);
       }
     }
 
@@ -3186,6 +3260,7 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
 
     const photos = Array.isArray(photoRows) ? photoRows.filter((p) => p?.url) : [];
     const uniquePhotos = Array.from(new Map(photos.map((p) => [p.url, p])).values());
+    const staffMeasurements = await getLatestStaffMeasurementsForListing(id);
 
     if (uniquePhotos.length === 0) {
       const noPhotoDiagnostics = {
@@ -3194,6 +3269,11 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
         summary: 'No photos available for diagnostics.',
         recommendations: ['Upload at least one clear tree photo.'],
         public_about: 'This tree is waiting for its first photo and identification. Once photos are uploaded, ArborAI will add a friendly public description here.',
+        uses_throughout_history: `${listing.title || 'This tree or plant'} has supported local landscapes over time by providing shade, habitat, and ecological value.`,
+        growth_cycle_facts: `${listing.title || 'This tree or plant'} typically shows seasonal growth with active leaf and canopy expansion in warm months and slower dormancy in colder months.`,
+        estimated_age: staffMeasurements?.trunk_diameter_inches
+          ? `Best guess age is based on recorded measurements, including a trunk diameter of ${staffMeasurements.trunk_diameter_inches} inches${staffMeasurements?.height_estimate_feet ? ` and a height near ${staffMeasurements.height_estimate_feet} feet` : ''}. This remains an estimate rather than an exact age.`
+          : 'Best guess age is currently broad because there are no photos yet. Adding photos, trunk diameter, and height estimate will improve accuracy.',
         photo_summaries: [],
         alerts: ['No photos available'],
         health_score: '0/10',
@@ -3222,8 +3302,6 @@ api.get('/ai/analyze-tree/:id', async (req, res) => {
       ? Math.min(uniquePhotos.length, 5)
       : uniquePhotos.length;
     const photosToAnalyze = uniquePhotos.slice(0, photosToAnalyzeCount);
-
-    const staffMeasurements = await getLatestStaffMeasurementsForListing(id);
 
     const treeSummary = `
 Tree ID: ${listing.id}
@@ -3257,6 +3335,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
         ],
         public_about: publicAbout,
         uses_throughout_history: `${speciesGuess} has long served communities through shade, habitat support, and practical material use. Historical uses vary by species, but many trees have been valued for woodworking, fuel, and cultural gathering places.`,
+        growth_cycle_facts: `${speciesGuess} typically follows a seasonal cycle with active growth in spring and summer, gradual hardening in fall, and slower dormancy in winter while roots continue limited development.`,
         estimated_age: staffMeasurements?.trunk_diameter_inches
           ? `Best guess unavailable right now. Recorded trunk diameter is ${staffMeasurements.trunk_diameter_inches} inches${staffMeasurements?.height_estimate_feet ? ` and height is about ${staffMeasurements.height_estimate_feet} feet` : ''}.`
           : 'Best guess unavailable right now. Add trunk diameter and height estimate for a stronger age estimate.',
@@ -3307,6 +3386,7 @@ Photos Sent For AI Analysis: ${photosToAnalyze.length}
 - recommendations: array of strings (actionable care steps)
 - public_about: string (friendly, upbeat, non-technical public-facing description with one fun fact)
 - uses_throughout_history: string (public-facing historical or cultural uses of this species, concise and educational)
+- growth_cycle_facts: string (public-facing interesting facts about the species growth cycle and seasonal development)
 - estimated_age: string (best-guess age estimate using visible maturity plus any provided trunk diameter and height measurements; explain uncertainty briefly)
 - photo_summaries: array of strings (one brief observation per photo)
 - alerts: array of strings (urgent issues requiring human attention, empty array if none)
@@ -3462,6 +3542,13 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
     }
 
     diagnostics.uses_throughout_history = historicalUses;
+
+    let growthCycleFacts = (diagnostics?.growth_cycle_facts || '').toString().trim();
+    if (!growthCycleFacts) {
+      growthCycleFacts = `${speciesName} follows a yearly growth rhythm: new leaf and shoot expansion in spring, stronger canopy and trunk growth through summer, and slower dormant behavior during colder months while root systems continue limited development.`;
+    }
+
+    diagnostics.growth_cycle_facts = growthCycleFacts;
 
     let estimatedAge = (diagnostics?.estimated_age || '').toString().trim();
     if (!estimatedAge) {

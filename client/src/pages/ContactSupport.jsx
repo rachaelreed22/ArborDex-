@@ -71,7 +71,7 @@ export default function ContactSupport() {
             <p className="contact-direct-label">Direct inbox</p>
             <a href="mailto:arbortag_support@rrtech.dev">arbortag_support@rrtech.dev</a>
             <p>
-              After you submit this form, the backend will forward your message to support and send a confirmation email back to you.
+              After you submit this form, this system will forward your message to support and send a confirmation email back to you.
             </p>
           </div>
         </div>

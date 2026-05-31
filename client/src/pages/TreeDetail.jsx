@@ -258,7 +258,15 @@ export default function TreeDetail() {
       const data = await fetchListing();
       if (!data || cancelled) return;
       const logs = await fetchDiagnosticsLogs();
-      const latestDiagnostics = extractLatestDiagnosticsFromLogs(logs);
+      let latestDiagnostics = extractLatestDiagnosticsFromLogs(logs);
+
+      // Backfill public diagnostics fields for older records that do not have an AI log yet.
+      if (!latestDiagnostics) {
+        await fetchDiagnostics();
+        const refreshedLogs = await fetchDiagnosticsLogs();
+        latestDiagnostics = extractLatestDiagnosticsFromLogs(refreshedLogs);
+      }
+
       setDiagnostics(latestDiagnostics);
       setDiagnosticsStatus(latestDiagnostics ? "success" : "idle");
       setDiagnosticsError("");
@@ -323,7 +331,7 @@ export default function TreeDetail() {
     }
   }
 
-  // ⭐ NEW: Fetch AI diagnostics for Dex mode
+  // Fetch AI diagnostics for both staff and public tree pages
   async function fetchDiagnostics() {
     try {
       setDiagnosticsStatus("loading");
@@ -659,11 +667,20 @@ export default function TreeDetail() {
   const usesThroughoutHistoryText =
     (typeof diagnostics?.uses_throughout_history === "string" && diagnostics.uses_throughout_history.trim()) ||
     extractHistoricalUsesFromLogs(diagnosticsLogs) ||
-    "";
+    `${listing.title || "This tree or plant"} has supported local ecosystems over time by providing shade, habitat, and seasonal resources for nearby wildlife.`;
+  const growthCycleFactsText =
+    (typeof diagnostics?.growth_cycle_facts === "string" && diagnostics.growth_cycle_facts.trim()) ||
+    `${listing.title || "This tree or plant"} typically follows a seasonal growth cycle: active leaf and shoot growth in warm months, slower dormancy in colder months, and annual root and canopy renewal.`;
+  const loggedMeasurements = extractLatestStaffMeasurementsFromLogs(diagnosticsLogs);
+  const staffMeasurements = diagnostics?.staff_measurements || {
+    trunk_diameter_inches: loggedMeasurements.trunkDiameterInches || null,
+    height_estimate_feet: loggedMeasurements.heightEstimateFeet || null,
+  };
   const estimatedAgeText =
     (typeof diagnostics?.estimated_age === "string" && diagnostics.estimated_age.trim()) ||
-    "";
-  const staffMeasurements = diagnostics?.staff_measurements || null;
+    ((staffMeasurements?.trunk_diameter_inches || staffMeasurements?.height_estimate_feet)
+      ? `${listing.title || "This tree or plant"} appears to be established. Based on the recorded measurements${staffMeasurements?.trunk_diameter_inches ? `, including a trunk diameter of ${staffMeasurements.trunk_diameter_inches} inches` : ""}${staffMeasurements?.height_estimate_feet ? `${staffMeasurements?.trunk_diameter_inches ? " and" : ", including"} a height of about ${staffMeasurements.height_estimate_feet} feet` : ""}, this is a best estimate and not an exact age.`
+      : "ArborAI best age estimate is not yet precise for this record. Add trunk diameter and height estimate to improve age accuracy.");
   const diagnosticsChipLabel = !isStaff
     ? "Public mode"
     : diagnosticsStatus === "loading"
@@ -1109,6 +1126,13 @@ return (
   <section className="card section-history">
     <h2>Uses Throughout History</h2>
     <p>{usesThroughoutHistoryText}</p>
+  </section>
+)}
+
+{growthCycleFactsText && (
+  <section className="card section-history">
+    <h2>Growth Cycle Facts</h2>
+    <p>{growthCycleFactsText}</p>
   </section>
 )}
 
