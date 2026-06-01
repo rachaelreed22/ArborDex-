@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
@@ -13,6 +13,7 @@ export default function PendingPhotos() {
   const [loadError, setLoadError] = useState("");
   const [expandedKey, setExpandedKey] = useState(null);
   const [actionMsg, setActionMsg] = useState("");
+  const [lightbox, setLightbox] = useState(null);
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   useEffect(() => {
@@ -156,7 +157,6 @@ export default function PendingPhotos() {
 
             return (
               <div key={key} className={`pending-submission-card${isExpanded ? " expanded" : ""}`}>
-                {/* CARD HEADER — click to expand */}
                 <button
                   className="pending-card-header"
                   onClick={() => toggleExpand(key)}
@@ -205,7 +205,6 @@ export default function PendingPhotos() {
                   </div>
                 </button>
 
-                {/* EXPANDED DETAIL */}
                 {isExpanded && (
                   <div className="pending-card-detail">
                     <div className="pending-cap-notice">
@@ -232,7 +231,12 @@ export default function PendingPhotos() {
                     <div className="pending-photos-grid">
                       {group.photos.map((photo) => (
                         <div key={photo.id} className="pending-photo-item">
-                          <img src={photo.url} alt="" className="pending-photo-img" />
+                          <img
+                            src={photo.url}
+                            alt=""
+                            className="pending-photo-img pending-photo-clickable"
+                            onClick={() => setLightbox(photo)}
+                          />
                           <div className="pending-photo-actions">
                             <button
                               className="btn btn-xs btn-secondary"
@@ -267,6 +271,15 @@ export default function PendingPhotos() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+            <button className="lightbox-close" onClick={() => setLightbox(null)}>x</button>
+            <img src={lightbox.url} alt="Enlarged" className="lightbox-img" />
+          </div>
         </div>
       )}
     </div>

@@ -247,6 +247,7 @@ export default function TreeDetail() {
     managedBy: "",
     inspectionStatus: "",
   });
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const isStaff = mode === "dex";
   const needsAttention = isStaff && getNeedsAttention(diagnostics);
@@ -656,7 +657,8 @@ export default function TreeDetail() {
     );
   }
 
-  const photos = listing.photos || [];
+  // Only show approved photos on the tree profile (max 5); pending ones live in the Pending Photos queue
+  const photos = (listing.photos || []).filter((p) => p.staff_uploaded !== false).slice(0, 5);
   const mainPhoto = photos.find((p) => p.is_main) || photos[0] || null;
   const winnerPhoto = photos.find((p) => p.winner) || null;
   const photoSummaries = Array.isArray(diagnostics?.photo_summaries) ? diagnostics.photo_summaries : [];
@@ -1252,7 +1254,12 @@ return (
     <div className="gallery-grid">
       {photos.map((photo, idx) => (
         <div key={photo.id} className="gallery-card">
-          <img src={photo.url} alt="Gallery" className="gallery-image" />
+          <img
+            src={photo.url}
+            alt="Gallery"
+            className="gallery-image gallery-image-clickable"
+            onClick={() => setLightboxPhoto(photo)}
+          />
           <div className="gallery-meta">
             {photo.photographer && (
               <p className="photo-credit">📸 {photo.photographer}</p>
@@ -1300,6 +1307,45 @@ return (
                 onClick={() => handleDeletePhoto(photo.id)}
               >
                 Delete
+
+              {/* Lightbox */}
+              {lightboxPhoto && (
+                <div
+                  className="lightbox-overlay"
+                  onClick={() => setLightboxPhoto(null)}
+                >
+                  <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+                    <button className="lightbox-close" onClick={() => setLightboxPhoto(null)}>✕</button>
+                    <img src={lightboxPhoto.url} alt="Enlarged" className="lightbox-img" />
+                    <div className="lightbox-meta">
+                      {lightboxPhoto.photographer && (
+                        <p className="photo-credit">📸 {lightboxPhoto.photographer}</p>
+                      )}
+                      <div className="badge-row">
+                        {lightboxPhoto.is_main && <span className="badge">Main</span>}
+                        {lightboxPhoto.winner && <span className="badge badge-warn">⭐ Winner</span>}
+                      </div>
+                      {isStaff && (
+                        <div className="lightbox-actions">
+                          {!lightboxPhoto.is_main && (
+                            <button className="btn btn-sm btn-secondary" onClick={() => { handleSetMain(lightboxPhoto.id); setLightboxPhoto(null); }}>
+                              Set Main
+                            </button>
+                          )}
+                          {!lightboxPhoto.winner && (
+                            <button className="btn btn-sm btn-secondary" onClick={() => { handleSetWinner(lightboxPhoto.id); setLightboxPhoto(null); }}>
+                              Set Winner
+                            </button>
+                          )}
+                          <button className="btn btn-sm btn-danger" onClick={() => { handleDeletePhoto(lightboxPhoto.id); setLightboxPhoto(null); }}>
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               </button>
             </div>
           )}
