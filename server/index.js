@@ -637,7 +637,9 @@ function enforceToxicLookalikeSafety(payload = {}) {
 
   const hasApiaceae = /(apiaceae|umbel|umbellifer|queen anne'?s lace|wild carrot|daucus\s+carota|hemlock|conium\s+maculatum|cicuta|water hemlock|fool'?s parsley)/i.test(combined);
   const hasHemlockNamed = /(poison hemlock|conium\s+maculatum|water hemlock|cicuta)/i.test(combined);
+  const hasWildCarrotNamed = /(queen anne'?s lace|wild carrot|daucus\s+carota)/i.test(combined);
   const identifiesWildCarrot = /(queen anne'?s lace|wild carrot|daucus\s+carota)/i.test(identificationText);
+  const hasToxicLanguage = /(poison|poisonous|toxic|danger|fatal|neurotoxin|do not ingest|do not touch)/i.test(combined);
 
   const stemBlotchCue = /(purple\s*(blotch|spot|mottl)|blotch(ed)?\s+stem|purple[-\s]?spotted\s+stem|reddish[-\s]?purple\s+blotch)/i.test(combined);
   const smoothHairlessCue = /(smooth\s+stem|hairless\s+stem|glabrous\s+stem)/i.test(combined);
@@ -645,7 +647,8 @@ function enforceToxicLookalikeSafety(payload = {}) {
   const hairyStemCue = /(hairy\s+stem|bristly\s+stem|fuzzy\s+stem)/i.test(combined);
 
   const hemlockStemPattern = (stemBlotchCue || smoothHairlessCue || hollowStemCue) && !hairyStemCue;
-  const toxicLookalikeRisk = hasApiaceae && (hasHemlockNamed || hemlockStemPattern);
+  const hemlockEvidence = hasHemlockNamed || hemlockStemPattern;
+  const toxicLookalikeRisk = hasApiaceae && (hemlockEvidence || (hasWildCarrotNamed && hasToxicLanguage));
 
   if (!toxicLookalikeRisk) {
     return next;
@@ -653,21 +656,31 @@ function enforceToxicLookalikeSafety(payload = {}) {
 
   const toxicWarning = 'Potential poisonous Apiaceae lookalike detected (possible Poison Hemlock). Do not ingest or handle without protection; seek expert verification.';
   const stemCheckPrompt = 'Verify stem traits: purple blotching, smooth hairless surface, and hollow stem strongly favor Poison Hemlock over Wild Carrot.';
+  const differentialComparison = 'Qualifier check: Poison Hemlock often has smooth hairless stems with purple blotches and can be highly toxic; Wild Carrot (Queen Anne\'s Lace) typically has hairy/bristly stems and is less hazardous. If uncertain, treat as Poison Hemlock risk first.';
+  const toxicFirstLabel = 'Potential Poison Hemlock risk (verify vs Wild Carrot)';
 
   if (typeof next.confidence !== 'undefined') {
     next.confidence = capConfidenceTier(next.confidence, 'Medium');
   }
 
-  if (identifiesWildCarrot && hemlockStemPattern) {
+  if (identifiesWildCarrot && (hemlockEvidence || hasToxicLanguage)) {
     if (typeof next.species !== 'undefined') {
-      next.species = 'Uncertain Apiaceae (possible Poison Hemlock vs Wild Carrot)';
+      next.species = toxicFirstLabel;
     }
     if (typeof next.likely_identification !== 'undefined') {
-      next.likely_identification = 'Uncertain Apiaceae (possible Poison Hemlock vs Wild Carrot)';
+      next.likely_identification = toxicFirstLabel;
     }
     if (typeof next.confidence !== 'undefined') {
       next.confidence = capConfidenceTier(next.confidence, 'Low');
     }
+  }
+
+  if (typeof next.species !== 'undefined' && !next.species) {
+    next.species = toxicFirstLabel;
+  }
+
+  if (typeof next.likely_identification !== 'undefined' && !next.likely_identification) {
+    next.likely_identification = toxicFirstLabel;
   }
 
   const hazardDetails = normalizeStringArrayField(next.hazard_details);
@@ -682,6 +695,9 @@ function enforceToxicLookalikeSafety(payload = {}) {
   if (!recommendations.some((item) => /verify stem traits|purple blotch|hairless|hollow stem/i.test(item))) {
     recommendations.unshift(stemCheckPrompt);
   }
+  if (!recommendations.some((item) => /poison hemlock often has smooth hairless stems|wild carrot|queen anne/i.test(item))) {
+    recommendations.unshift(differentialComparison);
+  }
   next.recommendations = Array.from(new Set(recommendations));
 
   const careNotes = normalizeStringArrayField(next.care_notes);
@@ -695,6 +711,9 @@ function enforceToxicLookalikeSafety(payload = {}) {
   const warningSigns = normalizeStringArrayField(next.warning_signs);
   if (!warningSigns.some((item) => /poisonous apiaceae|poison hemlock|purple blotch/i.test(item))) {
     warningSigns.unshift('Poisonous Apiaceae lookalike risk (possible Poison Hemlock).');
+  }
+  if (!warningSigns.some((item) => /wild carrot|queen anne|hairy\/bristly stems/i.test(item))) {
+    warningSigns.unshift(differentialComparison);
   }
   if (warningSigns.length > 0) {
     next.warning_signs = Array.from(new Set(warningSigns));
@@ -718,7 +737,16 @@ function enforceToxicLookalikeSafety(payload = {}) {
   if (typeof next.raw_ai_message !== 'undefined') {
     const rawMessage = (next.raw_ai_message || '').toString().trim();
     if (!/do not ingest|poisonous|hemlock/i.test(rawMessage)) {
-      next.raw_ai_message = `${toxicWarning} ${rawMessage}`.trim();
+      next.raw_ai_message = `${toxicWarning} ${differentialComparison} ${rawMessage}`.trim();
+    } else if (!/wild carrot|queen anne|hairy\/bristly stems/i.test(rawMessage)) {
+      next.raw_ai_message = `${rawMessage} ${differentialComparison}`.trim();
+    }
+  }
+
+  if (typeof next.summary !== 'undefined') {
+    const summary = (next.summary || '').toString().trim();
+    if (!/poison hemlock|wild carrot|queen anne|hairy\/bristly stems|purple blotch/i.test(summary)) {
+      next.summary = `${summary ? `${summary} ` : ''}${differentialComparison}`.trim();
     }
   }
 
