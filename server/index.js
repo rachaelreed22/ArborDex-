@@ -588,6 +588,158 @@ function enforceCriticalDecayFailSafe(payload = {}) {
   return next;
 }
 
+function normalizeConfidenceTier(value) {
+  const raw = (value || '').toString().trim().toLowerCase();
+  if (!raw) return 'Low';
+  if (raw.includes('high')) return 'High';
+  if (raw.includes('medium') || raw.includes('moderate')) return 'Medium';
+  if (raw.includes('low')) return 'Low';
+  return 'Low';
+}
+
+function capConfidenceTier(currentValue, maxTier = 'Medium') {
+  const order = { Low: 1, Medium: 2, High: 3 };
+  const current = normalizeConfidenceTier(currentValue);
+  const max = normalizeConfidenceTier(maxTier);
+  return order[current] > order[max] ? max : current;
+}
+
+function normalizeStringArrayField(value) {
+  return Array.isArray(value)
+    ? value.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean)
+    : [];
+}
+
+function enforceToxicLookalikeSafety(payload = {}) {
+  const next = { ...payload };
+
+  const identificationText = [next.species, next.likely_identification]
+    .filter(Boolean)
+    .join(' | ')
+    .toLowerCase();
+
+  const signalText = [
+    next.summary,
+    next.raw_ai_message,
+    next.toxicity_info,
+    ...(Array.isArray(next.photo_summaries) ? next.photo_summaries : []),
+    ...(Array.isArray(next.key_features_noticed) ? next.key_features_noticed : []),
+    ...(Array.isArray(next.primary_concerns) ? next.primary_concerns : []),
+    ...(Array.isArray(next.warning_signs) ? next.warning_signs : []),
+    ...(Array.isArray(next.risks) ? next.risks : []),
+    ...(Array.isArray(next.recommendations) ? next.recommendations : []),
+    ...(Array.isArray(next.hazard_details) ? next.hazard_details : []),
+  ]
+    .map((item) => (item == null ? '' : item.toString().toLowerCase()))
+    .join(' | ');
+
+  const combined = `${identificationText} | ${signalText}`;
+
+  const hasApiaceae = /(apiaceae|umbel|umbellifer|queen anne'?s lace|wild carrot|daucus\s+carota|hemlock|conium\s+maculatum|cicuta|water hemlock|fool'?s parsley)/i.test(combined);
+  const hasHemlockNamed = /(poison hemlock|conium\s+maculatum|water hemlock|cicuta)/i.test(combined);
+  const identifiesWildCarrot = /(queen anne'?s lace|wild carrot|daucus\s+carota)/i.test(identificationText);
+
+  const stemBlotchCue = /(purple\s*(blotch|spot|mottl)|blotch(ed)?\s+stem|purple[-\s]?spotted\s+stem|reddish[-\s]?purple\s+blotch)/i.test(combined);
+  const smoothHairlessCue = /(smooth\s+stem|hairless\s+stem|glabrous\s+stem)/i.test(combined);
+  const hollowStemCue = /(hollow\s+stem)/i.test(combined);
+  const hairyStemCue = /(hairy\s+stem|bristly\s+stem|fuzzy\s+stem)/i.test(combined);
+
+  const hemlockStemPattern = (stemBlotchCue || smoothHairlessCue || hollowStemCue) && !hairyStemCue;
+  const toxicLookalikeRisk = hasApiaceae && (hasHemlockNamed || hemlockStemPattern);
+
+  if (!toxicLookalikeRisk) {
+    return next;
+  }
+
+  const toxicWarning = 'Potential poisonous Apiaceae lookalike detected (possible Poison Hemlock). Do not ingest or handle without protection; seek expert verification.';
+  const stemCheckPrompt = 'Verify stem traits: purple blotching, smooth hairless surface, and hollow stem strongly favor Poison Hemlock over Wild Carrot.';
+
+  if (typeof next.confidence !== 'undefined') {
+    next.confidence = capConfidenceTier(next.confidence, 'Medium');
+  }
+
+  if (identifiesWildCarrot && hemlockStemPattern) {
+    if (typeof next.species !== 'undefined') {
+      next.species = 'Uncertain Apiaceae (possible Poison Hemlock vs Wild Carrot)';
+    }
+    if (typeof next.likely_identification !== 'undefined') {
+      next.likely_identification = 'Uncertain Apiaceae (possible Poison Hemlock vs Wild Carrot)';
+    }
+    if (typeof next.confidence !== 'undefined') {
+      next.confidence = capConfidenceTier(next.confidence, 'Low');
+    }
+  }
+
+  const hazardDetails = normalizeStringArrayField(next.hazard_details);
+  if (!hazardDetails.some((item) => /poisonous apiaceae lookalike|poison hemlock/i.test(item))) {
+    hazardDetails.unshift(toxicWarning);
+  }
+  next.hazard_details = Array.from(new Set(hazardDetails));
+  next.hazards_detected = 'Yes';
+  next.needs_human_inspection = true;
+
+  const recommendations = normalizeStringArrayField(next.recommendations);
+  if (!recommendations.some((item) => /verify stem traits|purple blotch|hairless|hollow stem/i.test(item))) {
+    recommendations.unshift(stemCheckPrompt);
+  }
+  next.recommendations = Array.from(new Set(recommendations));
+
+  const careNotes = normalizeStringArrayField(next.care_notes);
+  if (!careNotes.some((item) => /do not ingest|expert verification|poison/i.test(item))) {
+    careNotes.unshift('Potentially poisonous lookalike: avoid ingestion and direct handling until expert identification confirms species.');
+  }
+  if (careNotes.length > 0) {
+    next.care_notes = Array.from(new Set(careNotes));
+  }
+
+  const warningSigns = normalizeStringArrayField(next.warning_signs);
+  if (!warningSigns.some((item) => /poisonous apiaceae|poison hemlock|purple blotch/i.test(item))) {
+    warningSigns.unshift('Poisonous Apiaceae lookalike risk (possible Poison Hemlock).');
+  }
+  if (warningSigns.length > 0) {
+    next.warning_signs = Array.from(new Set(warningSigns));
+  }
+
+  const risks = normalizeStringArrayField(next.risks);
+  if (!risks.some((item) => /poisonous|toxic|hemlock/i.test(item))) {
+    risks.unshift('Possible poisonous lookalike (Poison Hemlock risk).');
+  }
+  if (risks.length > 0) {
+    next.risks = Array.from(new Set(risks));
+  }
+
+  if (typeof next.toxicity_info !== 'undefined') {
+    const toxicity = (next.toxicity_info || '').toString().trim();
+    if (!/poisonous|toxic|hemlock/i.test(toxicity)) {
+      next.toxicity_info = `${toxicity ? `${toxicity} ` : ''}${toxicWarning}`.trim();
+    }
+  }
+
+  if (typeof next.raw_ai_message !== 'undefined') {
+    const rawMessage = (next.raw_ai_message || '').toString().trim();
+    if (!/do not ingest|poisonous|hemlock/i.test(rawMessage)) {
+      next.raw_ai_message = `${toxicWarning} ${rawMessage}`.trim();
+    }
+  }
+
+  const dataQualityFlags = normalizeStringArrayField(next.data_quality_flags);
+  if (!dataQualityFlags.some((item) => /toxic lookalike|apiaceae|hemlock/i.test(item))) {
+    dataQualityFlags.unshift('Toxic lookalike guardrail applied: confidence reduced until stem evidence is confirmed.');
+  }
+  if (dataQualityFlags.length > 0) {
+    next.data_quality_flags = Array.from(new Set(dataQualityFlags));
+  }
+
+  if (typeof next.urgency_level !== 'undefined') {
+    const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
+    if (!urgency || urgency === 'low' || urgency === 'moderate') {
+      next.urgency_level = 'High';
+    }
+  }
+
+  return next;
+}
+
 async function sendWinnerNotificationEmail({ toEmail, listingTitle, listingId }) {
   if (!mailTransporter) {
     console.warn('Winner email not sent: SMTP configuration is missing.');
@@ -1534,6 +1686,8 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
   - Inspect every photo independently before forming a combined conclusion.
   - If photos appear to show different plants, unrelated scenes, or conflicting species, do NOT force a single confident identification.
   - In mixed or conflicting photo sets, explicitly say so, lower confidence, and include data quality or mismatch warnings.
+  - For Apiaceae/umbel flowers, explicitly evaluate Poison Hemlock vs Wild Carrot cues from stems. Purple-blotched smooth/hairless stems and hollow stems are dangerous hemlock signals.
+  - If a poisonous lookalike cannot be ruled out, do not return High confidence and add a clear warning in warning_signs and toxicity_info.
   - If one photo shows disease or damage, mention that specific issue instead of generic care advice.
   - Do not describe the plant as healthy unless the visible evidence clearly supports that.
   - Do not let the plant name override the images.
@@ -1725,6 +1879,8 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
     normalized.hazards_detected = hazardDecision.hazards_detected;
     normalized.hazard_details = hazardDecision.hazard_details;
     Object.assign(normalized, enforceCriticalDecayFailSafe(normalized));
+    Object.assign(normalized, enforceHumanInspectionAlertSignals(normalized));
+    Object.assign(normalized, enforceToxicLookalikeSafety(normalized));
     Object.assign(normalized, enforceHumanInspectionAlertSignals(normalized));
 
     while (normalized.photo_summaries.length < photos.length) {
@@ -3608,6 +3764,8 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
     diagnostics.hazard_details = hazardDecision.hazard_details;
     diagnostics = enforceCriticalDecayFailSafe(diagnostics);
     diagnostics = enforceHumanInspectionAlertSignals(diagnostics);
+    diagnostics = enforceToxicLookalikeSafety(diagnostics);
+    diagnostics = enforceHumanInspectionAlertSignals(diagnostics);
 
     const speciesName = diagnostics?.species && diagnostics.species !== 'Unknown'
       ? diagnostics.species
@@ -3752,6 +3910,10 @@ api.post('/ai/ask-arborai', publicAiAskLimiter, upload.array('photos', 6), async
 - hazards_detected: string ("Yes" or "No")
 - hazard_details: array of strings
 - raw_ai_message: string (friendly conversational chat response)
+Critical safety rules:
+- For Apiaceae/umbel plants, explicitly compare Poison Hemlock vs Wild Carrot using stem evidence.
+- Purple-blotched smooth/hairless or hollow stems must trigger poisonous lookalike warnings.
+- If poisonous lookalike risk exists, do NOT output High confidence and include clear do-not-ingest language in risks/recommendations/raw_ai_message.
 If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.`;
 
     const userContent = [
@@ -3846,7 +4008,9 @@ If information is uncertain, state best estimate and keep raw_ai_message support
     payload.hazards_detected = hazardDecision.hazards_detected;
     payload.hazard_details = hazardDecision.hazard_details;
     const normalizedPayload = enforceHumanInspectionAlertSignals(
-      enforceCriticalDecayFailSafe(payload)
+      enforceToxicLookalikeSafety(
+        enforceCriticalDecayFailSafe(payload)
+      )
     );
 
     res.json(normalizedPayload);
