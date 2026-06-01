@@ -6,6 +6,8 @@ import { getNeedsAttention } from "../utils/attentionRules";
 import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import "./TreeList.css";
 
+const CLOUD_API_BASE = "https://arbordex.onrender.com";
+
 function inferHazardsFromDiagnostics(diagnostics) {
   if (!diagnostics || typeof diagnostics !== "object") {
     return false;
@@ -50,6 +52,7 @@ export default function TreeList() {
   const [attentionByListingId, setAttentionByListingId] = useState({});
   const [hazardByListingId, setHazardByListingId] = useState({});
   const [usingAllListingsFallback, setUsingAllListingsFallback] = useState(false);
+  const [usingCloudFallback, setUsingCloudFallback] = useState(false);
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   const listingsEndpoint = selectedParkName
@@ -57,6 +60,18 @@ export default function TreeList() {
     : "/api/listings";
 
   const activeListingsEndpoint = usingAllListingsFallback ? "/api/listings" : listingsEndpoint;
+
+  function canUseCloudFallback() {
+    return import.meta.env.DEV && window.location.hostname === "localhost";
+  }
+
+  function apiUrlFromBase(path, base = "") {
+    return `${base}${path}`;
+  }
+
+  function listingsApiUrl(path) {
+    return apiUrlFromBase(path, usingCloudFallback ? CLOUD_API_BASE : "");
+  }
 
   useEffect(() => {
     fetchListings();
@@ -76,37 +91,65 @@ export default function TreeList() {
   async function fetchListings() {
     try {
       setLoadError("");
-      const res = await fetchWithTimeout(apiUrl(listingsEndpoint), {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      }, 15000);
-      const data = await res.json();
-      let nextListings = Array.isArray(data) ? data : [];
+      const candidateBases = [""];
+      if (canUseCloudFallback()) candidateBases.push(CLOUD_API_BASE);
 
-      // If a park is selected but no listings are tagged to it, show all listings
-      // so previously saved tree profiles remain visible.
-      if (selectedParkName && nextListings.length === 0) {
-        const allRes = await fetchWithTimeout(apiUrl("/api/listings"), {
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        }, 15000);
-        const allData = await allRes.json().catch(() => []);
-        const allListings = Array.isArray(allData) ? allData : [];
-        if (allListings.length > 0) {
-          nextListings = allListings;
-          setUsingAllListingsFallback(true);
-        } else {
-          setUsingAllListingsFallback(false);
+      let nextListings = [];
+      let resolvedBase = "";
+      let lastError = null;
+
+      for (const base of candidateBases) {
+        try {
+          const fetchListingsAtBase = async (path) => {
+            const res = await fetchWithTimeout(apiUrlFromBase(path, base), {
+              cache: "no-store",
+              headers: { Accept: "application/json" },
+            }, 15000);
+
+            if (!res.ok) {
+              throw new Error(`Listings request failed (${res.status})`);
+            }
+
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+          };
+
+          let fetchedListings = await fetchListingsAtBase(listingsEndpoint);
+
+          // If a park is selected but no listings are tagged to it, show all listings
+          // so previously saved tree profiles remain visible.
+          if (selectedParkName && fetchedListings.length === 0) {
+            const allListings = await fetchListingsAtBase("/api/listings");
+            if (allListings.length > 0) {
+              fetchedListings = allListings;
+              setUsingAllListingsFallback(true);
+            } else {
+              setUsingAllListingsFallback(false);
+            }
+          } else {
+            setUsingAllListingsFallback(false);
+          }
+
+          nextListings = fetchedListings;
+          resolvedBase = base;
+          break;
+        } catch (err) {
+          lastError = err;
+          nextListings = [];
+          continue;
         }
-      } else {
-        setUsingAllListingsFallback(false);
       }
 
+      if (!resolvedBase && lastError) {
+        throw lastError;
+      }
+
+      setUsingCloudFallback(Boolean(resolvedBase));
       setListings(nextListings);
       setLoading(false); // show cards immediately
 
       if (nextListings.length > 0) {
-        fetchAttentionFlags(nextListings); // background — no await
+        fetchAttentionFlags(nextListings, resolvedBase); // background — no await
       } else {
         setAttentionByListingId({});
         setHazardByListingId({});
@@ -124,10 +167,10 @@ export default function TreeList() {
     }
   }
 
-  async function fetchAttentionFlags(listingRows) {
+  async function fetchAttentionFlags(listingRows, base = "") {
     try {
       const listingIds = listingRows.map((l) => l.id);
-      const res = await fetchWithTimeout(apiUrl("/api/diagnostics-logs/bulk-latest"), {
+      const res = await fetchWithTimeout(apiUrlFromBase("/api/diagnostics-logs/bulk-latest", base), {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -203,7 +246,7 @@ export default function TreeList() {
         throw new Error(serverMessage || `Delete failed (${res.status})`);
       }
 
-      const verifyRes = await fetchWithTimeout(apiUrl(activeListingsEndpoint), {
+      const verifyRes = await fetchWithTimeout(listingsApiUrl(activeListingsEndpoint), {
         cache: "no-store",
         headers: { Accept: "application/json" },
       }, 15000);
