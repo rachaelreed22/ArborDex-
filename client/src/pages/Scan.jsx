@@ -290,18 +290,12 @@ export default function Scan() {
 
     const formData = new FormData();
     formData.append("listingId", listingId);
-
-    if (!isStaff) {
-      formData.append("firstName", photographerInfo.firstName);
-      formData.append("lastName", photographerInfo.lastName);
-      formData.append("email", photographerInfo.email);
-      formData.append("staffUploaded", "false");
-    } else {
-      formData.append("firstName", "Staff");
-      formData.append("lastName", "User");
-      formData.append("email", "staff@rrtech.dev");
-      formData.append("staffUploaded", "true");
-    }
+    // All scan uploads go to the pending queue (staff_uploaded=false) regardless of role.
+    // Staff approves them on the Pending Photos page before they appear on the tree profile.
+    formData.append("staffUploaded", "false");
+    formData.append("firstName", photographerInfo.firstName || (isStaff ? "Staff" : ""));
+    formData.append("lastName", photographerInfo.lastName || (isStaff ? "Upload" : ""));
+    formData.append("email", photographerInfo.email || (isStaff ? "staff@rrtech.dev" : ""));
 
     selectedPhotos.forEach((file) => {
       formData.append("photos", file);
