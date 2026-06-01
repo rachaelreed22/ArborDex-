@@ -11,6 +11,7 @@ export default function PendingPhotos() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [usingParkFilter, setUsingParkFilter] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [actionMsg, setActionMsg] = useState("");
   const [lightbox, setLightbox] = useState(null);
@@ -24,17 +25,36 @@ export default function PendingPhotos() {
     try {
       setLoadError("");
       setLoading(true);
-      const qs = selectedParkName ? `?parkName=${encodeURIComponent(selectedParkName)}` : "";
-      const res = await fetch(apiUrl(`/api/photos/pending${qs}`), {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error("Failed to load");
-      const data = await res.json();
-      setGroups(Array.isArray(data) ? data : []);
+      const headers = getStaffHeaders();
+
+      const fetchPending = async (parkName = "") => {
+        const qs = parkName ? `?parkName=${encodeURIComponent(parkName)}` : "";
+        const res = await fetch(apiUrl(`/api/photos/pending${qs}`), { headers });
+        if (!res.ok) throw new Error("Failed to load");
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      };
+
+      let pendingGroups = [];
+      if (selectedParkName) {
+        pendingGroups = await fetchPending(selectedParkName);
+        if (pendingGroups.length === 0) {
+          pendingGroups = await fetchPending("");
+          setUsingParkFilter(false);
+        } else {
+          setUsingParkFilter(true);
+        }
+      } else {
+        pendingGroups = await fetchPending("");
+        setUsingParkFilter(false);
+      }
+
+      setGroups(pendingGroups);
     } catch (err) {
       console.error("Failed to load pending photos:", err);
       setLoadError("Failed to load pending photos. Check your staff login.");
       setGroups([]);
+      setUsingParkFilter(false);
     } finally {
       setLoading(false);
     }
@@ -117,9 +137,11 @@ export default function PendingPhotos() {
           <p className="pending-photos-kicker">Photo Moderation</p>
           <h1>Pending Photos</h1>
           <p className="pending-photos-subtitle">
-            {selectedParkName
+            {selectedParkName && usingParkFilter
               ? `Review uploads for ${selectedParkName}.`
-              : "Review uploads waiting for staff approval."}
+              : selectedParkName && !usingParkFilter
+                ? `No pending uploads were found for ${selectedParkName}. Showing all parks instead.`
+                : "Review uploads waiting for staff approval."}
           </p>
         </div>
       </section>
