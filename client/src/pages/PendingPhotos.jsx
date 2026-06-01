@@ -5,6 +5,7 @@ import { getStaffHeaders } from "../utils/staffAuth";
 import "./PendingPhotos.css";
 
 const PHOTO_CAP = 5;
+const CLOUD_API_BASE = "https://arbordex.onrender.com";
 
 export default function PendingPhotos() {
   const navigate = useNavigate();
@@ -12,10 +13,19 @@ export default function PendingPhotos() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [usingParkFilter, setUsingParkFilter] = useState(false);
+  const [usingCloudFallback, setUsingCloudFallback] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [actionMsg, setActionMsg] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
+
+  function apiUrlFromBase(path, base = "") {
+    return `${base}${path}`;
+  }
+
+  function canUseCloudFallback() {
+    return import.meta.env.DEV && window.location.hostname === "localhost";
+  }
 
   useEffect(() => {
     loadPending();
@@ -26,51 +36,70 @@ export default function PendingPhotos() {
       setLoadError("");
       setLoading(true);
       const headers = getStaffHeaders();
+      const candidateBases = [""];
+      if (canUseCloudFallback()) candidateBases.push(CLOUD_API_BASE);
 
-      const fetchPending = async (parkName = "") => {
+      const fetchPending = async (parkName = "", base = "") => {
         const qs = parkName ? `?parkName=${encodeURIComponent(parkName)}` : "";
-        const res = await fetch(apiUrl(`/api/photos/pending${qs}`), { headers });
+        const path = `/api/photos/pending${qs}`;
+        const endpoint = base ? apiUrlFromBase(path, base) : apiUrl(path);
+        const res = await fetch(endpoint, { headers });
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
         return Array.isArray(data) ? data : [];
       };
 
       let pendingGroups = [];
-      if (selectedParkName) {
-        pendingGroups = await fetchPending(selectedParkName);
-        if (pendingGroups.length === 0) {
-          pendingGroups = await fetchPending("");
-          setUsingParkFilter(false);
-        } else {
-          setUsingParkFilter(true);
+      let lastError = null;
+      let resolvedBase = "";
+
+      for (const base of candidateBases) {
+        try {
+          if (selectedParkName) {
+            pendingGroups = await fetchPending(selectedParkName, base);
+            if (pendingGroups.length === 0) {
+              pendingGroups = await fetchPending("", base);
+              setUsingParkFilter(false);
+            } else {
+              setUsingParkFilter(true);
+            }
+          } else {
+            pendingGroups = await fetchPending("", base);
+            setUsingParkFilter(false);
+          }
+          resolvedBase = base;
+          break;
+        } catch (err) {
+          lastError = err;
+          pendingGroups = [];
+          continue;
         }
-      } else {
-        pendingGroups = await fetchPending("");
-        setUsingParkFilter(false);
       }
 
+      if (!resolvedBase && lastError) {
+        throw lastError;
+      }
+
+      setUsingCloudFallback(Boolean(resolvedBase));
       setGroups(pendingGroups);
     } catch (err) {
       console.error("Failed to load pending photos:", err);
       setLoadError("Failed to load pending photos. Check your staff login.");
       setGroups([]);
       setUsingParkFilter(false);
+      setUsingCloudFallback(false);
     } finally {
       setLoading(false);
     }
   }
 
-  function groupKey(group) {
-    return `${group.listingId}__${group.photographer}`;
-  }
-
-  function toggleExpand(key) {
-    setExpandedKey((prev) => (prev === key ? null : key));
+  function endpoint(path) {
+    return usingCloudFallback ? apiUrlFromBase(path, CLOUD_API_BASE) : apiUrl(path);
   }
 
   async function doAction(url, method, successMsg) {
     try {
-      const res = await fetch(apiUrl(url), { method, headers: getStaffHeaders() });
+      const res = await fetch(endpoint(url), { method, headers: getStaffHeaders() });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         setActionMsg(err?.error || "Action failed.");
@@ -106,7 +135,7 @@ export default function PendingPhotos() {
     setActionMsg("Implementing photos...");
     let failed = 0;
     for (const photo of group.photos) {
-      const res = await fetch(apiUrl(`/api/photos/${photo.id}/approve`), {
+      const res = await fetch(endpoint(`/api/photos/${photo.id}/approve`), {
         method: "PATCH",
         headers: getStaffHeaders(),
       });
@@ -126,6 +155,14 @@ export default function PendingPhotos() {
     if (ok) loadPending();
   }
 
+  function groupKey(group) {
+    return `${group.listingId}__${group.photographer}`;
+  }
+
+  function toggleExpand(key) {
+    setExpandedKey((prev) => (prev === key ? null : key));
+  }
+
   if (loading) {
     return <div className="loading">Loading pending photos...</div>;
   }
@@ -143,6 +180,9 @@ export default function PendingPhotos() {
                 ? `No pending uploads were found for ${selectedParkName}. Showing all parks instead.`
                 : "Review uploads waiting for staff approval."}
           </p>
+          {usingCloudFallback && (
+            <p className="pending-photos-subtitle">Local API is offline. Connected to cloud API fallback.</p>
+          )}
         </div>
       </section>
 
