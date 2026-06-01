@@ -248,6 +248,8 @@ export default function TreeDetail() {
     inspectionStatus: "",
   });
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const [photoActionMessage, setPhotoActionMessage] = useState("");
+  const [photoActionBusyId, setPhotoActionBusyId] = useState(null);
 
   const isStaff = mode === "dex";
   const needsAttention = isStaff && getNeedsAttention(diagnostics);
@@ -505,25 +507,47 @@ export default function TreeDetail() {
 
   const handleSetMain = async (photoId) => {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/main`), {
+      setPhotoActionBusyId(photoId);
+      const res = await fetch(apiUrl(`/api/photos/${photoId}/main`), {
         method: "PATCH",
         headers: getStaffHeaders(),
       });
+      if (!res.ok) throw new Error("Failed to set main photo");
+      setPhotoActionMessage("Main photo updated.");
       fetchListing();
     } catch (err) {
       console.error("Error setting main photo:", err);
+      setPhotoActionMessage("Could not set main photo.");
+    } finally {
+      setPhotoActionBusyId(null);
     }
   };
 
   const handleSetWinner = async (photoId) => {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/winner`), {
+      setPhotoActionBusyId(photoId);
+      const res = await fetch(apiUrl(`/api/photos/${photoId}/winner`), {
         method: "PATCH",
         headers: getStaffHeaders(),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Failed to set winner");
+      const emailStatus = data?.winner_email;
+      if (emailStatus?.sent === true) {
+        setPhotoActionMessage("Winner set. Notification email sent.");
+      } else if (emailStatus?.reason === "smtp_not_configured") {
+        setPhotoActionMessage("Winner set. Email not sent: SMTP not configured.");
+      } else if (emailStatus?.reason === "missing_recipient") {
+        setPhotoActionMessage("Winner set. Email not sent: upload has no recipient email.");
+      } else {
+        setPhotoActionMessage("Winner set.");
+      }
       fetchListing();
     } catch (err) {
       console.error("Error setting winner:", err);
+      setPhotoActionMessage("Could not set winner.");
+    } finally {
+      setPhotoActionBusyId(null);
     }
   };
 
@@ -1251,6 +1275,7 @@ return (
       <h2>Photo Gallery</h2>
       <span className="gallery-count">{photos.length} photos</span>
     </div>
+    {photoActionMessage && <p className="staff-measurements-note">{photoActionMessage}</p>}
     <div className="gallery-grid">
       {photos.map((photo, idx) => (
         <div key={photo.id} className="gallery-card">
@@ -1282,16 +1307,18 @@ return (
                 <button
                   className="btn btn-sm btn-secondary"
                   onClick={() => handleSetMain(photo.id)}
+                  disabled={photoActionBusyId === photo.id}
                 >
-                  Set Main
+                  {photoActionBusyId === photo.id ? "Saving..." : "Set Main"}
                 </button>
               )}
               {!photo.winner && (
                 <button
                   className="btn btn-sm btn-secondary"
                   onClick={() => handleSetWinner(photo.id)}
+                  disabled={photoActionBusyId === photo.id}
                 >
-                  Set Winner
+                  {photoActionBusyId === photo.id ? "Saving..." : "Set Winner"}
                 </button>
               )}
               {photo.staff_uploaded === false && (
@@ -1307,51 +1334,59 @@ return (
                 onClick={() => handleDeletePhoto(photo.id)}
               >
                 Delete
-
-              {/* Lightbox */}
-              {lightboxPhoto && (
-                <div
-                  className="lightbox-overlay"
-                  onClick={() => setLightboxPhoto(null)}
-                >
-                  <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
-                    <button className="lightbox-close" onClick={() => setLightboxPhoto(null)}>✕</button>
-                    <img src={lightboxPhoto.url} alt="Enlarged" className="lightbox-img" />
-                    <div className="lightbox-meta">
-                      {lightboxPhoto.photographer && (
-                        <p className="photo-credit">📸 {lightboxPhoto.photographer}</p>
-                      )}
-                      <div className="badge-row">
-                        {lightboxPhoto.is_main && <span className="badge">Main</span>}
-                        {lightboxPhoto.winner && <span className="badge badge-warn">⭐ Winner</span>}
-                      </div>
-                      {isStaff && (
-                        <div className="lightbox-actions">
-                          {!lightboxPhoto.is_main && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => { handleSetMain(lightboxPhoto.id); setLightboxPhoto(null); }}>
-                              Set Main
-                            </button>
-                          )}
-                          {!lightboxPhoto.winner && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => { handleSetWinner(lightboxPhoto.id); setLightboxPhoto(null); }}>
-                              Set Winner
-                            </button>
-                          )}
-                          <button className="btn btn-sm btn-danger" onClick={() => { handleDeletePhoto(lightboxPhoto.id); setLightboxPhoto(null); }}>
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
               </button>
             </div>
           )}
         </div>
       ))}
     </div>
+
+    {/* Lightbox */}
+    {lightboxPhoto && (
+      <div
+        className="lightbox-overlay"
+        onClick={() => setLightboxPhoto(null)}
+      >
+        <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+          <button className="lightbox-close" onClick={() => setLightboxPhoto(null)}>✕</button>
+          <img src={lightboxPhoto.url} alt="Enlarged" className="lightbox-img" />
+          <div className="lightbox-meta">
+            {lightboxPhoto.photographer && (
+              <p className="photo-credit">📸 {lightboxPhoto.photographer}</p>
+            )}
+            <div className="badge-row">
+              {lightboxPhoto.is_main && <span className="badge">Main</span>}
+              {lightboxPhoto.winner && <span className="badge badge-warn">⭐ Winner</span>}
+            </div>
+            {isStaff && (
+              <div className="lightbox-actions">
+                {!lightboxPhoto.is_main && (
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => { handleSetMain(lightboxPhoto.id); setLightboxPhoto(null); }}
+                    disabled={photoActionBusyId === lightboxPhoto.id}
+                  >
+                    {photoActionBusyId === lightboxPhoto.id ? "Saving..." : "Set Main"}
+                  </button>
+                )}
+                {!lightboxPhoto.winner && (
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => { handleSetWinner(lightboxPhoto.id); setLightboxPhoto(null); }}
+                    disabled={photoActionBusyId === lightboxPhoto.id}
+                  >
+                    {photoActionBusyId === lightboxPhoto.id ? "Saving..." : "Set Winner"}
+                  </button>
+                )}
+                <button className="btn btn-sm btn-danger" onClick={() => { handleDeletePhoto(lightboxPhoto.id); setLightboxPhoto(null); }}>
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
   </section>
 )}
 </div>

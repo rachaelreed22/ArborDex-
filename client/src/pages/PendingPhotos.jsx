@@ -16,6 +16,8 @@ export default function PendingPhotos() {
   const [usingCloudFallback, setUsingCloudFallback] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [actionMsg, setActionMsg] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionBusyPhotoId, setActionBusyPhotoId] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
@@ -99,39 +101,58 @@ export default function PendingPhotos() {
 
   async function doAction(url, method, successMsg) {
     try {
+      setActionBusy(true);
       const res = await fetch(endpoint(url), { method, headers: getStaffHeaders() });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         setActionMsg(err?.error || "Action failed.");
-        return false;
+        return { ok: false, data: err || null };
       }
+      const data = await res.json().catch(() => null);
       setActionMsg(successMsg);
       setTimeout(() => setActionMsg(""), 3000);
-      return true;
+      return { ok: true, data };
     } catch {
       setActionMsg("Unexpected error.");
-      return false;
+      return { ok: false, data: null };
+    } finally {
+      setActionBusy(false);
+      setActionBusyPhotoId(null);
     }
   }
 
   async function handleSetMain(photoId) {
-    const ok = await doAction(`/api/photos/${photoId}/main`, "PATCH", "Set as main photo.");
-    if (ok) loadPending();
+    setActionBusyPhotoId(photoId);
+    const result = await doAction(`/api/photos/${photoId}/main`, "PATCH", "Main photo updated.");
+    if (result.ok) loadPending();
   }
 
   async function handleSetWinner(photoId) {
-    const ok = await doAction(`/api/photos/${photoId}/winner`, "PATCH", "Marked as winner!");
-    if (ok) loadPending();
+    setActionBusyPhotoId(photoId);
+    const result = await doAction(`/api/photos/${photoId}/winner`, "PATCH", "Marked as winner.");
+    if (result.ok) {
+      const emailStatus = result.data?.winner_email;
+      if (emailStatus?.sent === true) {
+        setActionMsg("Marked as winner. Winner email sent.");
+      } else if (emailStatus?.reason === "smtp_not_configured") {
+        setActionMsg("Marked as winner. Email not sent: SMTP is not configured yet.");
+      } else if (emailStatus?.reason === "missing_recipient") {
+        setActionMsg("Marked as winner. Email not sent: this upload has no recipient email.");
+      }
+      loadPending();
+    }
   }
 
   async function handleDelete(photoId) {
     if (!window.confirm("Delete this photo permanently?")) return;
-    const ok = await doAction(`/api/photos/${photoId}`, "DELETE", "Photo deleted.");
-    if (ok) loadPending();
+    setActionBusyPhotoId(photoId);
+    const result = await doAction(`/api/photos/${photoId}`, "DELETE", "Photo deleted.");
+    if (result.ok) loadPending();
   }
 
   async function handleImplementAll(group) {
     if (!window.confirm(`Move all ${group.photos.length} photo(s) from this submission to the tree profile?`)) return;
+    setActionBusy(true);
     setActionMsg("Implementing photos...");
     let failed = 0;
     for (const photo of group.photos) {
@@ -147,12 +168,15 @@ export default function PendingPhotos() {
       setActionMsg("All photos moved to tree profile.");
       setTimeout(() => setActionMsg(""), 3000);
     }
+    setActionBusy(false);
+    setActionBusyPhotoId(null);
     loadPending();
   }
 
   async function handleImplementOne(photoId) {
-    const ok = await doAction(`/api/photos/${photoId}/approve`, "PATCH", "Photo added to tree profile.");
-    if (ok) loadPending();
+    setActionBusyPhotoId(photoId);
+    const result = await doAction(`/api/photos/${photoId}/approve`, "PATCH", "Photo added to tree profile.");
+    if (result.ok) loadPending();
   }
 
   function groupKey(group) {
@@ -303,26 +327,30 @@ export default function PendingPhotos() {
                             <button
                               className="btn btn-xs btn-secondary"
                               onClick={() => handleSetMain(photo.id)}
+                              disabled={actionBusy && actionBusyPhotoId === photo.id}
                             >
-                              Make Main
+                              {actionBusy && actionBusyPhotoId === photo.id ? "Saving..." : "Make Main"}
                             </button>
                             <button
                               className="btn btn-xs btn-warning"
                               onClick={() => handleSetWinner(photo.id)}
+                              disabled={actionBusy && actionBusyPhotoId === photo.id}
                             >
-                              Winner
+                              {actionBusy && actionBusyPhotoId === photo.id ? "Saving..." : "Winner"}
                             </button>
                             <button
                               className="btn btn-xs btn-primary"
                               onClick={() => handleImplementOne(photo.id)}
+                              disabled={actionBusy && actionBusyPhotoId === photo.id}
                             >
-                              Implement
+                              {actionBusy && actionBusyPhotoId === photo.id ? "Saving..." : "Implement"}
                             </button>
                             <button
                               className="btn btn-xs btn-danger"
                               onClick={() => handleDelete(photo.id)}
+                              disabled={actionBusy && actionBusyPhotoId === photo.id}
                             >
-                              Discard
+                              {actionBusy && actionBusyPhotoId === photo.id ? "Saving..." : "Discard"}
                             </button>
                           </div>
                         </div>
