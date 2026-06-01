@@ -35,6 +35,7 @@ export default function Scan() {
 
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [qrUploadDecoding, setQrUploadDecoding] = useState(false);
+  const [uploadConfirm, setUploadConfirm] = useState(null); // { count, listingId, treeTitle }
 
   const [photographerInfo, setPhotographerInfo] = useState({
     firstName: "",
@@ -318,7 +319,22 @@ export default function Scan() {
         return;
       }
 
-      alert("Photos uploaded successfully!");
+      const result = await res.json();
+      const count = result?.uploaded || selectedPhotos.length;
+
+      // Try to get tree title for the confirmation banner
+      let treeTitle = "";
+      try {
+        const treeRes = await fetch(apiUrl(`/api/listings/${listingId}`));
+        if (treeRes.ok) {
+          const treeData = await treeRes.json();
+          treeTitle = treeData?.title || "";
+        }
+      } catch {
+        // non-fatal
+      }
+
+      setUploadConfirm({ count, listingId, treeTitle });
       setSelectedPhotos([]);
     } catch (err) {
       console.error("Upload error:", err);
@@ -431,6 +447,31 @@ export default function Scan() {
         </section>
 
         {message && <p className="scan-message">{message}</p>}
+
+      {/* UPLOAD CONFIRMATION */}
+      {uploadConfirm && (
+        <section className="scan-card scan-confirm-card">
+          <div className="scan-confirm-icon">✓</div>
+          <h2 className="scan-confirm-title">Photos Submitted!</h2>
+          <p className="scan-confirm-body">
+            <strong>{uploadConfirm.count}</strong> photo{uploadConfirm.count !== 1 ? "s" : ""} uploaded
+            {uploadConfirm.treeTitle ? ` for "${uploadConfirm.treeTitle}"` : ""} and are pending staff review.
+          </p>
+          <p className="scan-confirm-sub">
+            Staff will review your submission in the Pending Photos queue.
+          </p>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setUploadConfirm(null);
+              setListingId(null);
+              setMessage("");
+            }}
+          >
+            Upload More Photos
+          </button>
+        </section>
+      )}
 
       {/* PHOTO GALLERY */}
       <section className="scan-card">

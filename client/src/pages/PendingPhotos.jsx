@@ -2,78 +2,107 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import "./PendingPhotos.css";
+
+const PHOTO_CAP = 5;
 
 export default function PendingPhotos() {
   const navigate = useNavigate();
-  const [pendingItems, setPendingItems] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [expandedKey, setExpandedKey] = useState(null);
+  const [actionMsg, setActionMsg] = useState("");
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   useEffect(() => {
-    loadPendingPhotos();
+    loadPending();
   }, []);
 
-  async function loadPendingPhotos() {
+  async function loadPending() {
     try {
       setLoadError("");
-      const endpoint = selectedParkName
-        ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
-        : "/api/listings";
-      const res = await fetchWithTimeout(apiUrl(endpoint), {}, 15000);
-      const data = await res.json();
-      const listings = Array.isArray(data) ? data : [];
-
-      const flattened = listings.flatMap((listing) => {
-        const photos = Array.isArray(listing.photos) ? listing.photos : [];
-        return photos
-          .filter((photo) => photo && photo.staff_uploaded === false)
-          .map((photo) => ({
-            listingId: listing.id,
-            listingTitle: listing.title || "Untitled Tree",
-            photo,
-          }));
+      setLoading(true);
+      const qs = selectedParkName ? `?parkName=${encodeURIComponent(selectedParkName)}` : "";
+      const res = await fetch(apiUrl(`/api/photos/pending${qs}`), {
+        headers: getStaffHeaders(),
       });
-
-      setPendingItems(flattened);
+      if (!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      setGroups(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load pending photos:", err);
-      if (err?.name === "AbortError") {
-        setLoadError("Pending photos request timed out. Please try again.");
-      } else {
-        setLoadError("Failed to load pending photos.");
-      }
-      setPendingItems([]);
+      setLoadError("Failed to load pending photos. Check your staff login.");
+      setGroups([]);
     } finally {
       setLoading(false);
     }
   }
 
-  async function approvePhoto(photoId) {
+  function groupKey(group) {
+    return `${group.listingId}__${group.photographer}`;
+  }
+
+  function toggleExpand(key) {
+    setExpandedKey((prev) => (prev === key ? null : key));
+  }
+
+  async function doAction(url, method, successMsg) {
     try {
-      await fetch(apiUrl(`/api/photos/${photoId}/approve`), {
-        method: "PATCH",
-        headers: getStaffHeaders(),
-      });
-      loadPendingPhotos();
-    } catch (err) {
-      console.error("Failed to approve photo:", err);
+      const res = await fetch(apiUrl(url), { method, headers: getStaffHeaders() });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setActionMsg(err?.error || "Action failed.");
+        return false;
+      }
+      setActionMsg(successMsg);
+      setTimeout(() => setActionMsg(""), 3000);
+      return true;
+    } catch {
+      setActionMsg("Unexpected error.");
+      return false;
     }
   }
 
-  async function rejectPhoto(photoId) {
-    if (!window.confirm("Delete this pending photo?")) return;
-    try {
-      await fetch(apiUrl(`/api/photos/${photoId}`), {
-        method: "DELETE",
+  async function handleSetMain(photoId) {
+    const ok = await doAction(`/api/photos/${photoId}/main`, "PATCH", "Set as main photo.");
+    if (ok) loadPending();
+  }
+
+  async function handleSetWinner(photoId) {
+    const ok = await doAction(`/api/photos/${photoId}/winner`, "PATCH", "Marked as winner!");
+    if (ok) loadPending();
+  }
+
+  async function handleDelete(photoId) {
+    if (!window.confirm("Delete this photo permanently?")) return;
+    const ok = await doAction(`/api/photos/${photoId}`, "DELETE", "Photo deleted.");
+    if (ok) loadPending();
+  }
+
+  async function handleImplementAll(group) {
+    if (!window.confirm(`Move all ${group.photos.length} photo(s) from this submission to the tree profile?`)) return;
+    setActionMsg("Implementing photos...");
+    let failed = 0;
+    for (const photo of group.photos) {
+      const res = await fetch(apiUrl(`/api/photos/${photo.id}/approve`), {
+        method: "PATCH",
         headers: getStaffHeaders(),
       });
-      loadPendingPhotos();
-    } catch (err) {
-      console.error("Failed to delete pending photo:", err);
+      if (!res.ok) failed++;
     }
+    if (failed > 0) {
+      setActionMsg(`${failed} photo(s) failed to implement.`);
+    } else {
+      setActionMsg("All photos moved to tree profile.");
+      setTimeout(() => setActionMsg(""), 3000);
+    }
+    loadPending();
+  }
+
+  async function handleImplementOne(photoId) {
+    const ok = await doAction(`/api/photos/${photoId}/approve`, "PATCH", "Photo added to tree profile.");
+    if (ok) loadPending();
   }
 
   if (loading) {
@@ -105,43 +134,139 @@ export default function PendingPhotos() {
         </div>
       </div>
 
+      {actionMsg && (
+        <div className="pending-action-msg">{actionMsg}</div>
+      )}
+
       {loadError ? (
-        <div className="empty-list">
-          <p>{loadError}</p>
-        </div>
+        <div className="empty-list"><p>{loadError}</p></div>
       ) : null}
 
-      {pendingItems.length === 0 ? (
+      {!loadError && groups.length === 0 ? (
         <div className="empty-list">
           <p>No pending photos right now.</p>
         </div>
       ) : (
-        <div className="tree-grid">
-          {pendingItems.map(({ listingId, listingTitle, photo }) => (
-            <div key={photo.id} className="tree-card">
-              <div className="tree-card-photo-wrapper">
-                <img src={photo.url} alt={listingTitle} className="tree-card-photo" />
-              </div>
-              <div className="tree-card-info">
-                <h3 className="tree-card-title">{listingTitle}</h3>
-                <p className="tree-card-meta">Listing: {listingId}</p>
-                {photo.photographer && (
-                  <p className="tree-card-meta">Photographer: {photo.photographer}</p>
+        <div className="pending-submissions-list">
+          {groups.map((group) => {
+            const key = groupKey(group);
+            const isExpanded = expandedKey === key;
+            const overCap = group.approvedCount >= PHOTO_CAP;
+            const nearCap = !overCap && group.approvedCount >= PHOTO_CAP - 1;
+
+            return (
+              <div key={key} className={`pending-submission-card${isExpanded ? " expanded" : ""}`}>
+                {/* CARD HEADER — click to expand */}
+                <button
+                  className="pending-card-header"
+                  onClick={() => toggleExpand(key)}
+                  aria-expanded={isExpanded}
+                >
+                  <div className="pending-card-thumbs">
+                    {group.photos.slice(0, 3).map((p) => (
+                      <img key={p.id} src={p.url} alt="" className="pending-thumb-sm" />
+                    ))}
+                    {group.photos.length > 3 && (
+                      <span className="pending-thumb-overflow">+{group.photos.length - 3}</span>
+                    )}
+                  </div>
+
+                  <div className="pending-card-meta">
+                    <span className="pending-card-tree">{group.listingTitle}</span>
+                    {group.listingLocation && (
+                      <span className="pending-card-location">{group.listingLocation}</span>
+                    )}
+                    <span className="pending-card-id">Tree ID: {group.listingId}</span>
+                    <span className="pending-card-uploader">
+                      {group.photographerFirst && group.photographerLast
+                        ? `${group.photographerFirst} ${group.photographerLast}`
+                        : group.photographer}
+                      {group.photographerEmail ? ` · ${group.photographerEmail}` : ""}
+                    </span>
+                    <span className="pending-card-count">
+                      {group.photos.length} photo{group.photos.length !== 1 ? "s" : ""}
+                      {" · "}
+                      {new Date(group.latestDate).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="pending-card-badges">
+                    {overCap && (
+                      <span className="pending-badge pending-badge-over">
+                        ⚠ Tree at {PHOTO_CAP}-photo limit
+                      </span>
+                    )}
+                    {nearCap && (
+                      <span className="pending-badge pending-badge-near">
+                        {group.approvedCount}/{PHOTO_CAP} approved
+                      </span>
+                    )}
+                    <span className="pending-expand-arrow">{isExpanded ? "▲" : "▼"}</span>
+                  </div>
+                </button>
+
+                {/* EXPANDED DETAIL */}
+                {isExpanded && (
+                  <div className="pending-card-detail">
+                    <div className="pending-cap-notice">
+                      <strong>Note:</strong> Tree profiles should have no more than {PHOTO_CAP} photos.
+                      This tree currently has <strong>{group.approvedCount}</strong> approved photo{group.approvedCount !== 1 ? "s" : ""}.
+                      {overCap && " This tree is already at capacity — consider discarding instead of implementing."}
+                    </div>
+
+                    <div className="pending-bulk-actions">
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => navigate(`/listing/${group.listingId}`)}
+                      >
+                        View Tree Profile
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleImplementAll(group)}
+                      >
+                        Implement All to Tree
+                      </button>
+                    </div>
+
+                    <div className="pending-photos-grid">
+                      {group.photos.map((photo) => (
+                        <div key={photo.id} className="pending-photo-item">
+                          <img src={photo.url} alt="" className="pending-photo-img" />
+                          <div className="pending-photo-actions">
+                            <button
+                              className="btn btn-xs btn-secondary"
+                              onClick={() => handleSetMain(photo.id)}
+                            >
+                              Make Main
+                            </button>
+                            <button
+                              className="btn btn-xs btn-warning"
+                              onClick={() => handleSetWinner(photo.id)}
+                            >
+                              Winner
+                            </button>
+                            <button
+                              className="btn btn-xs btn-primary"
+                              onClick={() => handleImplementOne(photo.id)}
+                            >
+                              Implement
+                            </button>
+                            <button
+                              className="btn btn-xs btn-danger"
+                              onClick={() => handleDelete(photo.id)}
+                            >
+                              Discard
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="tree-card-actions">
-                <button className="btn btn-sm btn-primary" onClick={() => approvePhoto(photo.id)}>
-                  Approve
-                </button>
-                <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/listing/${listingId}`)}>
-                  Open Tree
-                </button>
-                <button className="btn btn-sm btn-danger" onClick={() => rejectPhoto(photo.id)}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

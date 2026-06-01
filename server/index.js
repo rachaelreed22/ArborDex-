@@ -2507,6 +2507,103 @@ api.delete('/listings/:id', async (req, res) => {
 // ===========================
 // PHOTO ROUTES
 // ===========================
+
+// GET /api/photos/pending — returns all pending (staff_uploaded=false) photos grouped by listing+photographer
+api.get('/photos/pending', requireStaffAction, async (req, res) => {
+  try {
+    const parkName = (req.query?.parkName || '').toString().trim();
+
+    // Fetch pending photos joined with listing info
+    let query = writeSupabase
+      .from('photos')
+      .select(`
+        id,
+        listing_id,
+        url,
+        is_main,
+        winner,
+        staff_uploaded,
+        photographer,
+        photographer_first,
+        photographer_last,
+        photographer_email,
+        created_at,
+        listings!inner(id, title, location)
+      `)
+      .eq('staff_uploaded', false)
+      .order('created_at', { ascending: false });
+
+    if (parkName) {
+      query = query.ilike('listings.location', `%${parkName}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching pending photos:', error);
+      return res.status(500).json({ error: 'Failed to fetch pending photos' });
+    }
+
+    const photos = Array.isArray(data) ? data : [];
+
+    // Count total approved photos per listing to warn about 5-photo cap
+    const listingIds = [...new Set(photos.map((p) => p.listing_id))];
+    let approvedCountMap = {};
+    if (listingIds.length > 0) {
+      const { data: approvedRows } = await writeSupabase
+        .from('photos')
+        .select('listing_id')
+        .in('listing_id', listingIds)
+        .eq('staff_uploaded', true);
+      if (Array.isArray(approvedRows)) {
+        approvedRows.forEach((r) => {
+          approvedCountMap[r.listing_id] = (approvedCountMap[r.listing_id] || 0) + 1;
+        });
+      }
+    }
+
+    // Group by listing_id + photographer key
+    const groups = {};
+    for (const photo of photos) {
+      const photographerKey = photo.photographer || 'Unknown';
+      const groupKey = `${photo.listing_id}__${photographerKey}`;
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          listingId: photo.listing_id,
+          listingTitle: photo.listings?.title || 'Untitled Tree',
+          listingLocation: photo.listings?.location || '',
+          photographer: photographerKey,
+          photographerFirst: photo.photographer_first || '',
+          photographerLast: photo.photographer_last || '',
+          photographerEmail: photo.photographer_email || '',
+          approvedCount: approvedCountMap[photo.listing_id] || 0,
+          photos: [],
+          latestDate: photo.created_at,
+        };
+      }
+      groups[groupKey].photos.push({
+        id: photo.id,
+        url: photo.url,
+        is_main: photo.is_main,
+        winner: photo.winner,
+        created_at: photo.created_at,
+      });
+      if (photo.created_at > groups[groupKey].latestDate) {
+        groups[groupKey].latestDate = photo.created_at;
+      }
+    }
+
+    const result = Object.values(groups).sort((a, b) =>
+      b.latestDate.localeCompare(a.latestDate)
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.error('Unexpected error fetching pending photos:', err);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
+});
+
 api.post('/photos/upload', publicPhotoUploadLimiter, upload.array('photos', 10), async (req, res) => {
   try {
     const listingId = decodeURIComponent((req.body?.listingId || '').toString()).trim();
