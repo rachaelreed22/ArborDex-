@@ -3925,7 +3925,29 @@ api.post('/ai/ask-arborai', publicAiAskLimiter, upload.array('photos', 6), async
       return res.status(400).json({ error: 'Provide a question or at least one photo.' });
     }
 
-    const systemPrompt = `${ARBORAI_REGIONAL_SCOPE}
+    if (aiImageUrls.length === 0) {
+      return res.json({
+        species: 'Unknown',
+        confidence: 'Low',
+        health_score: 0,
+        summary: 'No photos were provided, so image-based identification is not possible.',
+        risks: [],
+        recommendations: ['Upload at least one clear photo for image-first identification.'],
+        photo_summaries: [],
+        hazards_detected: 'No',
+        hazard_details: [],
+        raw_ai_message: question
+          ? `You asked: "${question}". I need at least one clear photo before I can identify this safely.`
+          : 'Upload at least one clear photo before asking for species identification.',
+        photo_urls: uploadedPhotoUrls,
+      });
+    }
+
+    const identificationSystemPrompt = `${ARBORAI_REGIONAL_SCOPE}
+
+  You are performing IMAGE-FIRST identification and diagnostics.
+  Ignore user wording biases such as "baby tree", named species guesses, or category assumptions.
+  Use only visual evidence from the photos for species and hazard calls.
 
   Respond ONLY as valid JSON with these exact keys:
 - species: string
@@ -3944,10 +3966,10 @@ Critical safety rules:
 - If poisonous lookalike risk exists, do NOT output High confidence and include clear do-not-ingest language in risks/recommendations/raw_ai_message.
 If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.`;
 
-    const userContent = [
+    const identificationUserContent = [
       {
         type: 'text',
-        text: `User question: ${question || 'Please analyze these tree photos and provide identification and diagnostics.'}`,
+        text: 'Perform image-first identification and diagnostics from the photos only. Do not use user phrasing to choose a species.',
       },
       ...aiImageUrls.map((url, index) => ({
         type: 'text',
@@ -3968,8 +3990,8 @@ If information is uncertain, state best estimate and keep raw_ai_message support
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
+          { role: 'system', content: identificationSystemPrompt },
+          { role: 'user', content: identificationUserContent },
         ],
         response_format: { type: 'json_object' },
         max_tokens: 900,
@@ -4040,6 +4062,65 @@ If information is uncertain, state best estimate and keep raw_ai_message support
         enforceCriticalDecayFailSafe(payload)
       )
     );
+
+    const questionText = (question || '').toString().trim();
+    const questionLower = questionText.toLowerCase();
+    const asksTreeCategory = /(baby\s+tree|sapling|seedling|what\s+tree|which\s+tree|\btree\b)/i.test(questionLower);
+    const asksWalnut = /(walnut|juglans|black\s+walnut)/i.test(questionLower);
+
+    const evidenceBlob = [
+      normalizedPayload.species,
+      normalizedPayload.summary,
+      ...(Array.isArray(normalizedPayload.hazard_details) ? normalizedPayload.hazard_details : []),
+      ...(Array.isArray(normalizedPayload.risks) ? normalizedPayload.risks : []),
+      ...(Array.isArray(normalizedPayload.recommendations) ? normalizedPayload.recommendations : []),
+    ]
+      .map((item) => (item == null ? '' : item.toString().toLowerCase()))
+      .join(' | ');
+
+    const indicatesApiaceae = /(hemlock|wild carrot|queen anne|apiaceae|umbel|umbellifer|conium|cicuta|fool'?s parsley)/i.test(evidenceBlob);
+    const indicatesWalnut = /(walnut|juglans)/i.test(evidenceBlob);
+    const questionBiasDetected = (asksTreeCategory && indicatesApiaceae) || (asksWalnut && !indicatesWalnut);
+
+    if (questionBiasDetected) {
+      normalizedPayload.question_bias_detected = true;
+      const dataQualityFlags = normalizeStringArrayField(normalizedPayload.data_quality_flags);
+      if (!dataQualityFlags.some((item) => /question wording conflicted|prompt anchoring/i.test(item))) {
+        dataQualityFlags.unshift('Question wording conflicted with image evidence; anti-anchoring rules were applied.');
+      }
+      normalizedPayload.data_quality_flags = dataQualityFlags;
+
+      const recommendations = normalizeStringArrayField(normalizedPayload.recommendations);
+      if (!recommendations.some((item) => /image-first|wording|anchoring/i.test(item))) {
+        recommendations.unshift('Identification stayed image-first and was not changed by question wording.');
+      }
+      normalizedPayload.recommendations = recommendations;
+    } else {
+      normalizedPayload.question_bias_detected = false;
+    }
+
+    const confidenceLabel = normalizeConfidenceTier(normalizedPayload.confidence);
+    const assistantParts = [
+      `Image-first result: ${normalizedPayload.species || 'Unknown'} (confidence: ${confidenceLabel}).`,
+    ];
+
+    if (questionText) {
+      assistantParts.push(`You asked: "${questionText}".`);
+    }
+
+    if (questionBiasDetected) {
+      assistantParts.push('Your wording suggested a different category/species, but ArborAI kept identification locked to visual evidence to reduce hallucinations.');
+    }
+
+    if ((normalizedPayload.hazards_detected || '').toString().toLowerCase() === 'yes') {
+      assistantParts.push('Safety note: potentially hazardous or toxic traits were detected, so treat this as potentially dangerous until expert verification.');
+    }
+
+    if (Array.isArray(normalizedPayload.recommendations) && normalizedPayload.recommendations.length > 0) {
+      assistantParts.push(`Key qualifier: ${normalizedPayload.recommendations[0]}`);
+    }
+
+    normalizedPayload.raw_ai_message = assistantParts.join(' ').trim();
 
     res.json(normalizedPayload);
   } catch (err) {
