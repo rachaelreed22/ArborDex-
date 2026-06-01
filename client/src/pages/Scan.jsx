@@ -6,13 +6,15 @@ import { apiUrl } from "../utils/apiUrl";
 import "./Scan.css";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_ANYWHERE_PATTERN = /([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
 
 function extractArborTagListingId(rawValue) {
   const raw = (rawValue || "").toString().trim();
   if (!raw) return "";
 
   const pathMatch = raw.match(/\/(?:tag|tree|listing)\/([A-Za-z0-9-]{8,})/i);
-  const candidate = (pathMatch?.[1] || raw).trim();
+  const uuidMatch = raw.match(UUID_ANYWHERE_PATTERN);
+  const candidate = (pathMatch?.[1] || uuidMatch?.[1] || raw).trim();
   return UUID_PATTERN.test(candidate) ? candidate : "";
 }
 
@@ -53,16 +55,35 @@ export default function Scan() {
     return () => clearTimeout(timer);
   }, [modalOpen, modalType]);
 
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   /* CAMERA + QR LOGIC */
   const startCamera = async (callback) => {
     setMessage("");
 
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMessage("Camera API is unavailable in this browser. Use HTTPS or a supported mobile browser.");
+        return;
+      }
+
       let stream;
 
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -72,6 +93,9 @@ export default function Scan() {
 
       const video = videoRef.current;
       video.srcObject = stream;
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute("muted", "true");
       video.setAttribute("playsinline", true);
       await video.play();
 
@@ -79,7 +103,28 @@ export default function Scan() {
       animationRef.current = requestAnimationFrame(() => tick(callback));
     } catch (err) {
       console.error("Camera error:", err);
-      setMessage("Unable to access camera.");
+
+      if (err?.name === "NotAllowedError") {
+        setMessage("Camera access was denied. Allow camera permission for this site and try again.");
+        return;
+      }
+
+      if (err?.name === "NotFoundError") {
+        setMessage("No camera device was found on this device.");
+        return;
+      }
+
+      if (err?.name === "NotReadableError") {
+        setMessage("Camera is busy in another app/tab. Close other camera apps and try again.");
+        return;
+      }
+
+      if (window.isSecureContext === false) {
+        setMessage("Camera scanning requires a secure context (HTTPS). Open the secure site URL and try again.");
+        return;
+      }
+
+      setMessage("Unable to access camera. You can use Upload QR Image as a fallback.");
     }
   };
 
@@ -100,16 +145,23 @@ export default function Scan() {
 
     if (!video || !canvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (!video.videoWidth || !video.videoHeight) {
+        animationRef.current = requestAnimationFrame(() => tick(callback));
+        return;
+      }
+
       canvas.height = video.videoHeight;
       canvas.width = video.videoWidth;
 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height, {
+        inversionAttempts: "attemptBoth",
+      });
 
       if (code) {
         const scanned = code.data.trim();
