@@ -189,7 +189,168 @@ const ASK_ARBORAI_BUCKET_CANDIDATES = Array.from(
   )
 );
 
+// ============================================================
+// ORCHARD PLANT KNOWLEDGE — Apple, Peach, Strawberry, Blueberry
+// Add new plants by appending a new section following this pattern.
+// ============================================================
+const ORCHARD_PLANT_KNOWLEDGE = `
+ORCHARD PLANT IDENTIFICATION AND DIAGNOSTICS KNOWLEDGE BASE
+Region: Southwestern Missouri, USA (zones 5b-6b)
+
+--- APPLE (Malus domestica) ---
+Common Cultivars in MO: Honeycrisp, Gala, Jonathan, Arkansas Black, Liberty, Enterprise, Gold Rush, Fuji, Grimes Golden.
+Visual ID: Alternate ovate leaves with serrated margins, 5-petaled white-pink blossoms in spring, pome fruits (round, firm, red/yellow/green), gray furrowed bark on mature trees.
+Adjacent/Lookalike Species: Crabapple (Malus sylvestris — smaller tart fruit <2in), Serviceberry (Amelanchier — smoother bark, earlier bloom, small dark berries), Pear (Pyrus — oval leaves, grainy flesh).
+Key Pests (visual symptoms):
+  - Codling moth: small round entry hole at blossom end of fruit, frass/webbing inside; caterpillar tunnels through core.
+  - Apple maggot (Rhagoletis pomonella): brown streaking inside flesh, dimpled skin surface with tiny punctures.
+  - Japanese beetle (Popillia japonica): skeletonized leaves (lace-like, veins remain), metallic green/bronze adult beetles visible.
+  - European red mite: bronze-stippled upper leaf surface, silky webbing on leaf undersides, premature leaf drop.
+  - Aphids (Aphis pomi): curled/cupped young leaves, sticky honeydew residue, soft clustered insects on new growth.
+  - Wooly apple aphid: white cottony masses on branches, pruning wounds, and roots.
+Key Diseases (visual symptoms):
+  - Fire blight (Erwinia amylovora): shepherd's crook wilting of shoot tips, water-soaked then blackened/brown blossoms and shoots, bacterial ooze in humidity; HIGHEST PRIORITY disease in MO.
+  - Cedar-apple rust (Gymnosporangium juniperi-virginianae): bright orange-yellow circular spots on upper leaf surface, tube-like spore structures on leaf undersides; requires Eastern Red Cedar as alternate host — CRITICAL in MO where cedars are common.
+  - Apple scab (Venturia inaequalis): olive-green to brown velvety lesions on leaves and fruit; lesions crack as fruit matures.
+  - Powdery mildew: white powdery coating on young leaves/shoots, distortion of new growth.
+  - Brown rot (Monilinia fructicola): tan-brown rapidly spreading rot on fruit, concentric rings of gray-tan spore masses.
+  - Bitter rot (Colletotrichum acutatum): sunken water-soaked tan-brown spots on fruit, often with salmon-pink spore masses in wet weather.
+Health indicators: Full leaf canopy, firm fruit without lesions, no shoot dieback, no bark cankers.
+
+--- PEACH (Prunus persica) ---
+Common Cultivars in MO: Reliance, Contender, Redhaven, Loring, Harken, Madison, Veteran.
+Visual ID: Long lanceolate leaves with finely serrated margins, pink 5-petaled single blossoms in early spring (before leaves), fuzzy skin drupes (fruit), reddish-brown scaly bark on mature trees.
+Adjacent/Lookalike Species: Nectarine (Prunus persica var. nucipersica — smooth skinned, same tree), Plum (Prunus domestica/americana — rounder fruit, less furry, different leaf shape), Almond (Prunus dulcis — similar blossom but not fruiting in MO), Cherry (Prunus avium/cerasus — smaller rounder fruit, different bark).
+Key Pests (visual symptoms):
+  - Peach tree borer (Synanthedon exitiosa): gummosis (amber jelly-like sap) at base of trunk near soil line, frass + gum mass at crown; larvae girdle cambium.
+  - Oriental fruit moth (Grapholita molesta): wilted shoot tips with entry holes (first generation), internal worm tunnels in fruit near pit (later generations).
+  - Plum curculio (Conotrachelus nenuphar): crescent-shaped egg-laying scars on young fruit, misshapen/dropped fruit with curved larval tunnels.
+  - Tarnished plant bug: small corky deformed areas on fruit skin, catfacing (puckered scars) at blossom end.
+  - European red mite / Two-spotted spider mite: bronzing and stippling of leaf surface, webbing on undersides, early leaf drop in summer.
+  - Stink bugs: hard corky tissue patches inside fruit (cat-facing), dimpled surface.
+Key Diseases (visual symptoms):
+  - Peach leaf curl (Taphrina deformans): red-pink puckered blistered/curled new leaves in spring, leaves thicken and pucker before turning yellow-gray and dropping — VERY COMMON and visually dramatic.
+  - Brown rot (Monilinia fructicola): tan-brown spreading rot on ripening fruit, fuzzy gray-tan spore rings; also kills blossoms and small shoots (blossom blight).
+  - Bacterial spot (Xanthomonas arboricola): angular water-soaked spots on leaves turning brown with yellow halos, shot-hole appearance; dark sunken lesions on fruit.
+  - Cytospora canker (Leucostoma persoonii): gummosis on scaffold branches/trunk, bark dies and sunken cankers appear; associated with winter injury.
+  - Powdery mildew: white powdery growth on young leaves and fruit surface.
+Health indicators: Upright vigorous shoot growth, full green canopy, no gummosis, clean fruit skin.
+
+--- STRAWBERRY (Fragaria × ananassa) ---
+Common Types in MO: June-bearing (Earliglow, Allstar, Honeoye), Everbearing (Quinault, Fort Laramie), Day-neutral (Seascape, Albion).
+Visual ID: Low-growing rosette plant with trifoliate leaves (3 oval toothed leaflets), white 5-petaled flowers with yellow centers, red aggregate accessory fruits at ground level, runners (stolons) spreading horizontally.
+Adjacent/Lookalike Species: Wild strawberry (Fragaria virginiana — smaller fruit, smaller leaflets, native MO), Mock strawberry (Duchesnea indica — yellow flowers, tasteless fruit, no fragrance), Potentilla (similar leaves but no fruit runners).
+Key Pests (visual symptoms):
+  - Tarnished plant bug (Lygus lineolaris): misshapen/seedy/nubbly fruit ("button berries"), bronze stippling on leaves.
+  - Spotted wing drosophila (Drosophila suzukii): small internal maggots in ripe fruit, accelerated soft rot on harvest.
+  - Two-spotted spider mite: yellow stippling on upper leaf surface, fine webbing on undersides, bronzed appearance in hot dry weather.
+  - Strawberry clipper weevil (Anthonomus signatus): clipped flower buds hanging by single thread; buds fall before blooming.
+  - Cyclamen mite: stunted distorted leaves at crown, bronze/brown coloring on new growth.
+  - Aphids: curled leaves, honeydew residue, colonies on undersides.
+Key Diseases (visual symptoms):
+  - Gray mold / Botrytis (Botrytis cinerea): fuzzy gray spore masses on ripe or damaged fruit; tan lesions on blossoms, stems, and leaves; most damaging in cool wet spring — HIGHEST PRIORITY MO disease.
+  - Angular leaf spot (Xanthomonas fragariae): angular water-soaked spots on leaf undersides, white bacterial exudate visible in morning; spots turn reddish-brown.
+  - Powdery mildew (Podosphaera aphanis): white powdery coating on leaf undersides, upward leaf curl at margins, purple blotching on upper surface.
+  - Red stele (Phytophthora fragariae): wilted stunted plants, roots turn brick-red inside when cut; associated with wet poorly-drained soils.
+  - Crown rot (Phytophthora cactorum): sudden plant collapse, brown rot at crown/base, white mycelium sometimes visible.
+  - Leaf scorch (Diplocarpon earlianum): irregular purple-red spots on leaves with tan-gray centers.
+Health indicators: Bright green trifoliate leaves, firm plump fruit, vigorous runner production, white clean roots.
+
+--- BLUEBERRY (Vaccinium corymbosum / V. angustifolium) ---
+Common Types in MO: Northern highbush (Bluecrop, Duke, Jersey, Patriot), Southern highbush (O'Neal, Sunshine Blue), Lowbush (Vaccinium angustifolium — wild type).
+Visual ID: Woody shrub with oval alternate leaves (smooth edges or fine serration), white urn-shaped drooping flower clusters in spring, dark blue-black fruit with powdery bloom and star-shaped calyx end, reddish-orange fall color.
+Adjacent/Lookalike Species: Huckleberry (Gaylussacia baccata — resinous dots on leaf undersides, 10-seeded fruit), Serviceberry (Amelanchier — larger tree/shrub, white clustered blossoms, not urn-shaped flowers), Privet (Ligustrum — opposite leaves, no edible fruit), Elderberry (Sambucus — pinnately compound leaves, very different structure).
+Key Pests (visual symptoms):
+  - Spotted wing drosophila (Drosophila suzukii): internal maggots in ripening fruit, collapsed soft spots, accelerated fruit drop.
+  - Blueberry maggot (Rhagoletis mendax): infested fruit collapses/wrinkles, internal white maggot present.
+  - Aphids: distorted curled leaves, honeydew and sooty mold on stems.
+  - Blueberry tip borer (Hendecaneura shawiana): wilted shoot tips (flagging), small larvae inside stem.
+  - Japanese beetle: skeletonized leaves, adult beetles feeding on ripe fruit.
+  - Cranberry fruitworm / Cherry fruitworm: webbed clusters of fruit with entry holes, internal larvae.
+Key Diseases (visual symptoms):
+  - Mummy berry (Monilinia vaccinii-corymbosi): shriveled gray-tan "mummy" fruits remaining on plant through fall/winter; shoots wilt and turn brown in spring (shoot blight phase) before fruiting; MO-COMMON.
+  - Stem blight (Botryosphaeria dothidea): sudden wilting and browning of individual canes starting at tips, tan-brown discoloration inside stem when cut.
+  - Anthracnose (Colletotrichum acutatum): salmon-pink spore masses on fruit, sunken lesions; worse in warm wet harvests.
+  - Botrytis blight (Botrytis cinerea): gray fuzzy spore masses on blossoms and young fruit in cool wet spring.
+  - Phytophthora root rot: sudden plant decline, wilting despite adequate moisture, brown roots.
+  - Powdery mildew: white powdery coating on leaves and young shoots.
+Health indicators: Vigorous multi-stem growth, deep green foliage, abundant flower/fruit set, no stem dieback.
+`;
+
+// ============================================================
+// REGIONAL HARDWOOD KNOWLEDGE — Missouri Parks + Landscape Trees
+// Add new species by appending to the relevant section.
+// ============================================================
+const REGIONAL_HARDWOOD_KNOWLEDGE = `
+MISSOURI HARDWOOD AND COMMON LANDSCAPE TREE IDENTIFICATION KNOWLEDGE BASE
+Region: Southwestern Missouri, USA (zones 5b-6b)
+
+--- CRITICAL LOOKALIKE CORRECTIONS ---
+
+Eastern Red Cedar (Juniperus virginiana) vs Eastern Hemlock (Tsuga canadensis):
+  These are NOT the same species and should NEVER be confused.
+  EASTERN RED CEDAR: Scale-like or awl-like overlapping foliage (not needles in flat sprays), dense columnar/pyramidal form, blue-gray berry-like cones (0.25in) at branch tips, reddish-brown shredding fibrous bark, extremely common in MO — most common landscape/windbreak/pasture evergreen in SW Missouri.
+  EASTERN HEMLOCK: Flat feathery sprays of short soft needles with white stripe undersides, small hanging oval cones (0.75in), graceful drooping branch tips, thin furrowed bark; NOT common in SW Missouri — rare, would be a notable landscape planting if present.
+  RULE: In SW Missouri, an unidentified small to medium evergreen is FAR more likely Eastern Red Cedar than Eastern Hemlock. If scale-like foliage is visible, it is NOT hemlock. Only identify as Hemlock if flat soft spray needles with white bands are clearly visible.
+
+Common MO Conifers / Evergreens:
+  - Eastern Red Cedar (Juniperus virginiana): most common MO evergreen, scale-like foliage, blue berries, shredding bark.
+  - Shortleaf Pine (Pinus echinata): 2-needle bundles (~3-4in), rough plated bark, small spiny cones; native to Ozarks.
+  - Eastern White Pine (Pinus strobus): 5-needle bundles (soft, flexible), long cylindrical cones; planted ornamental.
+  - Norway Spruce (Picea abies): sharp 4-sided single needles, large hanging cones, pendulous branches; planted ornamental.
+  - Blue Spruce (Picea pungens): stiff silver-blue sharp needles; planted ornamental.
+
+--- COMMON MISSOURI HARDWOODS (Parks and Urban Landscapes) ---
+
+Oak Family (Quercus):
+  - White Oak (Q. alba): rounded smooth-lobed leaves, light gray blocky bark, acorn with warty cap covering 1/4 of nut; dominant MO forest species.
+  - Red Oak (Q. rubra): pointed-lobe leaves with bristle tips, dark furrowed upper bark / lighter gray lower, large flat-topped acorn cap; very common.
+  - Pin Oak (Q. palustris): deeply cut pointed-lobe leaves, lower branches drooping, small round acorn; common urban/park tree.
+  - Bur Oak (Q. macrocarpa): mossy-fringed acorn cap covering more than half the nut, deeply furrowed corky bark; open savanna indicator species in MO.
+  - Chinkapin Oak (Q. muehlenbergii): toothed (not lobed) leaves resembling American chestnut, gray flaky bark on ridge tops.
+  - Blackjack Oak (Q. marilandica): distinctive spatula/duck-foot shaped leaves, gnarled small tree on dry rocky soils.
+  Key Oak Pests/Diseases: Oak wilt (Ceratocystis fagacearum — wilting from crown down, brown streaking in sapwood, spreads through root grafts; CRITICAL in red oak group), Two-lined chestnut borer (D-shaped exit holes), Gypsy moth (defoliation), Spongy moth (defoliation), Bacterial leaf scorch (marginal leaf browning), Hypoxylon canker (silvery-gray bark patches on dying wood).
+
+Maple Family (Acer):
+  - Silver Maple (A. saccharinum): deeply cut 5-lobed leaves, pale silver leaf undersides, shaggy gray bark, weedy-fast grower near water.
+  - Sugar Maple (A. saccharum): classic 5-lobed leaf, gray furrowed bark, brilliant orange-red fall color, slow-growing.
+  - Red Maple (A. rubrum): 3-5 lobed leaf with whitish underside, red flowers/samaras in early spring, red fall color.
+  - Box Elder (A. negundo): compound pinnate leaves (looks unlike typical maple), green twigs, weedy near streams.
+  Key Maple Pests/Diseases: Verticillium wilt (sudden dieback of individual branches, olive-green streaking in sapwood), Anthracnose (irregular brown patches on leaves in spring, worse in wet years), Cottony maple scale (white cottony masses on branches), Asian longhorned beetle (round exit holes in bark, NOT YET common in MO but monitor), Phyllosticta leaf spot.
+
+Elm Family (Ulmus):
+  - American Elm (U. americana): asymmetric leaf base, doubly serrated oval leaves, vase-shaped form, corky ridged bark.
+  - Siberian/Chinese Elm (U. pumila): smaller smoother leaves, round papery samaras, planted ornamental.
+  Key Elm Pests/Diseases: Dutch elm disease (DED — Ophiostoma ulmi/novo-ulmi; wilting from crown, elm bark beetle galleries under bark), Elm leaf beetle (notched/skeletonized leaves), Elm yellows (phytoplasma; buttery-yellow fall color out of season then rapid death).
+
+Ash Family (Fraxinus):
+  - White Ash (F. americana): opposite pinnately compound leaves (5-9 leaflets), diamond-patterned bark, oar-shaped samaras, purple fall color.
+  - Green Ash (F. pennsylvanica): similar to white, but leaflet undersides often slightly hairy, more common in wet sites.
+  Key Ash Pests/Diseases: Emerald ash borer (EAB — Agrilus planipennis; S-shaped larval galleries under bark, D-shaped exit holes, epicormic sprouting from trunk, crown dieback; MOST CRITICAL MO ash threat — assume EAB if any ash shows dieback), Ash anthracnose, Lilac/ash borer.
+
+Other Key Missouri Trees:
+  - Eastern Redbud (Cercis canadensis): small tree, heart-shaped leaves, magenta pea-flowers directly on bark in spring before leaves, flat seed pods; native MO, extremely common ornamental.
+  - Flowering Dogwood (Cornus florida): opposite simple leaves, distinctive 4 large white bracts (not petals) in spring, red drupes in clusters, blocky alligator-hide bark; native understory tree. Susceptible to: dogwood anthracnose (Discula destructiva), powdery mildew.
+  - Black Walnut (Juglans nigra): large alternate pinnately compound leaves (15-23 leaflets), large round green aromatic husked fruit, deeply furrowed dark bark; native MO. Toxic allelopathic roots kill some nearby plants. Pests: walnut caterpillar (mass defoliation), walnut husk fly.
+  - Hackberry (Celtis occidentalis): corky warty bark (very distinctive), asymmetric simple toothed leaves, small dark purple drupes; very common MO urban/park tree, often confused with elm.
+  - Sycamore (Platanus occidentalis): distinctive white/tan/green mottled exfoliating bark (most distinctive of any MO tree), large 3-5 lobed maple-like leaves, ball-shaped hanging seed clusters; common near water.
+  - Honey Locust (Gleditsia triacanthos): pinnate/bipinnate compound leaves, large branched thorns on trunk (wild form), long twisted tan seed pods; common urban/park tree.
+  - Osage Orange (Maclura pomifera): large rough bumpy green fruit ("hedge apple"), milky sap, stout thorns, native MO hedge/windbreak.
+  - Persimmon (Diospyros virginiana): blocky square-patterned dark bark (like alligator hide), oval simple alternate leaves, orange-tan persimmon fruit after frost; native MO.
+
+--- COMMON CITY PARK SHRUBS (SW Missouri) ---
+  - Eastern Red Cedar (juvenile): common as shrub in open/disturbed areas before growing into tree form.
+  - Wild Plum (Prunus americana): thicket-forming, white blossoms in early spring, small red-yellow plums, thorny branches.
+  - Elderberry (Sambucus canadensis): opposite pinnately compound leaves, flat-topped white flower clusters, purple-black berry clusters; very common MO shrub near water and edges.
+  - Spicebush (Lindera benzoin): alternate simple oval leaves, aromatic when crushed, small yellow flowers on bare stems in spring, red drupes in fall; native understory shrub.
+  - Roughleaf Dogwood (Cornus drummondii): opposite simple rough-textured leaves, white flat-topped flower clusters, white berries; very common MO thicket shrub.
+`;
+
 const ARBORAI_REGIONAL_SCOPE = `You are ArborAI, an identification and diagnostics assistant for trees, shrubs, houseplants, and common garden plants found in Southwestern Missouri, USA. Your knowledge must reflect the ecology, climate, soils, pests, and species typical of this region.
+
+You have access to detailed regional knowledge for:
+- ORCHARD PLANTS: Apple, Peach, Strawberry, and Blueberry — including cultivar ID, pests, and diseases specific to SW Missouri.
+- MISSOURI HARDWOODS AND LANDSCAPE TREES: Including critical lookalike corrections (e.g. Eastern Red Cedar vs Eastern Hemlock), oak wilt, EAB, and common park species.
 
 ArborAI has two output modes depending on the user context:
 
@@ -210,31 +371,35 @@ Rules:
 - No speculation beyond what is visible
 - No emotional language
 - No homeowner-style advice
-- Keep under 180 words
-- Use Missouri-specific pests/diseases (EAB, oak wilt, cedar-apple rust, etc.)
+- Keep under 200 words
+- Use Missouri-specific pests/diseases (EAB, oak wilt, cedar-apple rust, fire blight, Botrytis, mummy berry, etc.)
+- For orchard plants: always consider and name cultivar if identifiable, and cite specific pest/disease by common + scientific name.
 
-2. Public Mode (Visitors, Homeowners, Gardeners)
+2. Public Mode (Visitors, Homeowners, Gardeners, Orchard Visitors)
 Triggered when the user is not logged in, scans a QR code, or uploads a plant photo.
 
 Tone:
 Friendly, simple, educational, encouraging.
 
 Required Structure:
-- Likely Identification
+- Likely Identification (include cultivar guess if visible)
 - Key Features Noticed
 - Care or Interesting Facts
-- Common Issues to Watch For
+- Common Issues to Watch For (name real pests/diseases, not generic advice)
 
 Rules:
 - Avoid technical jargon
 - No TRAQ-style risk language
 - No municipal liability language
-- Keep under 150 words
+- Keep under 200 words
 - Include indoor/outdoor garden plants, ornamentals, and houseplants
 - Provide Missouri-appropriate care guidance
 
 General Identification Rules (Both Modes):
 - Prioritize species native or common in SW Missouri
+- For orchard fruit trees and berry plants: use the ORCHARD PLANT KNOWLEDGE BASE for ID, cultivar, pest, and disease calls.
+- For landscape, park, and hardwood trees: use the REGIONAL HARDWOOD KNOWLEDGE BASE for ID and lookalike corrections.
+- CRITICAL: In SW Missouri, unidentified evergreens are almost always Eastern Red Cedar (Juniperus virginiana), NOT Eastern Hemlock. Only identify as Hemlock if flat spray needles with white bands are clearly and unmistakably visible.
 - Only suggest out-of-region species if the photo strongly supports it
 - If uncertain, provide the closest likely match and ask for specific additional photos
 - Never give medical, legal, or chemical-treatment advice`;
@@ -763,6 +928,169 @@ function enforceToxicLookalikeSafety(payload = {}) {
     if (!urgency || urgency === 'low' || urgency === 'moderate') {
       next.urgency_level = 'High';
     }
+  }
+
+  return next;
+}
+
+// ============================================================
+// GUARDRAIL — Orchard plant and hardwood ID accuracy enforcement
+// Add new correction rules here as new species are onboarded.
+// ============================================================
+function enforceOrchardAndHardwoodIDAccuracy(payload = {}) {
+  const next = { ...payload };
+
+  const identificationText = [
+    next.species,
+    next.likely_identification,
+  ]
+    .filter(Boolean)
+    .map((v) => v.toString().toLowerCase())
+    .join(' | ');
+
+  const signalText = [
+    next.summary,
+    next.raw_ai_message,
+    ...(Array.isArray(next.photo_summaries) ? next.photo_summaries : []),
+    ...(Array.isArray(next.key_features_noticed) ? next.key_features_noticed : []),
+    ...(Array.isArray(next.primary_concerns) ? next.primary_concerns : []),
+    ...(Array.isArray(next.risks) ? next.risks : []),
+    ...(Array.isArray(next.recommendations) ? next.recommendations : []),
+    ...(Array.isArray(next.hazard_details) ? next.hazard_details : []),
+  ]
+    .map((item) => (item == null ? '' : item.toString().toLowerCase()))
+    .join(' | ');
+
+  const combined = `${identificationText} | ${signalText}`;
+
+  // --- RULE 1: Eastern Red Cedar vs Eastern Hemlock ---
+  // In SW Missouri, unidentified evergreens are almost always Eastern Red Cedar.
+  // Correct model if it identifies hemlock when cedar visual cues are present.
+  const identifiesHemlock = /(eastern hemlock|tsuga canadensis|tsuga)/i.test(identificationText);
+  const identifiesCedar = /(eastern red cedar|juniperus virginiana|juniperus|red cedar)/i.test(identificationText);
+  const hasCedarCues = /(scale[- ]like|awl[- ]like|scaly foliage|blue.{0,10}berr|shredding bark|fibrous bark|columnar|windbreak|cedar gall|cedar.apple)/i.test(combined);
+  const hasHamlockCues = /(flat.{0,10}spray|white band|needle.{0,10}underside|drooping tip|graceful|tsuga)/i.test(combined);
+  const misidentifiedHemlock = identifiesHemlock && (hasCedarCues || !hasHamlockCues);
+
+  if (misidentifiedHemlock) {
+    const correction = 'ID corrected: Eastern Hemlock is rare in SW Missouri. Visual evidence matches Eastern Red Cedar (Juniperus virginiana) — scale-like or awl-like foliage, blue-gray berries, shredding bark. Only identify as Hemlock if flat soft spray needles with white bands are clearly visible.';
+    const correctedId = 'Eastern Red Cedar (Juniperus virginiana) — likely misidentified as Eastern Hemlock';
+    if (typeof next.species !== 'undefined') next.species = correctedId;
+    if (typeof next.likely_identification !== 'undefined') next.likely_identification = correctedId;
+    if (typeof next.confidence !== 'undefined') next.confidence = capConfidenceTier(next.confidence, 'Medium');
+    const flags = normalizeStringArrayField(next.data_quality_flags);
+    if (!flags.some((f) => /hemlock.*cedar|cedar.*hemlock|id corrected/i.test(f))) {
+      flags.unshift(correction);
+    }
+    next.data_quality_flags = Array.from(new Set(flags));
+    const recs = normalizeStringArrayField(next.recommendations);
+    if (!recs.some((r) => /eastern red cedar|scale.like|juniperus/i.test(r))) {
+      recs.unshift('Verify foliage type: Eastern Red Cedar has scale-like or awl-like foliage (not needle sprays). Look for blue-gray berry-like cones and shredding reddish-brown bark.');
+    }
+    next.recommendations = Array.from(new Set(recs));
+  }
+
+  // --- RULE 2: Cedar-Apple Rust on Apple ---
+  // If apple + cedar-apple rust is mentioned, always surface Eastern Red Cedar as the alternate host.
+  const isApple = /(malus|apple|crabapple)/i.test(identificationText);
+  const hasCedarAppleRust = /(cedar.apple rust|gymnosporangium)/i.test(combined);
+  if (isApple && hasCedarAppleRust) {
+    const rustNote = 'Cedar-apple rust requires Eastern Red Cedar as its alternate host. If Eastern Red Cedars are present nearby, this disease risk is elevated. Removing nearby cedars or selecting rust-resistant apple cultivars (Liberty, Enterprise, Redfree) is the most effective long-term management.';
+    const recs = normalizeStringArrayField(next.recommendations);
+    if (!recs.some((r) => /cedar.apple rust.*alternate host|alternate host.*cedar|resistant.*cultivar/i.test(r))) {
+      recs.unshift(rustNote);
+    }
+    next.recommendations = Array.from(new Set(recs));
+  }
+
+  // --- RULE 3: Fire Blight on Apple or Pear ---
+  // Surface urgency and specific shepherd's crook visual cue if fire blight detected.
+  const isAppleOrPear = /(malus|apple|pear|pyrus)/i.test(identificationText);
+  const hasFireBlight = /(fire blight|erwinia amylovora|shepherd.{0,5}crook|shoot.*wilting.*blacken|blacken.*shoot)/i.test(combined);
+  if (isAppleOrPear && hasFireBlight) {
+    const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
+    if (!urgency || urgency === 'low') next.urgency_level = 'High';
+    const hazardDetails = normalizeStringArrayField(next.hazard_details);
+    if (!hazardDetails.some((d) => /fire blight/i.test(d))) {
+      hazardDetails.unshift('Fire blight detected (Erwinia amylovora): prune 12+ inches below visible infection, sterilize tools between cuts, avoid high-nitrogen fertilizer which promotes susceptible new growth.');
+    }
+    next.hazard_details = Array.from(new Set(hazardDetails));
+    next.hazards_detected = 'Yes';
+    next.needs_human_inspection = true;
+  }
+
+  // --- RULE 4: Peach Leaf Curl ---
+  // If peach + leaf curl is present, ensure it's correctly named and visualized.
+  const isPeach = /(prunus persica|peach|nectarine)/i.test(identificationText);
+  const hasPeachLeafCurl = /(leaf curl|taphrina|puckered|blistered.{0,20}leaf|red.{0,10}curled)/i.test(combined);
+  if (isPeach && hasPeachLeafCurl) {
+    const recs = normalizeStringArrayField(next.recommendations);
+    if (!recs.some((r) => /taphrina|leaf curl|copper fungicide|dormant spray/i.test(r))) {
+      recs.unshift('Peach leaf curl (Taphrina deformans): apply copper fungicide or lime-sulfur as a dormant spray in late winter before buds swell. Once leaves are curled in spring, fungicide is no longer effective for that season.');
+    }
+    next.recommendations = Array.from(new Set(recs));
+  }
+
+  // --- RULE 5: Emerald Ash Borer (EAB) ---
+  // Any ash showing dieback should flag EAB as the primary suspect in Missouri.
+  const isAsh = /(fraxinus|white ash|green ash|ash tree)/i.test(identificationText);
+  const hasDieback = /(dieback|crown.*die|dying|decline|dead.*branch|branch.*dead|d.shaped exit|serpentine|gallery)/i.test(combined);
+  const hasEAB = /(emerald ash borer|agrilus planipennis|\beab\b)/i.test(combined);
+  if (isAsh && hasDieback && !hasEAB) {
+    const eabWarning = 'PRIORITY: Ash dieback in Missouri must be assumed to be Emerald Ash Borer (Agrilus planipennis / EAB) until ruled out by inspection. Look for D-shaped exit holes (3-4mm) in bark, S-shaped larval galleries under bark, and epicormic sprouting from trunk base. EAB is confirmed throughout Missouri and has devastated ash populations.';
+    const hazardDetails = normalizeStringArrayField(next.hazard_details);
+    if (!hazardDetails.some((d) => /emerald ash borer|\beab\b/i.test(d))) {
+      hazardDetails.unshift(eabWarning);
+    }
+    next.hazard_details = Array.from(new Set(hazardDetails));
+    next.hazards_detected = 'Yes';
+    next.needs_human_inspection = true;
+    const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
+    if (!urgency || urgency === 'low' || urgency === 'moderate') next.urgency_level = 'High';
+  }
+
+  // --- RULE 6: Oak Wilt ---
+  // Oak showing wilt/dieback from crown should flag oak wilt as a suspect in Missouri.
+  const isRedOakGroup = /(red oak|pin oak|scarlet oak|black oak|quercus rubra|quercus palustris|quercus velutina)/i.test(identificationText);
+  const hasWilt = /(wilt|flagging|brown.*crown|crown.*brown|vascular|sapwood.*streak|rapid.*decline)/i.test(combined);
+  const hasOakWilt = /(oak wilt|ceratocystis)/i.test(combined);
+  if (isRedOakGroup && hasWilt && !hasOakWilt) {
+    const oakWiltWarning = 'PRIORITY: Crown wilt or dieback in the red oak group must be evaluated for oak wilt (Ceratocystis fagacearum). Oak wilt spreads rapidly through root grafts and kills red oaks within weeks of symptom onset in Missouri. Do not prune oaks between April and July. Contact a certified arborist immediately for sapwood streak evaluation.';
+    const hazardDetails = normalizeStringArrayField(next.hazard_details);
+    if (!hazardDetails.some((d) => /oak wilt|ceratocystis/i.test(d))) {
+      hazardDetails.unshift(oakWiltWarning);
+    }
+    next.hazard_details = Array.from(new Set(hazardDetails));
+    next.hazards_detected = 'Yes';
+    next.needs_human_inspection = true;
+    const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
+    if (!urgency || urgency === 'low' || urgency === 'moderate') next.urgency_level = 'High';
+  }
+
+  // --- RULE 7: Mummy Berry on Blueberry ---
+  const isBlueberry = /(vaccinium|blueberry|highbush|lowbush)/i.test(identificationText);
+  const hasMummyBerry = /(mummy berry|monilinia vaccinii|shriveled.*fruit.*remain|gray.*mummy)/i.test(combined);
+  const hasDrainageOrBlightCue = /(stem blight|botryosphaeria|wilting.*cane|tip.*brown|cane.*die)/i.test(combined);
+  if (isBlueberry && (hasMummyBerry || hasDrainageOrBlightCue)) {
+    const recs = normalizeStringArrayField(next.recommendations);
+    if (hasMummyBerry && !recs.some((r) => /mummy berry|monilinia|rake.*mummies/i.test(r))) {
+      recs.unshift('Mummy berry (Monilinia vaccinii-corymbosi): remove and destroy all mummified fruits on the plant and ground before spring. Apply a layer of fresh mulch to block spore release. Fungicide applications at early bloom (captan or azoxystrobin) can reduce shoot blight phase.');
+    }
+    if (hasDrainageOrBlightCue && !recs.some((r) => /stem blight|prune.*cane|botryosphaeria/i.test(r))) {
+      recs.unshift('Stem blight (Botryosphaeria): prune affected canes 6+ inches below the brown discoloration. Sterilize pruners between cuts. Improve air circulation by not over-crowding plants.');
+    }
+    next.recommendations = Array.from(new Set(recs));
+  }
+
+  // --- RULE 8: Strawberry Botrytis ---
+  const isStrawberry = /(fragaria|strawberry)/i.test(identificationText);
+  const hasBotrytis = /(botrytis|gray mold|grey mold|fuzzy.*gray.*fruit|gray.*fuzz)/i.test(combined);
+  if (isStrawberry && hasBotrytis) {
+    const recs = normalizeStringArrayField(next.recommendations);
+    if (!recs.some((r) => /botrytis|gray mold|air circulation|harvest.*promptly/i.test(r))) {
+      recs.unshift('Gray mold / Botrytis (Botrytis cinerea): harvest ripe fruit promptly, remove all infected fruit from the planting, improve air circulation by managing row covers and plant density, avoid overhead irrigation. Fungicide applications (captan, thiram, or Elevate) at bloom and early fruit development reduce losses.');
+    }
+    next.recommendations = Array.from(new Set(recs));
   }
 
   return next;
@@ -1909,6 +2237,7 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
     Object.assign(normalized, enforceCriticalDecayFailSafe(normalized));
     Object.assign(normalized, enforceHumanInspectionAlertSignals(normalized));
     Object.assign(normalized, enforceToxicLookalikeSafety(normalized));
+    Object.assign(normalized, enforceOrchardAndHardwoodIDAccuracy(normalized));
     Object.assign(normalized, enforceHumanInspectionAlertSignals(normalized));
 
     while (normalized.photo_summaries.length < photos.length) {
@@ -3793,6 +4122,7 @@ IMPORTANT: photo_summaries must contain exactly ${photosToAnalyze.length} non-em
     diagnostics = enforceCriticalDecayFailSafe(diagnostics);
     diagnostics = enforceHumanInspectionAlertSignals(diagnostics);
     diagnostics = enforceToxicLookalikeSafety(diagnostics);
+    diagnostics = enforceOrchardAndHardwoodIDAccuracy(diagnostics);
     diagnostics = enforceHumanInspectionAlertSignals(diagnostics);
 
     const speciesName = diagnostics?.species && diagnostics.species !== 'Unknown'
@@ -4058,8 +4388,10 @@ If information is uncertain, state best estimate and keep raw_ai_message support
     payload.hazards_detected = hazardDecision.hazards_detected;
     payload.hazard_details = hazardDecision.hazard_details;
     const normalizedPayload = enforceHumanInspectionAlertSignals(
-      enforceToxicLookalikeSafety(
-        enforceCriticalDecayFailSafe(payload)
+      enforceOrchardAndHardwoodIDAccuracy(
+        enforceToxicLookalikeSafety(
+          enforceCriticalDecayFailSafe(payload)
+        )
       )
     );
 
