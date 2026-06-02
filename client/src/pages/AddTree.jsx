@@ -119,7 +119,10 @@ export default function AddTree() {
     const loadListings = async () => {
       setListingsLoading(true);
       try {
-        const response = await fetch(apiUrl("/api/listings"));
+        const query = selectedParkName
+          ? `?parkName=${encodeURIComponent(selectedParkName)}`
+          : "";
+        const response = await fetch(apiUrl(`/api/listings${query}`));
         const data = await response.json().catch(() => []);
         const normalized = Array.isArray(data) ? data : [];
         setListings(normalized);
