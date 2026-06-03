@@ -56,14 +56,20 @@ export default function TreeList() {
   const selectedParkId = (localStorage.getItem("selectedParkId") || "").toString().trim();
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
-  const listingsEndpoint = selectedParkId
-    ? `/api/listings?parkId=${encodeURIComponent(selectedParkId)}${selectedParkName ? `&parkName=${encodeURIComponent(selectedParkName)}` : ""}`
-    : selectedParkName
-    ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
-    : "/api/listings";
-  const listingsFallbackEndpoint = selectedParkName
-    ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
-    : "/api/listings";
+  function buildListingsEndpoint(parkId = "", parkName = "") {
+    if (parkId) {
+      return `/api/listings?parkId=${encodeURIComponent(parkId)}${parkName ? `&parkName=${encodeURIComponent(parkName)}` : ""}`;
+    }
+
+    if (parkName) {
+      return `/api/listings?parkName=${encodeURIComponent(parkName)}`;
+    }
+
+    return "/api/listings";
+  }
+
+  const listingsEndpoint = buildListingsEndpoint(selectedParkId, selectedParkName);
+  const listingsFallbackEndpoint = buildListingsEndpoint("", selectedParkName);
 
   function canUseCloudFallback() {
     // Always allow cloud fallback so static hosts (e.g. Netlify) can recover when /api is not proxied.
@@ -119,12 +125,29 @@ export default function TreeList() {
             return Array.isArray(data) ? data : [];
           };
 
+          const tryHealStaleParkId = async (rows = []) => {
+            if (!selectedParkId || !selectedParkName) return rows;
+
+            // If park_id points to a partial legacy dataset, prefer broader parkName results and clear stale park id.
+            if (rows.length > 1) return rows;
+
+            const byNameRows = await fetchListingsAtBase(listingsFallbackEndpoint).catch(() => []);
+            if (byNameRows.length > rows.length) {
+              localStorage.removeItem("selectedParkId");
+              return byNameRows;
+            }
+
+            return rows;
+          };
+
           try {
             nextListings = await fetchListingsAtBase(listingsEndpoint);
+            nextListings = await tryHealStaleParkId(nextListings);
           } catch (parkIdErr) {
             // Compatibility fallback: if parkId query fails, retry by parkName.
             if (selectedParkId && selectedParkName) {
               nextListings = await fetchListingsAtBase(listingsFallbackEndpoint);
+              nextListings = await tryHealStaleParkId(nextListings);
             } else {
               throw parkIdErr;
             }

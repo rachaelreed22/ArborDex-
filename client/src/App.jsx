@@ -104,9 +104,10 @@ function HomeownerProtectedRoute({ children }) {
 }
 
 function DatabaseEntryRoute() {
-  const selectedParkId = localStorage.getItem('selectedParkId');
+  const selectedParkId = (localStorage.getItem('selectedParkId') || '').toString().trim();
+  const selectedParkName = (localStorage.getItem('selectedParkName') || '').toString().trim();
 
-  if (!selectedParkId) {
+  if (!selectedParkId && !selectedParkName) {
     return <Navigate to="/parks" replace />;
   }
 
