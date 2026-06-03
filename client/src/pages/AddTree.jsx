@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import jsQR from "jsqr";
 import { useMode } from "../context/ModeContext";
 import { apiUrl } from "../utils/apiUrl";
+import { normalizeParkText } from "../utils/parkText";
 import "./AddTree.css";
 
 const INSPECTION_STATUS_OPTIONS = [
@@ -18,6 +19,7 @@ export default function AddTree() {
   const location = useLocation();
   const navigate = useNavigate();
   const isStaff = mode === "dex";
+  const selectedParkId = (localStorage.getItem("selectedParkId") || "").toString().trim();
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   const scanPrefill = location.state?.fromScan || null;
@@ -105,7 +107,7 @@ export default function AddTree() {
     if (selectedParkName && !form.location) {
       setForm((prev) => ({
         ...prev,
-        location: selectedParkName,
+        location: normalizeParkText(selectedParkName),
       }));
     }
   }, []);
@@ -119,7 +121,9 @@ export default function AddTree() {
     const loadListings = async () => {
       setListingsLoading(true);
       try {
-        const query = selectedParkName
+        const query = selectedParkId
+          ? `?parkId=${encodeURIComponent(selectedParkId)}${selectedParkName ? `&parkName=${encodeURIComponent(selectedParkName)}` : ""}`
+          : selectedParkName
           ? `?parkName=${encodeURIComponent(selectedParkName)}`
           : "";
         const response = await fetch(apiUrl(`/api/listings${query}`));

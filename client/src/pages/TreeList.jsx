@@ -4,6 +4,7 @@ import { useMode } from "../context/ModeContext";
 import { API_BASE_URL, apiUrl } from "../utils/apiUrl";
 import { getNeedsAttention } from "../utils/attentionRules";
 import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { normalizeParkText } from "../utils/parkText";
 import "./TreeList.css";
 
 const CLOUD_API_BASE = "https://arbordex.onrender.com";
@@ -52,9 +53,12 @@ export default function TreeList() {
   const [attentionByListingId, setAttentionByListingId] = useState({});
   const [hazardByListingId, setHazardByListingId] = useState({});
   const [usingCloudFallback, setUsingCloudFallback] = useState(false);
+  const selectedParkId = (localStorage.getItem("selectedParkId") || "").toString().trim();
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
-  const listingsEndpoint = selectedParkName
+  const listingsEndpoint = selectedParkId
+    ? `/api/listings?parkId=${encodeURIComponent(selectedParkId)}${selectedParkName ? `&parkName=${encodeURIComponent(selectedParkName)}` : ""}`
+    : selectedParkName
     ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
     : "/api/listings";
 
@@ -261,10 +265,10 @@ export default function TreeList() {
       <section className="tree-list-park-flow">
         <div>
           <p className="tree-list-kicker">Tree Database</p>
-          <h1>{selectedParkName ? `${selectedParkName} Listings` : "All Tree Listings"}</h1>
+          <h1>{selectedParkName ? `${normalizeParkText(selectedParkName)} Listings` : "All Tree Listings"}</h1>
           <p className="tree-list-subtitle">
             {selectedParkName
-              ? `Browse, search, and manage profiles for ${selectedParkName}.`
+              ? `Browse, search, and manage profiles for ${normalizeParkText(selectedParkName)}.`
               : "Browse, search, and manage tree profiles for the active park."}
           </p>
         </div>
@@ -376,7 +380,7 @@ export default function TreeList() {
                 )}
 
                 {tree.location && (
-                  <p className="tree-card-location">📍 {tree.location}</p>
+                  <p className="tree-card-location">📍 {normalizeParkText(tree.location)}</p>
                 )}
 
                 <p className={`tree-card-location tree-card-hazards ${hazardsDetected ? "tree-card-hazards-danger" : ""}`}>

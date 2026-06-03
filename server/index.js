@@ -2836,6 +2836,7 @@ api.post('/listings/:id/diagnostics-log', requireStaffAction, async (req, res) =
 // ===========================
 api.get('/listings', async (req, res) => {
   try {
+    const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
     let query = writeSupabase
@@ -2852,7 +2853,9 @@ api.get('/listings', async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    if (parkName) {
+    if (parkId) {
+      query = query.eq('park_id', parkId);
+    } else if (parkName) {
       query = query.ilike('location', `%${parkName}%`);
     }
 
@@ -3024,6 +3027,7 @@ api.delete('/listings/:id', async (req, res) => {
 // GET /api/photos/pending — returns all pending (staff_uploaded=false) photos grouped by listing+photographer
 api.get('/photos/pending', requireStaffAction, async (req, res) => {
   try {
+    const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
     // Fetch pending photos joined with listing info
@@ -3046,7 +3050,9 @@ api.get('/photos/pending', requireStaffAction, async (req, res) => {
       .eq('staff_uploaded', false)
       .order('created_at', { ascending: false });
 
-    if (parkName) {
+    if (parkId) {
+      query = query.eq('listings.park_id', parkId);
+    } else if (parkName) {
       query = query.ilike('listings.location', `%${parkName}%`);
     }
 

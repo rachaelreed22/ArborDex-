@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
+import { normalizeParkText } from '../utils/parkText';
 import './ParkSelector.css';
 
 export default function ParkSelector() {
@@ -86,10 +87,10 @@ export default function ParkSelector() {
                   key={park.id}
                   className="park-card"
                   onClick={() => handleParkSelect(park.id, park.name)}
-                  aria-label={`Select ${park.name}`}
+                  aria-label={`Select ${normalizeParkText(park.name)}`}
                 >
-                  <h3>{park.name}</h3>
-                  {park.location && <p>{park.location}</p>}
+                  <h3>{normalizeParkText(park.name)}</h3>
+                  {park.location && <p>{normalizeParkText(park.location)}</p>}
                   <span className="park-card-arrow">→</span>
                 </button>
               );

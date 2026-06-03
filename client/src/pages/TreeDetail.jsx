@@ -5,6 +5,7 @@ import { getNeedsAttention } from "../utils/attentionRules";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
 import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { normalizeParkText } from "../utils/parkText";
 import "./TreeDetail.css";
 
 function extractHistoricalUsesFromLogs(logs) {
@@ -930,7 +931,7 @@ return (
               <h1 className="detail-title">{listing.title || "Untitled Tree"}</h1>
               <div className="header-meta">
                 {listing.location && (
-                  <p className="detail-location">📍 {listing.location}</p>
+                  <p className="detail-location">📍 {normalizeParkText(listing.location)}</p>
                 )}
                 {(listing.latitude || listing.longitude) && (
                   <p className="detail-coords">

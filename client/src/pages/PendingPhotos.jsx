@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../utils/apiUrl";
 import { getStaffHeaders } from "../utils/staffAuth";
+import { normalizeParkText } from "../utils/parkText";
 import "./PendingPhotos.css";
 
 const PHOTO_CAP = 5;
@@ -18,6 +19,7 @@ export default function PendingPhotos() {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionBusyPhotoId, setActionBusyPhotoId] = useState(null);
   const [lightbox, setLightbox] = useState(null);
+  const selectedParkId = (localStorage.getItem("selectedParkId") || "").toString().trim();
   const selectedParkName = (localStorage.getItem("selectedParkName") || "").toString().trim();
 
   function apiUrlFromBase(path, base = "") {
@@ -40,8 +42,12 @@ export default function PendingPhotos() {
       const candidateBases = [""];
       if (canUseCloudFallback()) candidateBases.push(CLOUD_API_BASE);
 
-      const fetchPending = async (parkName = "", base = "") => {
-        const qs = parkName ? `?parkName=${encodeURIComponent(parkName)}` : "";
+      const fetchPending = async (parkId = "", parkName = "", base = "") => {
+        const qs = parkId
+          ? `?parkId=${encodeURIComponent(parkId)}${parkName ? `&parkName=${encodeURIComponent(parkName)}` : ""}`
+          : parkName
+            ? `?parkName=${encodeURIComponent(parkName)}`
+            : "";
         const path = `/api/photos/pending${qs}`;
         const endpoint = base ? apiUrlFromBase(path, base) : apiUrl(path);
         const res = await fetch(endpoint, { headers });
@@ -56,7 +62,7 @@ export default function PendingPhotos() {
 
       for (const base of candidateBases) {
         try {
-          pendingGroups = await fetchPending(selectedParkName, base);
+          pendingGroups = await fetchPending(selectedParkId, selectedParkName, base);
           resolvedBase = base;
           break;
         } catch (err) {
@@ -186,7 +192,7 @@ export default function PendingPhotos() {
           <h1>Pending Photos</h1>
           <p className="pending-photos-subtitle">
             {selectedParkName
-              ? `Review uploads for ${selectedParkName}.`
+              ? `Review uploads for ${normalizeParkText(selectedParkName)}.`
               : "Review uploads waiting for staff approval."}
           </p>
           {usingCloudFallback && (
@@ -245,7 +251,7 @@ export default function PendingPhotos() {
                   <div className="pending-card-meta">
                     <span className="pending-card-tree">{group.listingTitle}</span>
                     {group.listingLocation && (
-                      <span className="pending-card-location">{group.listingLocation}</span>
+                      <span className="pending-card-location">{normalizeParkText(group.listingLocation)}</span>
                     )}
                     <span className="pending-card-id">Tree ID: {group.listingId}</span>
                     <span className="pending-card-uploader">
