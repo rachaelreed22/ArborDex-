@@ -2839,6 +2839,20 @@ api.get('/listings', async (req, res) => {
     const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
+    const mergeUniqueRows = (rows = [], key = 'id') => {
+      const merged = [];
+      const seen = new Set();
+
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const rowKey = (row?.[key] ?? '').toString();
+        if (!rowKey || seen.has(rowKey)) continue;
+        seen.add(rowKey);
+        merged.push(row);
+      }
+
+      return merged;
+    };
+
     const runListingsQuery = async (filterMode = 'none') => {
       let query = writeSupabase
         .from('listings')
@@ -2866,7 +2880,26 @@ api.get('/listings', async (req, res) => {
     let data = [];
     let error = null;
 
-    if (parkId) {
+    if (parkId && parkName) {
+      const byIdResult = await runListingsQuery('parkId');
+      const byNameResult = await runListingsQuery('parkName');
+
+      const byIdData = Array.isArray(byIdResult.data) ? byIdResult.data : [];
+      const byNameData = Array.isArray(byNameResult.data) ? byNameResult.data : [];
+      data = mergeUniqueRows([...byIdData, ...byNameData], 'id');
+
+      if (byIdResult.error && byNameResult.error) {
+        error = byIdResult.error;
+      } else {
+        if (byIdResult.error) {
+          console.warn('park_id listing filter failed during merge; returning parkName-filtered listings:', byIdResult.error.message || byIdResult.error);
+        }
+        if (byNameResult.error) {
+          console.warn('parkName listing filter failed during merge; returning park_id-filtered listings:', byNameResult.error.message || byNameResult.error);
+        }
+        error = null;
+      }
+    } else if (parkId) {
       ({ data, error } = await runListingsQuery('parkId'));
 
       // Compatibility fallback for environments where listings.park_id is not migrated yet.
@@ -3049,6 +3082,20 @@ api.get('/photos/pending', requireStaffAction, async (req, res) => {
     const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
+    const mergeUniqueRows = (rows = [], key = 'id') => {
+      const merged = [];
+      const seen = new Set();
+
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const rowKey = (row?.[key] ?? '').toString();
+        if (!rowKey || seen.has(rowKey)) continue;
+        seen.add(rowKey);
+        merged.push(row);
+      }
+
+      return merged;
+    };
+
     const runPendingQuery = async (filterMode = 'none') => {
       let query = writeSupabase
         .from('photos')
@@ -3081,7 +3128,26 @@ api.get('/photos/pending', requireStaffAction, async (req, res) => {
     let data = [];
     let error = null;
 
-    if (parkId) {
+    if (parkId && parkName) {
+      const byIdResult = await runPendingQuery('parkId');
+      const byNameResult = await runPendingQuery('parkName');
+
+      const byIdData = Array.isArray(byIdResult.data) ? byIdResult.data : [];
+      const byNameData = Array.isArray(byNameResult.data) ? byNameResult.data : [];
+      data = mergeUniqueRows([...byIdData, ...byNameData], 'id');
+
+      if (byIdResult.error && byNameResult.error) {
+        error = byIdResult.error;
+      } else {
+        if (byIdResult.error) {
+          console.warn('park_id pending filter failed during merge; returning parkName-filtered pending photos:', byIdResult.error.message || byIdResult.error);
+        }
+        if (byNameResult.error) {
+          console.warn('parkName pending filter failed during merge; returning park_id-filtered pending photos:', byNameResult.error.message || byNameResult.error);
+        }
+        error = null;
+      }
+    } else if (parkId) {
       ({ data, error } = await runPendingQuery('parkId'));
 
       // Compatibility fallback for environments where listings.park_id is not migrated yet.
