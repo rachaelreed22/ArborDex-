@@ -27,7 +27,8 @@ export default function PendingPhotos() {
   }
 
   function canUseCloudFallback() {
-    return import.meta.env.DEV && window.location.hostname === "localhost";
+    // Always allow cloud fallback so static hosts (e.g. Netlify) can recover when /api is not proxied.
+    return true;
   }
 
   useEffect(() => {
