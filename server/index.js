@@ -666,17 +666,40 @@ function inferHazardDetailsFromTextSignals(signalTexts) {
   return Array.from(new Set(inferred));
 }
 
+function isAdvisoryOnlyHazardDetail(text = '') {
+  const sample = (text || '').toString().trim();
+  if (!sample) return false;
+
+  const lower = sample.toLowerCase();
+  const hasHazardSignal = HAZARD_SIGNAL_KEYWORDS.some((keyword) => lower.includes(keyword));
+  if (!hasHazardSignal) return false;
+
+  const hasObservedEvidence = hasObservedHazardEvidence(sample);
+  const hasAdvisoryLanguage = HAZARD_ADVISORY_ONLY_PATTERNS.some((pattern) => pattern.test(sample));
+
+  return hasAdvisoryLanguage && !hasObservedEvidence;
+}
+
 function resolveHazardClassification({ hazardsDetectedRaw, hazardDetails, signalTexts }) {
   const explicitDetails = normalizeStringList(hazardDetails);
   const inferredDetails = inferHazardDetailsFromTextSignals(signalTexts);
-  const mergedDetails = Array.from(new Set([...explicitDetails, ...inferredDetails]));
+  const nonAdvisoryExplicitDetails = explicitDetails.filter((detail) => !isAdvisoryOnlyHazardDetail(detail));
+  const mergedDetails = Array.from(new Set([...nonAdvisoryExplicitDetails, ...inferredDetails]));
 
   const raw = (hazardsDetectedRaw || '').toString().trim().toLowerCase();
   const explicitYes = raw === 'yes' || raw === 'y' || raw === 'true';
   const explicitNo = raw === 'no' || raw === 'n' || raw === 'false';
 
+  const advisoryOnlyExplicitYes =
+    explicitYes
+    && nonAdvisoryExplicitDetails.length === 0
+    && inferredDetails.length === 0
+    && explicitDetails.length > 0;
+
   const inferredYes = mergedDetails.length > 0;
-  const hazardsDetected = explicitYes || inferredYes
+  const hazardsDetected = advisoryOnlyExplicitYes
+    ? 'No'
+    : explicitYes || inferredYes
     ? 'Yes'
     : explicitNo
       ? 'No'
@@ -706,9 +729,12 @@ function enforceHumanInspectionAlertSignals(payload = {}) {
     next.needs_human_inspection = true;
   } else {
     next.needs_human_inspection = false;
+    next.alerts = alerts.filter((item) => !/needs\s+human\s+inspection/i.test(item));
   }
 
-  next.alerts = Array.from(new Set(alerts));
+  if (hasHazards) {
+    next.alerts = Array.from(new Set(alerts));
+  }
   return next;
 }
 
