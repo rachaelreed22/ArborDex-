@@ -2839,27 +2839,46 @@ api.get('/listings', async (req, res) => {
     const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
-    let query = writeSupabase
-      .from('listings')
-      .select(`
-        id,
-        title,
-        description,
-        location,
-        latitude,
-        longitude,
-        qr_url,
-        photos(id, url, is_main, winner)
-      `)
-      .order('created_at', { ascending: false });
+    const runListingsQuery = async (filterMode = 'none') => {
+      let query = writeSupabase
+        .from('listings')
+        .select(`
+          id,
+          title,
+          description,
+          location,
+          latitude,
+          longitude,
+          qr_url,
+          photos(id, url, is_main, winner)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (filterMode === 'parkId' && parkId) {
+        query = query.eq('park_id', parkId);
+      } else if (filterMode === 'parkName' && parkName) {
+        query = query.ilike('location', `%${parkName}%`);
+      }
+
+      return query;
+    };
+
+    let data = [];
+    let error = null;
 
     if (parkId) {
-      query = query.eq('park_id', parkId);
-    } else if (parkName) {
-      query = query.ilike('location', `%${parkName}%`);
-    }
+      ({ data, error } = await runListingsQuery('parkId'));
 
-    const { data, error } = await query;
+      // Compatibility fallback for environments where listings.park_id is not migrated yet.
+      if (error && parkName) {
+        console.warn('park_id listing filter failed, falling back to parkName filter:', error.message || error);
+        ({ data, error } = await runListingsQuery('parkName'));
+      }
+    } else if (parkName) {
+      ({ data, error } = await runListingsQuery('parkName'));
+    } else {
+      ({ data, error } = await runListingsQuery('none'));
+    }
 
     if (error) {
       console.error("Error fetching listings:", error);
@@ -3030,33 +3049,51 @@ api.get('/photos/pending', requireStaffAction, async (req, res) => {
     const parkId = (req.query?.parkId || req.query?.park_id || '').toString().trim();
     const parkName = (req.query?.parkName || '').toString().trim();
 
-    // Fetch pending photos joined with listing info
-    let query = writeSupabase
-      .from('photos')
-      .select(`
-        id,
-        listing_id,
-        url,
-        is_main,
-        winner,
-        staff_uploaded,
-        photographer,
-        photographer_first,
-        photographer_last,
-        photographer_email,
-        created_at,
-        listings!inner(id, title, location)
-      `)
-      .eq('staff_uploaded', false)
-      .order('created_at', { ascending: false });
+    const runPendingQuery = async (filterMode = 'none') => {
+      let query = writeSupabase
+        .from('photos')
+        .select(`
+          id,
+          listing_id,
+          url,
+          is_main,
+          winner,
+          staff_uploaded,
+          photographer,
+          photographer_first,
+          photographer_last,
+          photographer_email,
+          created_at,
+          listings!inner(id, title, location)
+        `)
+        .eq('staff_uploaded', false)
+        .order('created_at', { ascending: false });
+
+      if (filterMode === 'parkId' && parkId) {
+        query = query.eq('listings.park_id', parkId);
+      } else if (filterMode === 'parkName' && parkName) {
+        query = query.ilike('listings.location', `%${parkName}%`);
+      }
+
+      return query;
+    };
+
+    let data = [];
+    let error = null;
 
     if (parkId) {
-      query = query.eq('listings.park_id', parkId);
-    } else if (parkName) {
-      query = query.ilike('listings.location', `%${parkName}%`);
-    }
+      ({ data, error } = await runPendingQuery('parkId'));
 
-    const { data, error } = await query;
+      // Compatibility fallback for environments where listings.park_id is not migrated yet.
+      if (error && parkName) {
+        console.warn('park_id pending filter failed, falling back to parkName filter:', error.message || error);
+        ({ data, error } = await runPendingQuery('parkName'));
+      }
+    } else if (parkName) {
+      ({ data, error } = await runPendingQuery('parkName'));
+    } else {
+      ({ data, error } = await runPendingQuery('none'));
+    }
 
     if (error) {
       console.error('Error fetching pending photos:', error);
