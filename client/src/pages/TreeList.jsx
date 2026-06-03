@@ -61,6 +61,9 @@ export default function TreeList() {
     : selectedParkName
     ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
     : "/api/listings";
+  const listingsFallbackEndpoint = selectedParkName
+    ? `/api/listings?parkName=${encodeURIComponent(selectedParkName)}`
+    : "/api/listings";
 
   function canUseCloudFallback() {
     return import.meta.env.DEV && window.location.hostname === "localhost";
@@ -115,7 +118,17 @@ export default function TreeList() {
             return Array.isArray(data) ? data : [];
           };
 
-          nextListings = await fetchListingsAtBase(listingsEndpoint);
+          try {
+            nextListings = await fetchListingsAtBase(listingsEndpoint);
+          } catch (parkIdErr) {
+            // Compatibility fallback: if parkId query fails, retry by parkName.
+            if (selectedParkId && selectedParkName) {
+              nextListings = await fetchListingsAtBase(listingsFallbackEndpoint);
+            } else {
+              throw parkIdErr;
+            }
+          }
+
           resolvedBase = base;
           break;
         } catch (err) {
