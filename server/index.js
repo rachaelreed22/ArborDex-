@@ -1032,8 +1032,11 @@ function enforceOrchardAndHardwoodIDAccuracy(payload = {}) {
   // --- RULE 3: Fire Blight on Apple or Pear ---
   // Surface urgency and specific shepherd's crook visual cue if fire blight detected.
   const isAppleOrPear = /(malus|apple|pear|pyrus)/i.test(identificationText);
-  const hasFireBlight = /(fire blight|erwinia amylovora|shepherd.{0,5}crook|shoot.*wilting.*blacken|blacken.*shoot)/i.test(combined);
-  if (isAppleOrPear && hasFireBlight) {
+  const hasFireBlightMention = /(fire blight|erwinia amylovora)/i.test(combined);
+  const hasFireBlightObservedSymptoms = /(shepherd.{0,5}crook|shoot.*wilting.*blacken|blacken.*shoot|blossom blight|bacterial ooze|blackened blossoms?)/i.test(combined);
+  const hasFireBlightAdvisoryOnly = /(watch\s+for|monitor\s+for|risk\s+of|susceptible\s+to|can\s+cause|could\s+cause|may\s+cause|inspect\s+for\s+signs?)/i.test(combined) && !hasFireBlightObservedSymptoms;
+
+  if (isAppleOrPear && hasFireBlightMention && hasFireBlightObservedSymptoms && !hasFireBlightAdvisoryOnly) {
     const urgency = (next.urgency_level || '').toString().trim().toLowerCase();
     if (!urgency || urgency === 'low') next.urgency_level = 'High';
     const hazardDetails = normalizeStringArrayField(next.hazard_details);
