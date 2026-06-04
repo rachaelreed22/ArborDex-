@@ -18,10 +18,8 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
-app.use((req, res, next) => {
-  if (req.originalUrl === '/api/stripe/webhook') return next();
-  return express.json()(req, res, next);
-});
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+app.use(express.json());
 
 // QR routes
 const qrRoutes = require("./qrRoutes");
@@ -5123,7 +5121,7 @@ ${question}
 // ===========================
 // STRIPE WEBHOOK
 // ===========================
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/stripe/webhook', async (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) {
     return res.status(500).send('Stripe webhook not configured');
   }
