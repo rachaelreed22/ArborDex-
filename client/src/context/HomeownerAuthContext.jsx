@@ -20,7 +20,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 function getHomeownerResetRedirectUrl() {
   const configured = PUBLIC_APP_URL.replace(/\/$/, '');
-  if (configured) {
+  if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) {
     return `${configured}/homeowners/reset-password`;
   }
 
