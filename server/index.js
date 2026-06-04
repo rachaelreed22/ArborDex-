@@ -173,7 +173,7 @@ const STRIPE_WEBHOOK_SECRET = STRIPE_CONFIG.webhookSecret;
 const STRIPE_PRICE_GARDENER = STRIPE_CONFIG.priceGardener;
 const STRIPE_PRICE_ESTATE = STRIPE_CONFIG.priceEstate;
 const STRIPE_EARLY_ACCESS_PROMO_ID = readStripeSetting('STRIPE_EARLY_ACCESS_PROMO_ID', STRIPE_CONFIG.mode)
-  || 'promo_1TeeUoBr0PeZyDiGQJ3NAwEA';
+  || 'promo_1Teft5Br0PeZyDiGdHSJMBxw';
 const STRIPE_EARLY_ACCESS_CODE = readStripeSetting('STRIPE_EARLY_ACCESS_CODE', STRIPE_CONFIG.mode)
   || 'ThankYou50';
 const STRIPE_EARLY_ACCESS_COUPON_ID = (process.env.STRIPE_EARLY_ACCESS_COUPON_ID || '').toString().trim();
