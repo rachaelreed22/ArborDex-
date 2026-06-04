@@ -373,6 +373,15 @@ export default function HomeownerPlants() {
             ? 'You are at your profile limit for this tier. Upgrade or delete a profile to add more.'
             : 'Add and manage plant profiles here. You can attach up to 5 photos per profile.'}
         </div>
+        <div className="homeowner-panel homeowner-panel-info mt-3 space-y-2 text-sm">
+          <p>
+            Tip: The more photos, notes, and updates you add, the more useful ArborAI's plant guidance can become.
+          </p>
+          <p>Your plant profiles are private to your account.</p>
+          <p>
+            ArborAI provides educational plant guidance and does not replace professional arborist, medical, legal, or chemical-treatment advice.
+          </p>
+        </div>
         {loading && (
           <div className="homeowner-plants-loading" role="status" aria-live="polite">
             <span className="homeowner-spinner" aria-hidden="true" />

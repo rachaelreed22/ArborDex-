@@ -43,6 +43,21 @@ export default function HomeownerLogin() {
         </div>
         <h1 className="homeowner-heading text-center text-3xl font-bold">Homeowner Login</h1>
         <p className="homeowner-subtext mt-2 text-center text-sm">Access your private plant profiles and plan limits.</p>
+        <div className="homeowner-panel homeowner-panel-info mt-4 space-y-2 text-sm">
+          <p>
+            ArborTag Homeowner Edition is currently in early access. Early users are helping shape the app by sharing honest feedback about setup, plant profiles, photo uploads, and ArborAI guidance.
+          </p>
+          <p>
+            Early Access Feedback Offer: Get 50% off your first month in exchange for honest feedback. Coupon expires June 15. Message me for the code.
+          </p>
+          <p>
+            Tip: The more photos, notes, and updates you add, the more useful ArborAI's plant guidance can become.
+          </p>
+          <p>Your plant profiles are private to your account.</p>
+          <p>
+            ArborAI provides educational plant guidance and does not replace professional arborist, medical, legal, or chemical-treatment advice.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
