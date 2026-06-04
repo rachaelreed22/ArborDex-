@@ -14,6 +14,8 @@ export default function HomeownerAccount() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const checkoutSuccess = new URLSearchParams(location.search).get('checkout') === 'success';
 
   const profileLimit = useMemo(() => getTierLimit(tier), [tier]);
@@ -65,6 +67,42 @@ export default function HomeownerAccount() {
       setError(err.message || 'Billing portal error');
     } finally {
       setBillingLoading(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirm.trim().toUpperCase() !== 'DELETE') {
+      setError('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    const proceed = window.confirm('Delete your account permanently? This removes your homeowner profiles and billing access.');
+    if (!proceed) return;
+
+    try {
+      setDeleteLoading(true);
+      setError('');
+
+      const token = await getAccessToken();
+      const res = await fetch(apiUrl('/api/homeowners/account'), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to delete account');
+      }
+
+      await logout().catch(() => {});
+      navigate('/homeowners/signup', { replace: true });
+    } catch (err) {
+      setError(err.message || 'Failed to delete account');
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -147,6 +185,32 @@ export default function HomeownerAccount() {
             className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {billingLoading ? 'Opening billing...' : 'Manage Billing'}
+          </button>
+        </div>
+
+        <div className="homeowner-panel homeowner-panel-warn mt-8">
+          <h2 className="homeowner-heading text-base font-semibold">Delete Account</h2>
+          <p className="homeowner-subtext mt-1 text-sm">
+            This permanently deletes your homeowner account, plant profiles, and associated photos.
+          </p>
+          <label className="homeowner-heading mt-3 block text-sm font-semibold" htmlFor="delete-account-confirm">
+            Type DELETE to confirm
+          </label>
+          <input
+            id="delete-account-confirm"
+            className="homeowner-input mt-1 w-full rounded-md px-3 py-2 text-sm outline-none"
+            type="text"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            disabled={deleteLoading}
+            placeholder="DELETE"
+          />
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleteLoading}
+            className="mt-3 rounded-md border border-[#7a1f1f] bg-[#7a1f1f] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deleteLoading ? 'Deleting account...' : 'Delete Account Permanently'}
           </button>
         </div>
       </div>

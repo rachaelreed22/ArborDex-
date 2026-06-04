@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { useHomeownerAuth } from '../context/HomeownerAuthContext';
@@ -42,8 +42,56 @@ export default function HomeownerSignup() {
   const [resetMessage, setResetMessage] = useState('');
   const [showResetNow, setShowResetNow] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
 
   const selectedPlan = useMemo(() => PLANS.find((p) => p.key === plan), [plan]);
+
+  useEffect(() => {
+    if (plan === 'free') {
+      setQuote(null);
+      setQuoteError('');
+      setQuoteLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setQuoteLoading(true);
+        setQuoteError('');
+
+        const res = await fetch(apiUrl('/api/stripe/checkout-preview'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier: plan, promoCode }),
+          signal: controller.signal,
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.error || 'Unable to preview checkout total');
+        }
+
+        setQuote(payload);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setQuote(null);
+        setQuoteError(err?.message || 'Unable to preview checkout total');
+      } finally {
+        if (!controller.signal.aborted) {
+          setQuoteLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [plan, promoCode]);
 
   function isExistingAccountError(message) {
     const normalized = (message || '').toString().toLowerCase();
@@ -102,7 +150,7 @@ export default function HomeownerSignup() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ tier: plan }),
+        body: JSON.stringify({ tier: plan, promoCode }),
       });
 
       const payload = await res.json().catch(() => ({}));
@@ -212,6 +260,45 @@ export default function HomeownerSignup() {
               Over 65 active plant IDs requires a B2B arrangement with custom pricing. Email{' '}
               <a className="font-semibold underline" href="mailto:rachaelr@rrtech.dev">rachaelr@rrtech.dev</a>.
             </p>
+
+            {plan !== 'free' && (
+              <div className="mt-4">
+                <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="signup-promo-code">
+                  Promo code (optional)
+                </label>
+                <input
+                  id="signup-promo-code"
+                  className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="Enter founding member code"
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {plan !== 'free' && (
+              <div className="homeowner-panel homeowner-panel-info mt-4">
+                <p className="text-sm font-semibold text-[#1d411d]">Charge preview</p>
+                {quoteLoading ? (
+                  <p className="homeowner-subtext mt-1 text-sm">Calculating your exact first charge...</p>
+                ) : quote ? (
+                  <div className="mt-2 space-y-1 text-sm">
+                    <p className="homeowner-subtext">Subtotal: <span className="font-semibold">{quote.subtotal_display}</span></p>
+                    {Number(quote.discount_minor || 0) > 0 && (
+                      <p className="homeowner-subtext">Promo discount: <span className="font-semibold text-[#1d411d]">-{quote.discount_display}</span></p>
+                    )}
+                    <p className="text-base font-semibold text-[#1d411d]">You will be charged: {quote.total_display}</p>
+                    {Number(quote.discount_minor || 0) > 0 && (
+                      <p className="homeowner-muted text-xs">Discount applies before the first subscription charge is collected.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="homeowner-subtext mt-1 text-sm">{quoteError || 'Enter a promo code if you have one, then continue.'}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <label className="flex items-start gap-2 text-sm homeowner-subtext cursor-pointer">

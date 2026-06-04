@@ -172,6 +172,11 @@ const STRIPE_SECRET_KEY = STRIPE_CONFIG.secretKey;
 const STRIPE_WEBHOOK_SECRET = STRIPE_CONFIG.webhookSecret;
 const STRIPE_PRICE_GARDENER = STRIPE_CONFIG.priceGardener;
 const STRIPE_PRICE_ESTATE = STRIPE_CONFIG.priceEstate;
+const STRIPE_EARLY_ACCESS_PROMO_ID = readStripeSetting('STRIPE_EARLY_ACCESS_PROMO_ID', STRIPE_CONFIG.mode)
+  || 'promo_1TeeUoBr0PeZyDiGQJ3NAwEA';
+const STRIPE_EARLY_ACCESS_CODE = readStripeSetting('STRIPE_EARLY_ACCESS_CODE', STRIPE_CONFIG.mode)
+  || 'ThankYou50';
+const STRIPE_EARLY_ACCESS_COUPON_ID = (process.env.STRIPE_EARLY_ACCESS_COUPON_ID || '').toString().trim();
 
 const stripe = STRIPE_SECRET_KEY
   ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
@@ -1183,6 +1188,105 @@ function getPriceIdFromTier(tier) {
   return null;
 }
 
+function formatMoneyFromMinorUnits(amountMinor, currency = 'usd') {
+  const amount = Number(amountMinor || 0) / 100;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: (currency || 'usd').toString().toUpperCase(),
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+async function resolveCheckoutDiscountForPromoCode(promoCodeInput) {
+  const normalizedPromoCodeInput = (promoCodeInput || '').toString().trim();
+  if (!normalizedPromoCodeInput || !stripe) {
+    return { promotionCodeId: null, couponId: null, coupon: null, matchedCode: null };
+  }
+
+  const normalizedEarlyAccessCode = STRIPE_EARLY_ACCESS_CODE.toLowerCase();
+  const lowerInput = normalizedPromoCodeInput.toLowerCase();
+  const matchedEarlyAccessCode = Boolean(
+    STRIPE_EARLY_ACCESS_PROMO_ID
+    && (
+      lowerInput === normalizedEarlyAccessCode
+      || normalizedPromoCodeInput === STRIPE_EARLY_ACCESS_PROMO_ID
+    )
+  );
+
+  if (matchedEarlyAccessCode) {
+    let coupon = null;
+    let couponId = STRIPE_EARLY_ACCESS_COUPON_ID || null;
+
+    if (couponId) {
+      coupon = await stripe.coupons.retrieve(couponId);
+    } else {
+      const promotionCode = await stripe.promotionCodes.retrieve(STRIPE_EARLY_ACCESS_PROMO_ID, {
+        expand: ['coupon'],
+      });
+      coupon = typeof promotionCode?.coupon === 'string' ? await stripe.coupons.retrieve(promotionCode.coupon) : promotionCode?.coupon || null;
+      couponId = coupon?.id || null;
+    }
+
+    return {
+      promotionCodeId: STRIPE_EARLY_ACCESS_PROMO_ID,
+      couponId,
+      coupon,
+      matchedCode: STRIPE_EARLY_ACCESS_CODE,
+    };
+  }
+
+  const promoList = await stripe.promotionCodes.list({
+    code: normalizedPromoCodeInput,
+    active: true,
+    limit: 1,
+  });
+
+  const promotionCode = Array.isArray(promoList?.data) ? promoList.data[0] : null;
+  if (!promotionCode?.id) {
+    return { promotionCodeId: null, couponId: null, coupon: null, matchedCode: null };
+  }
+
+  const couponId = typeof promotionCode.coupon === 'string' ? promotionCode.coupon : promotionCode.coupon?.id || null;
+  const coupon = promotionCode.coupon && typeof promotionCode.coupon === 'object'
+    ? promotionCode.coupon
+    : couponId
+      ? await stripe.coupons.retrieve(couponId)
+      : null;
+
+  return {
+    promotionCodeId: promotionCode.id,
+    couponId,
+    coupon,
+    matchedCode: normalizedPromoCodeInput,
+  };
+}
+
+function computeCheckoutDiscount(amountMinor, coupon) {
+  const subtotal = Number(amountMinor || 0);
+  if (!coupon) {
+    return { discountMinor: 0, totalMinor: subtotal };
+  }
+
+  const percentOff = Number(coupon.percent_off || 0);
+  const amountOff = Number(coupon.amount_off || 0);
+  let discountMinor = 0;
+
+  if (percentOff > 0) {
+    discountMinor = Math.round((subtotal * percentOff) / 100);
+  } else if (amountOff > 0) {
+    discountMinor = amountOff;
+  }
+
+  discountMinor = Math.max(0, Math.min(subtotal, discountMinor));
+  return {
+    discountMinor,
+    totalMinor: Math.max(0, subtotal - discountMinor),
+  };
+}
+
 function normalizeStripeCustomerId(value) {
   const normalized = (value || '').toString().trim();
   if (!normalized) return null;
@@ -1611,6 +1715,7 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
     }
 
     const tier = (req.body?.tier || '').toString().trim().toLowerCase();
+    const promoCodeInput = (req.body?.promoCode || '').toString().trim();
     const user = req.homeownerUser;
     const priceId = getPriceIdFromTier(tier);
 
@@ -1642,16 +1747,30 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
       }
     }
 
+    const discount = await resolveCheckoutDiscountForPromoCode(promoCodeInput);
+    const { promotionCodeId, couponId, coupon } = discount;
+
+    if (promoCodeInput && !promotionCodeId) {
+      return res.status(400).json({ error: 'Promo code is invalid or expired.' });
+    }
+
+    if (promoCodeInput && promotionCodeId && !couponId) {
+      return res.status(500).json({ error: 'Promo code matched, but no coupon was available for checkout.' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
+      ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
       success_url: `${CLIENT_URL}/homeowners/account?checkout=success`,
       cancel_url: `${CLIENT_URL}/homeowners/tiers?checkout=cancelled`,
       metadata: {
         supabase_user_id: user.id,
         requested_tier: tier,
+        ...(promotionCodeId ? { applied_promotion_code_id: promotionCodeId } : {}),
+        ...(couponId ? { applied_coupon_id: couponId } : {}),
       },
     });
 
@@ -1679,6 +1798,59 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
     }
 
     return res.status(500).json({ error: err?.message || 'Failed to create checkout session' });
+  }
+});
+
+api.post('/stripe/checkout-preview', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured on the server' });
+    }
+
+    const tier = (req.body?.tier || '').toString().trim().toLowerCase();
+    const promoCodeInput = (req.body?.promoCode || '').toString().trim();
+    const priceId = getPriceIdFromTier(tier);
+
+    if (!priceId) {
+      return res.status(400).json({ error: 'Tier must be gardener or estate for checkout' });
+    }
+
+    const [price, discount] = await Promise.all([
+      stripe.prices.retrieve(priceId),
+      resolveCheckoutDiscountForPromoCode(promoCodeInput),
+    ]);
+
+    if (promoCodeInput && !discount.promotionCodeId) {
+      return res.status(400).json({ error: 'Promo code is invalid or expired.' });
+    }
+
+    if (promoCodeInput && discount.promotionCodeId && !discount.couponId) {
+      return res.status(500).json({ error: 'Promo code matched, but no coupon was available for checkout.' });
+    }
+
+    const subtotalMinor = Number(price?.unit_amount || 0);
+    const computed = computeCheckoutDiscount(subtotalMinor, discount.coupon);
+
+    return res.json({
+      tier,
+      currency: (price?.currency || 'usd').toString().toUpperCase(),
+      subtotal_minor: subtotalMinor,
+      discount_minor: computed.discountMinor,
+      total_minor: computed.totalMinor,
+      subtotal_display: formatMoneyFromMinorUnits(subtotalMinor, price?.currency || 'usd'),
+      discount_display: formatMoneyFromMinorUnits(computed.discountMinor, price?.currency || 'usd'),
+      total_display: formatMoneyFromMinorUnits(computed.totalMinor, price?.currency || 'usd'),
+      promo_code_applied: Boolean(discount.promotionCodeId),
+      promotion_code_id: discount.promotionCodeId || null,
+      coupon_id: discount.couponId || null,
+      coupon_percent_off: discount.coupon?.percent_off ?? null,
+      coupon_amount_off: discount.coupon?.amount_off ?? null,
+      coupon_duration: discount.coupon?.duration || null,
+      coupon_duration_in_months: discount.coupon?.duration_in_months ?? null,
+    });
+  } catch (err) {
+    console.error('Stripe checkout preview error:', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Failed to preview checkout total' });
   }
 });
 
@@ -1712,6 +1884,90 @@ api.post('/stripe/create-portal-session', requireHomeownerAuth, async (req, res)
   } catch (err) {
     console.error('Stripe portal session error:', err);
     return res.status(500).json({ error: 'Failed to create portal session' });
+  }
+});
+
+api.delete('/homeowners/account', requireHomeownerAuth, async (req, res) => {
+  try {
+    if (!HAS_SERVICE_ROLE) {
+      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY is missing on backend; account delete is disabled.' });
+    }
+
+    const userId = req.homeownerUser.id;
+
+    const { profile, error: profileCreateError } = await ensureHomeownerProfileExists(userId);
+    if (profileCreateError) {
+      return res.status(500).json({ error: profileCreateError.message || 'Failed to load homeowner profile' });
+    }
+
+    const stripeCustomerId = normalizeStripeCustomerId(profile?.stripe_customer_id);
+
+    if (stripe && stripeCustomerId) {
+      try {
+        const subs = await stripe.subscriptions.list({ customer: stripeCustomerId, status: 'all', limit: 100 });
+        for (const sub of subs?.data || []) {
+          const status = (sub?.status || '').toString();
+          if (status === 'canceled' || status === 'incomplete_expired') continue;
+          await stripe.subscriptions.cancel(sub.id);
+        }
+      } catch (stripeErr) {
+        console.error('Failed to cancel Stripe subscriptions during account delete:', stripeErr?.message || stripeErr);
+        return res.status(500).json({ error: 'Failed to cancel active subscription. Please try again.' });
+      }
+    }
+
+    const { data: plants, error: plantsError } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, photos')
+      .eq('user_id', userId);
+
+    if (plantsError) {
+      return res.status(500).json({ error: plantsError.message || 'Failed to load plant profiles for delete' });
+    }
+
+    const storagePaths = [];
+    for (const plant of plants || []) {
+      for (const url of Array.isArray(plant?.photos) ? plant.photos : []) {
+        const objectPath = getStorageObjectPathFromPublicUrl(url, PHOTO_BUCKET);
+        if (objectPath) storagePaths.push(objectPath);
+      }
+    }
+
+    if (storagePaths.length > 0) {
+      const uniquePaths = Array.from(new Set(storagePaths));
+      const { error: storageError } = await writeSupabase.storage.from(PHOTO_BUCKET).remove(uniquePaths);
+      if (storageError) {
+        console.error('Failed to remove homeowner storage files during account delete:', storageError.message || storageError);
+      }
+    }
+
+    const { error: deletePlantsError } = await writeSupabase
+      .from('homeowner_plants')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deletePlantsError) {
+      return res.status(500).json({ error: deletePlantsError.message || 'Failed to delete plant profiles' });
+    }
+
+    const { error: deleteProfileError } = await writeSupabase
+      .from('homeowner_profiles')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deleteProfileError) {
+      return res.status(500).json({ error: deleteProfileError.message || 'Failed to delete homeowner profile' });
+    }
+
+    const { error: deleteUserError } = await writeSupabase.auth.admin.deleteUser(userId);
+    if (deleteUserError) {
+      return res.status(500).json({ error: deleteUserError.message || 'Failed to delete account user' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Homeowner account delete error:', err);
+    return res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 
