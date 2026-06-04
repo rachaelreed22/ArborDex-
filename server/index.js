@@ -1646,6 +1646,7 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
       mode: 'subscription',
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${CLIENT_URL}/homeowners/account?checkout=success`,
       cancel_url: `${CLIENT_URL}/homeowners/tiers?checkout=cancelled`,
       metadata: {
