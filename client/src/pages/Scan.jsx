@@ -398,7 +398,7 @@ export default function Scan() {
   /* RENDER */
   return (
     <div className="scan-page">
-      <h1 className="scan-title">Scan & Upload</h1>
+      <h1 className="scan-title">Submit A Photo</h1>
 
       {/* ACTIONS */}
       <section className="scan-card">

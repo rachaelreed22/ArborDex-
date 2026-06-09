@@ -115,7 +115,7 @@ export default function TreeList() {
             const res = await fetchWithTimeout(apiUrlFromBase(path, base), {
               cache: "no-store",
               headers: { Accept: "application/json" },
-            }, 15000);
+            }, 55000);
 
             if (!res.ok) {
               throw new Error(`Listings request failed (${res.status})`);
@@ -179,7 +179,7 @@ export default function TreeList() {
     } catch (err) {
       console.error("Error fetching listings:", err);
       if (err?.name === "AbortError") {
-        setLoadError("Tree listings request timed out. Please check API availability and try again.");
+        setLoadError("The server is waking up — please wait a moment and refresh.");
       } else {
         setLoadError("Unable to load tree listings right now.");
       }

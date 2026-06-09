@@ -287,7 +287,7 @@ export default function TreeDetail() {
   async function fetchListing() {
     try {
       setLoadError("");
-      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}`), {}, 15000);
+      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}`), {}, 55000);
       if (!res.ok) {
         setListing(null);
         setLoadError("Tree record could not be loaded.");
@@ -306,7 +306,7 @@ export default function TreeDetail() {
     } catch (err) {
       console.error("Error fetching listing:", err);
       if (err?.name === "AbortError") {
-        setLoadError("Tree details request timed out. Please try again.");
+        setLoadError("The server is waking up — please wait a moment and try again.");
       } else {
         setLoadError("Unable to load tree details right now.");
       }
@@ -318,7 +318,7 @@ export default function TreeDetail() {
 
   async function fetchDiagnosticsLogs() {
     try {
-      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}/diagnostics-logs`), {}, 12000);
+      const res = await fetchWithTimeout(apiUrl(`/api/listings/${id}/diagnostics-logs`), {}, 55000);
       if (!res.ok) {
         setDiagnosticsLogs([]);
         return [];

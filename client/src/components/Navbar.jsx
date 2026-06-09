@@ -61,7 +61,7 @@ export default function Navbar() {
           className="scan-qr-btn"
           onClick={() => handleNav('/scan')}
         >
-          Scan QR
+          Submit A Photo
         </button>
 
         <NavLink to="/ask-arborai" onClick={() => setMenuOpen(false)}>
