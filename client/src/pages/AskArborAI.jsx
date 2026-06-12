@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
+import { useAuth } from '../context/AuthContext';
+import { useHomeownerAuth } from '../context/HomeownerAuthContext';
 import { apiUrl } from '../utils/apiUrl';
 import './AskArborAI.css';
 
@@ -54,7 +56,14 @@ function createMessage({
 
 export default function AskArborAI() {
   const { mode } = useMode();
+  const { isAuthenticated: isStaffAuthenticated, loading: isStaffAuthLoading } = useAuth();
+  const { isAuthenticated: isHomeownerAuthenticated, loading: isHomeownerAuthLoading } = useHomeownerAuth();
   const isStaff = mode === 'dex';
+  const isVisitorUnsigned =
+    !isStaffAuthLoading
+    && !isHomeownerAuthLoading
+    && !isStaffAuthenticated
+    && !isHomeownerAuthenticated;
   const navigate = useNavigate();
   const [messages, setMessages] = useState([getInitialAssistantMessage()]);
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
@@ -65,6 +74,7 @@ export default function AskArborAI() {
   const [listings, setListings] = useState([]);
   const [isListingsLoading, setIsListingsLoading] = useState(false);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [signupPromptOpen, setSignupPromptOpen] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
   const [hasHydratedSession, setHasHydratedSession] = useState(false);
@@ -208,6 +218,18 @@ export default function AskArborAI() {
     setMessages((prev) => [...prev, createMessage({ role: 'assistant', text })]);
   };
 
+  const maybePromptSignup = () => {
+    if (isVisitorUnsigned) {
+      setSignupPromptOpen(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!isVisitorUnsigned) {
+      setSignupPromptOpen(false);
+    }
+  }, [isVisitorUnsigned]);
+
   const sendMessage = async () => {
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion && uploadedPhotos.length === 0) return;
@@ -323,6 +345,7 @@ export default function AskArborAI() {
           showActions: true,
         }),
       ]);
+      maybePromptSignup();
 
       resetComposer();
       setActionError('');
@@ -334,6 +357,7 @@ export default function AskArborAI() {
           text: `I could not complete that scan yet: ${error.message}`,
         }),
       ]);
+      maybePromptSignup();
     } finally {
       setIsLoading(false);
     }
@@ -711,6 +735,38 @@ export default function AskArborAI() {
                   disabled={isActionLoading}
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {signupPromptOpen && (
+          <div className="ask-modal-overlay" role="dialog" aria-modal="true" aria-label="Sign up prompt dialog">
+            <div className="ask-modal-card ask-convert-card">
+              <h2>Keep This Plant Story Going</h2>
+              <p>
+                You now know more about this plant. Create a free account to save this profile,
+                keep photo history, and get guidance as it grows.
+              </p>
+
+              <div className="ask-modal-actions">
+                <button
+                  type="button"
+                  className="ask-send-btn"
+                  onClick={() => {
+                    setSignupPromptOpen(false);
+                    navigate('/homeowners/signup');
+                  }}
+                >
+                  Sign Up To Save This Plant
+                </button>
+                <button
+                  type="button"
+                  className="ask-tool-btn"
+                  onClick={() => setSignupPromptOpen(false)}
+                >
+                  Close
                 </button>
               </div>
             </div>
