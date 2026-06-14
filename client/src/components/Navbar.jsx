@@ -7,7 +7,7 @@ import './Navbar.css';
 
 export default function Navbar() {
   const { mode, toggleMode } = useMode();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, isStaffAuthorized, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -21,7 +21,7 @@ export default function Navbar() {
   };
 
   const handleModeToggle = () => {
-    if (mode === 'tag' && !isAuthenticated) {
+    if (mode === 'tag' && !isStaffAuthorized) {
       handleNav('/staff/login');
       return;
     }

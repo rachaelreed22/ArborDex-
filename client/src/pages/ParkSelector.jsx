@@ -8,7 +8,7 @@ import './ParkSelector.css';
 export default function ParkSelector() {
   const navigate = useNavigate();
   const { mode, toggleMode } = useMode();
-  const { user, isQueen, userParkId, supabase } = useAuth();
+  const { user, isQueen, isStaffAuthorized, userParkId, supabase } = useAuth();
   const [parks, setParks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,8 +39,8 @@ export default function ParkSelector() {
     localStorage.setItem('selectedParkId', parkId);
     localStorage.setItem('selectedParkName', parkName);
 
-    // Only switch to staff/dex mode for logged-in users
-    if (user && mode !== 'dex') {
+    // Only switch to Dex mode when the session is staff-authorized.
+    if (isStaffAuthorized && mode !== 'dex') {
       toggleMode();
     }
 

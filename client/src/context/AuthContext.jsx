@@ -11,6 +11,11 @@ const SUPABASE_ANON_KEY =
   || 'sb_publishable_SUwAmMFR9xGM26BXK7A5oA_XsAvSbGz';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const STAFF_ROLES = new Set(['staff', 'queen']);
+
+function hasStaffAccess(role) {
+  return STAFF_ROLES.has((role || '').toString().trim().toLowerCase());
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -57,7 +62,7 @@ export function AuthProvider({ children }) {
         console.error('Error fetching profile:', profileError);
       }
 
-      if (profile) {
+      if (profile && hasStaffAccess(profile.role)) {
         setUserRole(profile.role);
         setUserParkId(profile.park_id);
       } else {
@@ -132,7 +137,7 @@ export function AuthProvider({ children }) {
 
       const { data: staffProfile, error: staffProfileError } = await supabase
         .from('staff_profiles')
-        .select('user_id')
+        .select('role, park_id')
         .eq('user_id', signedInUser.id)
         .maybeSingle();
 
@@ -141,7 +146,7 @@ export function AuthProvider({ children }) {
         throw new Error('Unable to verify staff permissions right now. Please try again.');
       }
 
-      if (!staffProfile?.user_id) {
+      if (!staffProfile || !hasStaffAccess(staffProfile.role)) {
         await supabase.auth.signOut();
         throw new Error('This account does not have staff access yet. Contact an administrator.');
       }
@@ -183,6 +188,7 @@ export function AuthProvider({ children }) {
     logout,
     supabase,
     isAuthenticated: !!user,
+    isStaffAuthorized: !!user && hasStaffAccess(userRole),
     isQueen: userRole === 'queen',
     isStaff: userRole === 'staff',
   };

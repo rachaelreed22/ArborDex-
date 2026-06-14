@@ -7,7 +7,7 @@ const TERMS_KEY = 'arbortag_terms_accepted';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { login, isStaffAuthorized, loading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,10 +25,10 @@ export default function AdminLogin() {
   };
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && isStaffAuthorized) {
       navigate('/staff/parks', { replace: true });
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isStaffAuthorized, authLoading, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();

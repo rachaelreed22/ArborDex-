@@ -76,13 +76,13 @@ function LayoutFooterOnly() {
 
 // Protected route for authenticated users (staff/admin)
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isStaffAuthorized, loading } = useAuth();
   
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading...</div>;
   }
   
-  if (!isAuthenticated) {
+  if (!isStaffAuthorized) {
     return <Navigate to="/staff/login" replace />;
   }
   
