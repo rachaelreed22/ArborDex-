@@ -90,6 +90,12 @@ function buildGeneratedObjectPath(prefix, mimeType) {
   return `${normalizeStoragePrefix(prefix)}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 }
 
+function buildQrImageUrl(payload) {
+  const data = (payload || '').toString().trim();
+  if (!data) return '';
+  return `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(data)}`;
+}
+
 async function validateRasterImageFile(file) {
   if (!file?.buffer || !Buffer.isBuffer(file.buffer)) {
     throw new Error('Invalid upload payload');
@@ -2917,13 +2923,17 @@ api.post("/listings", upload.array("photos"), async (req, res) => {
         .update({ qr_url: qrUrl })
         .eq("id", listing.id);
     } else {
-      qrUrl = scannedQrUrl || null;
-      if (!qrUrl) {
+      const qrPayload = scannedQrUrl || null;
+      let finalPayload = qrPayload;
+
+      if (!finalPayload) {
         const appBaseUrl = (process.env.APP_BASE_URL || '').toString().trim();
         if (appBaseUrl) {
-          qrUrl = `${appBaseUrl.replace(/\/$/, '')}/tag/${listing.id}`;
+          finalPayload = `${appBaseUrl.replace(/\/$/, '')}/tag/${listing.id}`;
         }
       }
+
+      qrUrl = finalPayload ? buildQrImageUrl(finalPayload) : null;
 
       if (qrUrl) {
         await writeSupabase

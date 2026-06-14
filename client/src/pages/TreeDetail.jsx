@@ -174,6 +174,23 @@ function parseQrCodeIdFromQrUrl(url) {
   return withoutExt || "";
 }
 
+function looksLikeQrImageUrl(url) {
+  const value = (url || "").toString().trim().toLowerCase();
+  if (!value) return false;
+  return (
+    value.includes("api.qrserver.com/v1/create-qr-code")
+    || /\.(png|jpg|jpeg|webp|gif|svg)(\?|$)/i.test(value)
+  );
+}
+
+function resolveQrImageSrc(qrUrl) {
+  const value = (qrUrl || "").toString().trim();
+  if (!value) return "";
+  if (looksLikeQrImageUrl(value)) return value;
+
+  return `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(value)}`;
+}
+
 function formatDateLabel(value) {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -795,6 +812,7 @@ export default function TreeDetail() {
     (typeof listing.managed_by === "string" && listing.managed_by.trim()) ||
     (typeof listing.owner_team === "string" && listing.owner_team.trim()) ||
     "ArborDex Staff";
+  const qrImageSrc = resolveQrImageSrc(listing.qr_url);
 
   const inspectionStatus = (() => {
     const explicitStatus =
@@ -1468,7 +1486,7 @@ return (
       </p>
       <div className="qr-wrapper">
         <img
-          src={listing.qr_url}
+          src={qrImageSrc}
           alt="Tree QR Code"
           className="qr-image"
         />
