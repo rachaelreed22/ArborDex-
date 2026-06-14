@@ -162,6 +162,32 @@
   box-shadow: 0 20px 44px rgba(7, 24, 16, 0.26);
 }
 
+.login-top-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.login-home-btn {
+  border: 1px solid rgba(20, 56, 38, 0.25);
+  border-radius: 999px;
+  background: rgba(247, 250, 240, 0.95);
+  color: #194732;
+  padding: 0.42rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-home-btn:hover {
+  background: rgba(232, 242, 223, 0.95);
+}
+
+.login-home-btn:focus-visible {
+  outline: 3px solid rgba(31, 93, 69, 0.3);
+  outline-offset: 2px;
+}
+
 .admin-login-box h1 {
   color: #103223;
   font-family: "Fraunces", "Cambria", serif;

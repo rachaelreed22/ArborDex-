@@ -28,8 +28,7 @@ export function AuthProvider({ children }) {
     }
 
     const isHomeownerSession =
-      authUser?.user_metadata?.account_type === 'homeowner'
-      || (typeof window !== 'undefined' && window.location.pathname.startsWith('/homeowners'));
+      typeof window !== 'undefined' && window.location.pathname.startsWith('/homeowners');
 
     if (isHomeownerSession) {
       // Homeowner auth is handled by HomeownerAuthContext; skip staff profile hydration.
@@ -124,6 +123,27 @@ export function AuthProvider({ children }) {
 
       if (signInError) {
         throw signInError;
+      }
+
+      const signedInUser = data?.user || null;
+      if (!signedInUser) {
+        throw new Error('Sign in succeeded but no user session was returned. Please try again.');
+      }
+
+      const { data: staffProfile, error: staffProfileError } = await supabase
+        .from('staff_profiles')
+        .select('user_id')
+        .eq('user_id', signedInUser.id)
+        .maybeSingle();
+
+      if (staffProfileError) {
+        await supabase.auth.signOut();
+        throw new Error('Unable to verify staff permissions right now. Please try again.');
+      }
+
+      if (!staffProfile?.user_id) {
+        await supabase.auth.signOut();
+        throw new Error('This account does not have staff access yet. Contact an administrator.');
       }
 
       // Don't await profile hydration here — onAuthStateChange handles it.

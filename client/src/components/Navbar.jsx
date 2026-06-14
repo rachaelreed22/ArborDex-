@@ -20,6 +20,16 @@ export default function Navbar() {
     setMenuOpen(false);
   };
 
+  const handleModeToggle = () => {
+    if (mode === 'tag' && !isAuthenticated) {
+      handleNav('/staff/login');
+      return;
+    }
+
+    toggleMode();
+    setMenuOpen(false);
+  };
+
   const handleLogout = async () => {
     await logout();
     handleNav('/');
@@ -84,7 +94,7 @@ export default function Navbar() {
           </button>
         )}
 
-        <button className="mode-toggle" onClick={() => { toggleMode(); setMenuOpen(false); }}>
+        <button className="mode-toggle" onClick={handleModeToggle}>
           {toggleLabel}
         </button>
       </nav>

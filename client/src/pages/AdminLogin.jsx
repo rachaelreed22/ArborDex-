@@ -47,6 +47,12 @@ export default function AdminLogin() {
   return (
     <div className="admin-login-container">
       <div className="admin-login-box">
+        <div className="login-top-actions">
+          <button type="button" className="login-home-btn" onClick={() => navigate('/')}>
+            Home
+          </button>
+        </div>
+
         <h1>Staff Login</h1>
         <p className="login-subtitle">Sign in to access your park dashboard</p>
 
