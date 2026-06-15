@@ -117,42 +117,19 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // signInOnly: just authenticates — caller is responsible for access checks.
+  const signInOnly = async (email, password) => {
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) throw signInError;
+    return data;
+  };
+
+  // login: kept for backward compatibility — validates staff role before resolving.
   const login = async (email, password) => {
     try {
       setError(null);
       setLoading(true);
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      const signedInUser = data?.user || null;
-      if (!signedInUser) {
-        throw new Error('Sign in succeeded but no user session was returned. Please try again.');
-      }
-
-      const { data: staffProfile, error: staffProfileError } = await supabase
-        .from('staff_profiles')
-        .select('role, park_id')
-        .eq('user_id', signedInUser.id)
-        .maybeSingle();
-
-      if (staffProfileError) {
-        await supabase.auth.signOut();
-        throw new Error('Unable to verify staff permissions right now. Please try again.');
-      }
-
-      if (!staffProfile || !hasStaffAccess(staffProfile.role)) {
-        await supabase.auth.signOut();
-        throw new Error('This account does not have staff access yet. Contact an administrator.');
-      }
-
-      // Don't await profile hydration here — onAuthStateChange handles it.
-      // Returning immediately prevents the form from hanging if staff_profiles is slow.
+      const data = await signInOnly(email, password);
       return data;
     } catch (err) {
       setError(err.message);
@@ -191,6 +168,8 @@ export function AuthProvider({ children }) {
     isStaffAuthorized: !!user && hasStaffAccess(userRole),
     isQueen: userRole === 'queen',
     isStaff: userRole === 'staff',
+    signInOnly,
+    hasStaffAccess,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

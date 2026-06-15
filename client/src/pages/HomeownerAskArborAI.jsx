@@ -47,6 +47,8 @@ export default function HomeownerAskArborAI() {
   const [plants, setPlants] = useState([]);
   const [isPlantsLoading, setIsPlantsLoading] = useState(false);
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
+  const [authPromptMessage, setAuthPromptMessage] = useState('');
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [attachMessageId, setAttachMessageId] = useState('');
   const [activeProfiles, setActiveProfiles] = useState(0);
@@ -54,6 +56,23 @@ export default function HomeownerAskArborAI() {
   const bottomRef = useRef(null);
 
   const atProfileLimit = activeProfiles >= profileLimit;
+
+  const isAuthErrorMessage = (message) => {
+    const text = (message || '').toString().trim().toLowerCase();
+    return (
+      text === 'auth_required'
+      || text.includes('invalid auth token')
+      || text.includes('auth token')
+      || text.includes('jwt')
+      || text.includes('session expired')
+      || text.includes('not signed in')
+      || text.includes('unauthorized')
+      || text.includes('401')
+      || text.includes('missing bearer token')
+    );
+  };
+
+  const visibleActionError = isAuthErrorMessage(actionError) ? '' : actionError;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,8 +89,23 @@ export default function HomeownerAskArborAI() {
     };
   }, [photoPreviews]);
 
+  const promptForAuth = (message = '') => {
+    setAttachDialogOpen(false);
+    setActionError('');
+    setAuthPromptMessage(
+      message
+      || 'Sign in or sign up to save this scan to a plant profile.'
+    );
+    setAuthPromptOpen(true);
+  };
+
   async function authJsonFetch(path, options = {}) {
     const token = await getAccessToken();
+    if (!token) {
+      promptForAuth('Sign in or sign up to save this scan to a plant profile.');
+      throw new Error('AUTH_REQUIRED');
+    }
+
     const response = await fetch(apiUrl(path), {
       ...options,
       headers: {
@@ -82,6 +116,11 @@ export default function HomeownerAskArborAI() {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
+      const serverErrorMessage = (payload?.error || '').toString();
+      if (response.status === 401 || isAuthErrorMessage(serverErrorMessage)) {
+        promptForAuth('Sign in or sign up to save this scan to a plant profile.');
+        throw new Error('AUTH_REQUIRED');
+      }
       throw new Error(payload.error || 'Request failed');
     }
 
@@ -139,6 +178,11 @@ export default function HomeownerAskArborAI() {
   };
 
   const appendAssistantMessage = (text) => {
+    if (isAuthErrorMessage(text)) {
+      promptForAuth('Sign in or sign up to save this scan to a plant profile.');
+      return;
+    }
+
     setMessages((prev) => [...prev, createMessage({ role: 'assistant', text })]);
   };
 
@@ -299,6 +343,7 @@ export default function HomeownerAskArborAI() {
       await refreshHomeownerStatus();
       navigate(`/homeowners/plants/${payload.plant.id}`);
     } catch (error) {
+      if (error?.message === 'AUTH_REQUIRED' || isAuthErrorMessage(error?.message)) return;
       setActionError(error.message);
       appendAssistantMessage(`Create Plant ID failed: ${error.message}`);
     } finally {
@@ -332,6 +377,7 @@ export default function HomeownerAskArborAI() {
         setSelectedPlantId(normalized[0].id);
       }
     } catch (error) {
+      if (error?.message === 'AUTH_REQUIRED' || isAuthErrorMessage(error?.message)) return;
       setActionError(error.message);
       appendAssistantMessage(`Could not load Plant IDs for attach: ${error.message}`);
     } finally {
@@ -369,6 +415,7 @@ export default function HomeownerAskArborAI() {
       appendAssistantMessage(`Added ${payload.added_photos || 0} photo(s) to Plant ID ${payload.plant.id}.`);
       navigate(`/homeowners/plants/${payload.plant.id}`);
     } catch (error) {
+      if (error?.message === 'AUTH_REQUIRED' || isAuthErrorMessage(error?.message)) return;
       setActionError(error.message);
       appendAssistantMessage(`Add to existing Plant ID failed: ${error.message}`);
     } finally {
@@ -543,7 +590,7 @@ export default function HomeownerAskArborAI() {
         </section>
 
         <section className="ask-composer homeowner-ask-composer">
-          {actionError && <p className="ask-error">{actionError}</p>}
+          {visibleActionError && <p className="ask-error">{visibleActionError}</p>}
 
           <div className="homeowner-ask-composer-note">
             Tip: keep each scan to one plant. Mixed photos lower the odds of a usable Plant ID.
@@ -647,6 +694,44 @@ export default function HomeownerAskArborAI() {
                   disabled={isActionLoading}
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {authPromptOpen && (
+          <div className="ask-modal-overlay" role="dialog" aria-modal="true" aria-label="Sign in prompt dialog">
+            <div className="ask-modal-card homeowner-ask-modal-card">
+              <h2>Save This Plant Scan</h2>
+              <p>{authPromptMessage}</p>
+              <div className="ask-modal-actions">
+                <button
+                  type="button"
+                  className="ask-send-btn homeowner-ask-send-btn"
+                  onClick={() => {
+                    setAuthPromptOpen(false);
+                    navigate('/homeowners/login');
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  className="ask-tool-btn homeowner-ask-tool-btn"
+                  onClick={() => {
+                    setAuthPromptOpen(false);
+                    navigate('/homeowners/signup');
+                  }}
+                >
+                  Sign Up
+                </button>
+                <button
+                  type="button"
+                  className="ask-tool-btn homeowner-ask-tool-btn"
+                  onClick={() => setAuthPromptOpen(false)}
+                >
+                  Close
                 </button>
               </div>
             </div>

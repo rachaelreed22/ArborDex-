@@ -7,7 +7,7 @@ const TERMS_KEY = 'arbortag_terms_accepted';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { login, isStaffAuthorized, loading: authLoading } = useAuth();
+  const { signInOnly, supabase, hasStaffAccess, isStaffAuthorized, loading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +36,37 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      // Step 1: authenticate credentials only.
+      const data = await signInOnly(email, password);
+      const signedInUser = data?.user || null;
+
+      if (!signedInUser) {
+        throw new Error('Sign in succeeded but no user session was returned. Please try again.');
+      }
+
+      // Step 2: check staff_profiles BEFORE any state updates propagate.
+      const { data: staffProfile, error: staffProfileError } = await supabase
+        .from('staff_profiles')
+        .select('role, park_id')
+        .eq('user_id', signedInUser.id)
+        .maybeSingle();
+
+      if (staffProfileError) {
+        setError('Unable to verify staff access right now. Please try again.');
+        supabase.auth.signOut().catch(() => {});
+        return;
+      }
+
+      if (!staffProfile || !hasStaffAccess(staffProfile.role)) {
+        setError('ACCESS_DENIED');
+        supabase.auth.signOut().catch(() => {});
+        return;
+      }
+
+      // Valid staff — do NOT navigate here.
+      // onAuthStateChange will hydrate userRole → isStaffAuthorized becomes true
+      // → the useEffect above navigates to /staff/parks once hydration is confirmed.
+      // Navigating here would race ProtectedRoute before hydration finishes.
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -85,11 +115,16 @@ export default function AdminLogin() {
             />
           </div>
 
-          {error && (
+          {error === 'ACCESS_DENIED' ? (
+            <div className="login-error login-access-denied" role="alert">
+              <strong>Access Denied</strong>
+              <p>This account does not have ArborDex staff access. If you believe this is an error, contact your administrator.</p>
+            </div>
+          ) : error ? (
             <div className="login-error" role="alert">
               {error}
             </div>
-          )}
+          ) : null}
 
           <div className="terms-check-row">
             <input

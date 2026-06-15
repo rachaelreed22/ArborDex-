@@ -248,6 +248,29 @@
   border-left-color: #b24444;
 }
 
+.login-access-denied {
+  background: #1d0a0a;
+  color: #f5c6c6;
+  border-left: 4px solid #e53e3e;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.login-access-denied strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+  color: #fc8181;
+  letter-spacing: 0.02em;
+}
+
+.login-access-denied p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #fed7d7;
+}
+
 @media (max-width: 600px) {
   .admin-login-container {
     padding: 0.75rem;
