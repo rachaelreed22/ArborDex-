@@ -48,7 +48,7 @@ export default function HomeownerLogin() {
             ArborTag Homeowner Edition is currently in early access. Early users are helping shape the app by sharing honest feedback about setup, plant profiles, photo uploads, and ArborAI guidance.
           </p>
           <p>
-            Early Access Feedback Offer: Get 50% off your first month in exchange for honest feedback. Coupon expires June 15. Message me for the code.
+            Homeowner Edition is built around the relationship between each person and each plant. The more photos, notes, and care updates you add, the more personal and useful your guidance becomes.
           </p>
           <p>
             Tip: The more photos, notes, and updates you add, the more useful ArborAI's plant guidance can become.

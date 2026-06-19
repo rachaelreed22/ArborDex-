@@ -15,7 +15,6 @@ export default function HomeownerTierSelection() {
   const navigate = useNavigate();
   const { tier, getAccessToken } = useHomeownerAuth();
   const [selectedTier, setSelectedTier] = useState(tier || 'free');
-  const [promoCode, setPromoCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +41,7 @@ export default function HomeownerTierSelection() {
         const res = await fetch(apiUrl('/api/stripe/checkout-preview'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tier: selectedTier, promoCode }),
+          body: JSON.stringify({ tier: selectedTier }),
           signal: controller.signal,
         });
 
@@ -67,7 +66,7 @@ export default function HomeownerTierSelection() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [selectedTier, promoCode]);
+  }, [selectedTier]);
 
   async function continueCheckout() {
     if (selectedTier === 'free') {
@@ -85,7 +84,7 @@ export default function HomeownerTierSelection() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ tier: selectedTier, promoCode }),
+        body: JSON.stringify({ tier: selectedTier }),
       });
 
       const payload = await res.json().catch(() => ({}));
@@ -146,24 +145,6 @@ export default function HomeownerTierSelection() {
           Selected: <span className="font-semibold">{getTierLabel(chosen?.key || 'free')}</span>
         </p>
 
-        <div className="mt-4">
-          <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="homeowner-promo-code">
-            Promo code (optional)
-          </label>
-          <input
-            id="homeowner-promo-code"
-            className="homeowner-input w-full rounded-md px-3 py-2 text-sm outline-none"
-            type="text"
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value)}
-            placeholder="Enter founding member code"
-            disabled={loading || billingLoading}
-          />
-          <p className="homeowner-muted mt-1 text-xs">
-            If you have a founding-member code, enter it here before continuing.
-          </p>
-        </div>
-
         {selectedTier !== 'free' && (
           <div className="homeowner-panel homeowner-panel-info mt-4">
             <p className="text-sm font-semibold text-[#1d411d]">Charge preview</p>
@@ -173,7 +154,7 @@ export default function HomeownerTierSelection() {
               <div className="mt-2 space-y-1 text-sm">
                 <p className="homeowner-subtext">Subtotal: <span className="font-semibold">{quote.subtotal_display}</span></p>
                 {Number(quote.discount_minor || 0) > 0 && (
-                  <p className="homeowner-subtext">Promo discount: <span className="font-semibold text-[#1d411d]">-{quote.discount_display}</span></p>
+                  <p className="homeowner-subtext">Early access adjustment: <span className="font-semibold text-[#1d411d]">-{quote.discount_display}</span></p>
                 )}
                 <p className="text-base font-semibold text-[#1d411d]">You will be charged: {quote.total_display}</p>
                 {Number(quote.discount_minor || 0) > 0 && (
@@ -181,7 +162,7 @@ export default function HomeownerTierSelection() {
                 )}
               </div>
             ) : (
-              <p className="homeowner-subtext mt-1 text-sm">{quoteError || 'Enter a promo code if you have one, then continue.'}</p>
+              <p className="homeowner-subtext mt-1 text-sm">{quoteError || 'Continue when you are ready to build stronger plant-person relationships.'}</p>
             )}
           </div>
         )}

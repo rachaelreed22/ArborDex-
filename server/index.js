@@ -176,11 +176,6 @@ const STRIPE_SECRET_KEY = STRIPE_CONFIG.secretKey;
 const STRIPE_WEBHOOK_SECRET = STRIPE_CONFIG.webhookSecret;
 const STRIPE_PRICE_GARDENER = STRIPE_CONFIG.priceGardener;
 const STRIPE_PRICE_ESTATE = STRIPE_CONFIG.priceEstate;
-const STRIPE_EARLY_ACCESS_PROMO_ID = readStripeSetting('STRIPE_EARLY_ACCESS_PROMO_ID', STRIPE_CONFIG.mode)
-  || 'promo_1Teft5Br0PeZyDiGdHSJMBxw';
-const STRIPE_EARLY_ACCESS_CODE = readStripeSetting('STRIPE_EARLY_ACCESS_CODE', STRIPE_CONFIG.mode)
-  || 'ThankYou50';
-const STRIPE_EARLY_ACCESS_COUPON_ID = (process.env.STRIPE_EARLY_ACCESS_COUPON_ID || '').toString().trim();
 
 const stripe = STRIPE_SECRET_KEY
   ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
@@ -1204,93 +1199,6 @@ function formatMoneyFromMinorUnits(amountMinor, currency = 'usd') {
   }
 }
 
-async function resolveCheckoutDiscountForPromoCode(promoCodeInput) {
-  const normalizedPromoCodeInput = (promoCodeInput || '').toString().trim();
-  if (!normalizedPromoCodeInput || !stripe) {
-    return { promotionCodeId: null, couponId: null, coupon: null, matchedCode: null };
-  }
-
-  const normalizedEarlyAccessCode = STRIPE_EARLY_ACCESS_CODE.toLowerCase();
-  const lowerInput = normalizedPromoCodeInput.toLowerCase();
-  const matchedEarlyAccessCode = Boolean(
-    STRIPE_EARLY_ACCESS_PROMO_ID
-    && (
-      lowerInput === normalizedEarlyAccessCode
-      || normalizedPromoCodeInput === STRIPE_EARLY_ACCESS_PROMO_ID
-    )
-  );
-
-  if (matchedEarlyAccessCode) {
-    let coupon = null;
-    let couponId = STRIPE_EARLY_ACCESS_COUPON_ID || null;
-
-    if (couponId) {
-      coupon = await stripe.coupons.retrieve(couponId);
-    } else {
-      const promotionCode = await stripe.promotionCodes.retrieve(STRIPE_EARLY_ACCESS_PROMO_ID, {
-        expand: ['coupon'],
-      });
-      coupon = typeof promotionCode?.coupon === 'string' ? await stripe.coupons.retrieve(promotionCode.coupon) : promotionCode?.coupon || null;
-      couponId = coupon?.id || null;
-    }
-
-    return {
-      promotionCodeId: STRIPE_EARLY_ACCESS_PROMO_ID,
-      couponId,
-      coupon,
-      matchedCode: STRIPE_EARLY_ACCESS_CODE,
-    };
-  }
-
-  const promoList = await stripe.promotionCodes.list({
-    code: normalizedPromoCodeInput,
-    active: true,
-    limit: 1,
-  });
-
-  const promotionCode = Array.isArray(promoList?.data) ? promoList.data[0] : null;
-  if (!promotionCode?.id) {
-    return { promotionCodeId: null, couponId: null, coupon: null, matchedCode: null };
-  }
-
-  const couponId = typeof promotionCode.coupon === 'string' ? promotionCode.coupon : promotionCode.coupon?.id || null;
-  const coupon = promotionCode.coupon && typeof promotionCode.coupon === 'object'
-    ? promotionCode.coupon
-    : couponId
-      ? await stripe.coupons.retrieve(couponId)
-      : null;
-
-  return {
-    promotionCodeId: promotionCode.id,
-    couponId,
-    coupon,
-    matchedCode: normalizedPromoCodeInput,
-  };
-}
-
-function computeCheckoutDiscount(amountMinor, coupon) {
-  const subtotal = Number(amountMinor || 0);
-  if (!coupon) {
-    return { discountMinor: 0, totalMinor: subtotal };
-  }
-
-  const percentOff = Number(coupon.percent_off || 0);
-  const amountOff = Number(coupon.amount_off || 0);
-  let discountMinor = 0;
-
-  if (percentOff > 0) {
-    discountMinor = Math.round((subtotal * percentOff) / 100);
-  } else if (amountOff > 0) {
-    discountMinor = amountOff;
-  }
-
-  discountMinor = Math.max(0, Math.min(subtotal, discountMinor));
-  return {
-    discountMinor,
-    totalMinor: Math.max(0, subtotal - discountMinor),
-  };
-}
-
 function normalizeStripeCustomerId(value) {
   const normalized = (value || '').toString().trim();
   if (!normalized) return null;
@@ -1719,7 +1627,6 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
     }
 
     const tier = (req.body?.tier || '').toString().trim().toLowerCase();
-    const promoCodeInput = (req.body?.promoCode || '').toString().trim();
     const user = req.homeownerUser;
     const priceId = getPriceIdFromTier(tier);
 
@@ -1751,30 +1658,15 @@ api.post('/stripe/create-checkout-session', requireHomeownerAuth, async (req, re
       }
     }
 
-    const discount = await resolveCheckoutDiscountForPromoCode(promoCodeInput);
-    const { promotionCodeId, couponId, coupon } = discount;
-
-    if (promoCodeInput && !promotionCodeId) {
-      return res.status(400).json({ error: 'Promo code is invalid or expired.' });
-    }
-
-    if (promoCodeInput && promotionCodeId && !couponId) {
-      return res.status(500).json({ error: 'Promo code matched, but no coupon was available for checkout.' });
-    }
-
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      ...(couponId ? {} : { allow_promotion_codes: true }),
-      ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
       success_url: `${CLIENT_URL}/homeowners/account?checkout=success`,
       cancel_url: `${CLIENT_URL}/homeowners/tiers?checkout=cancelled`,
       metadata: {
         supabase_user_id: user.id,
         requested_tier: tier,
-        ...(promotionCodeId ? { applied_promotion_code_id: promotionCodeId } : {}),
-        ...(couponId ? { applied_coupon_id: couponId } : {}),
       },
     });
 
@@ -1812,45 +1704,27 @@ api.post('/stripe/checkout-preview', async (req, res) => {
     }
 
     const tier = (req.body?.tier || '').toString().trim().toLowerCase();
-    const promoCodeInput = (req.body?.promoCode || '').toString().trim();
     const priceId = getPriceIdFromTier(tier);
 
     if (!priceId) {
       return res.status(400).json({ error: 'Tier must be gardener or estate for checkout' });
     }
 
-    const [price, discount] = await Promise.all([
-      stripe.prices.retrieve(priceId),
-      resolveCheckoutDiscountForPromoCode(promoCodeInput),
-    ]);
-
-    if (promoCodeInput && !discount.promotionCodeId) {
-      return res.status(400).json({ error: 'Promo code is invalid or expired.' });
-    }
-
-    if (promoCodeInput && discount.promotionCodeId && !discount.couponId) {
-      return res.status(500).json({ error: 'Promo code matched, but no coupon was available for checkout.' });
-    }
+    const price = await stripe.prices.retrieve(priceId);
 
     const subtotalMinor = Number(price?.unit_amount || 0);
-    const computed = computeCheckoutDiscount(subtotalMinor, discount.coupon);
+    const discountMinor = 0;
+    const totalMinor = subtotalMinor;
 
     return res.json({
       tier,
       currency: (price?.currency || 'usd').toString().toUpperCase(),
       subtotal_minor: subtotalMinor,
-      discount_minor: computed.discountMinor,
-      total_minor: computed.totalMinor,
+      discount_minor: discountMinor,
+      total_minor: totalMinor,
       subtotal_display: formatMoneyFromMinorUnits(subtotalMinor, price?.currency || 'usd'),
-      discount_display: formatMoneyFromMinorUnits(computed.discountMinor, price?.currency || 'usd'),
-      total_display: formatMoneyFromMinorUnits(computed.totalMinor, price?.currency || 'usd'),
-      promo_code_applied: Boolean(discount.promotionCodeId),
-      promotion_code_id: discount.promotionCodeId || null,
-      coupon_id: discount.couponId || null,
-      coupon_percent_off: discount.coupon?.percent_off ?? null,
-      coupon_amount_off: discount.coupon?.amount_off ?? null,
-      coupon_duration: discount.coupon?.duration || null,
-      coupon_duration_in_months: discount.coupon?.duration_in_months ?? null,
+      discount_display: formatMoneyFromMinorUnits(discountMinor, price?.currency || 'usd'),
+      total_display: formatMoneyFromMinorUnits(totalMinor, price?.currency || 'usd'),
     });
   } catch (err) {
     console.error('Stripe checkout preview error:', err?.message || err);

@@ -42,7 +42,6 @@ export default function HomeownerSignup() {
   const [resetMessage, setResetMessage] = useState('');
   const [showResetNow, setShowResetNow] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [promoCode, setPromoCode] = useState('');
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
@@ -66,7 +65,7 @@ export default function HomeownerSignup() {
         const res = await fetch(apiUrl('/api/stripe/checkout-preview'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tier: plan, promoCode }),
+          body: JSON.stringify({ tier: plan }),
           signal: controller.signal,
         });
 
@@ -91,7 +90,7 @@ export default function HomeownerSignup() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [plan, promoCode]);
+  }, [plan]);
 
   function isExistingAccountError(message) {
     const normalized = (message || '').toString().toLowerCase();
@@ -150,7 +149,7 @@ export default function HomeownerSignup() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ tier: plan, promoCode }),
+        body: JSON.stringify({ tier: plan }),
       });
 
       const payload = await res.json().catch(() => ({}));
@@ -262,23 +261,6 @@ export default function HomeownerSignup() {
             </p>
 
             {plan !== 'free' && (
-              <div className="mt-4">
-                <label className="homeowner-heading mb-1 block text-sm font-semibold" htmlFor="signup-promo-code">
-                  Promo code (optional)
-                </label>
-                <input
-                  id="signup-promo-code"
-                  className="homeowner-input w-full rounded-md px-3 py-2 outline-none"
-                  type="text"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  placeholder="Enter founding member code"
-                  disabled={loading}
-                />
-              </div>
-            )}
-
-            {plan !== 'free' && (
               <div className="homeowner-panel homeowner-panel-info mt-4">
                 <p className="text-sm font-semibold text-[#1d411d]">Charge preview</p>
                 {quoteLoading ? (
@@ -287,7 +269,7 @@ export default function HomeownerSignup() {
                   <div className="mt-2 space-y-1 text-sm">
                     <p className="homeowner-subtext">Subtotal: <span className="font-semibold">{quote.subtotal_display}</span></p>
                     {Number(quote.discount_minor || 0) > 0 && (
-                      <p className="homeowner-subtext">Promo discount: <span className="font-semibold text-[#1d411d]">-{quote.discount_display}</span></p>
+                      <p className="homeowner-subtext">Early access adjustment: <span className="font-semibold text-[#1d411d]">-{quote.discount_display}</span></p>
                     )}
                     <p className="text-base font-semibold text-[#1d411d]">You will be charged: {quote.total_display}</p>
                     {Number(quote.discount_minor || 0) > 0 && (
@@ -295,7 +277,7 @@ export default function HomeownerSignup() {
                     )}
                   </div>
                 ) : (
-                  <p className="homeowner-subtext mt-1 text-sm">{quoteError || 'Enter a promo code if you have one, then continue.'}</p>
+                  <p className="homeowner-subtext mt-1 text-sm">{quoteError || 'Continue when you are ready to start building each plant-person relationship profile.'}</p>
                 )}
               </div>
             )}
