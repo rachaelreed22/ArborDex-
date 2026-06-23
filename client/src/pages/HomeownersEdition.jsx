@@ -9,6 +9,12 @@ export default function HomeownersEdition() {
     <main className="homeowners-page">
       <div className="homeowners-container">
         <div className="coming-soon-card">
+          <button
+            className="homeowners-demo-cta"
+            onClick={() => navigate('/homeowners/demo-garden')}
+          >
+            Explore a Demo Digital Garden
+          </button>
           <h1>Homeowner's Edition</h1>
           <p className="coming-soon-text">Now Available</p>
           <p className="coming-soon-description">
