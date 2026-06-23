@@ -32,6 +32,7 @@ import HomeownerPlants from './pages/HomeownerPlants';
 import HomeownerPlantDetail from './pages/HomeownerPlantDetail';
 import HomeownerDemoGarden from './pages/HomeownerDemoGarden';
 import HomeownerPlantTagRedirect from './pages/HomeownerPlantTagRedirect';
+import HomeownerQrTagOrders from './pages/HomeownerQrTagOrders';
 import HomeownerAskArborAI from './pages/HomeownerAskArborAI';
 import HomeownerResetPasswordRequest from './pages/HomeownerResetPasswordRequest';
 import HomeownerResetPassword from './pages/HomeownerResetPassword';
@@ -147,6 +148,7 @@ export default function App() {
                 <Route path="/homeowners/reset-password" element={<HomeownerResetPassword />} />
                 <Route path="/homeowners/demo-garden" element={<HomeownerDemoGarden />} />
                 <Route path="/homeowners/plant-tag/:token" element={<HomeownerPlantTagRedirect />} />
+                <Route path="/homeowners/qr-tag-orders" element={<HomeownerQrTagOrders />} />
               </Route>
 
               {/* Protected staff routes - with navbar */}

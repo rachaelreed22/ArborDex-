@@ -1904,6 +1904,67 @@ api.delete('/homeowners/account', requireHomeownerAuth, async (req, res) => {
 // ===========================
 // HOMEOWNER PLANTS
 // ===========================
+api.get('/homeowners/qr-tag-orders', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { data: orders, error } = await writeSupabase
+      .from('homeowner_qr_tag_orders')
+      .select('id, user_id, quantity, tag_material, notes, status, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: error.message || 'Failed to load QR tag orders' });
+    }
+
+    return res.json({
+      coming_soon: true,
+      orders: orders || [],
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load QR tag orders' });
+  }
+});
+
+api.post('/homeowners/qr-tag-orders', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const quantity = Number.parseInt(req.body?.quantity, 10);
+    const tagMaterial = (req.body?.tag_material || '').toString().trim();
+    const notes = (req.body?.notes || '').toString().trim();
+
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+      return res.status(400).json({ error: 'Quantity must be between 1 and 500.' });
+    }
+
+    const { data: order, error } = await writeSupabase
+      .from('homeowner_qr_tag_orders')
+      .insert([
+        {
+          user_id: userId,
+          quantity,
+          tag_material: tagMaterial || null,
+          notes: notes || null,
+          status: 'coming_soon',
+        },
+      ])
+      .select('id, user_id, quantity, tag_material, notes, status, created_at, updated_at')
+      .single();
+
+    if (error || !order) {
+      return res.status(500).json({ error: error?.message || 'Failed to save QR tag order request' });
+    }
+
+    return res.status(201).json({
+      coming_soon: true,
+      message: 'QR tag ordering is coming soon. Your request has been saved.',
+      order,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to save QR tag order request' });
+  }
+});
+
 api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
   try {
     const userId = req.homeownerUser.id;
