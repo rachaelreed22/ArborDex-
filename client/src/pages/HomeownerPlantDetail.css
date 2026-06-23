@@ -340,6 +340,99 @@
   outline-offset: 1px;
 }
 
+.homeowner-qr-preview {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.homeowner-qr-image {
+  width: 170px;
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(20, 56, 38, 0.25);
+  background: #fff;
+  padding: 0.35rem;
+}
+
+.homeowner-qr-payload {
+  word-break: break-all;
+}
+
+.homeowner-journal-section {
+  margin-top: 1rem;
+}
+
+.homeowner-journal-subtext {
+  margin: 0.45rem 0 0;
+}
+
+.homeowner-journal-form {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 0.9rem;
+}
+
+.homeowner-journal-notes-field {
+  grid-column: 1 / -1;
+}
+
+.homeowner-journal-notes {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.homeowner-journal-error {
+  margin-top: 0.65rem;
+}
+
+.homeowner-journal-entry-list {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.homeowner-journal-entry {
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 10px;
+  background: #f8f6ee;
+  padding: 0.8rem;
+}
+
+.homeowner-journal-entry-type {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #1d411d;
+  letter-spacing: 0.04em;
+}
+
+.homeowner-journal-entry-date {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: #2d5340;
+}
+
+.homeowner-journal-entry-notes {
+  margin: 0.55rem 0 0;
+  color: #1f3f2e;
+}
+
+.homeowner-journal-entry-actions {
+  margin-top: 0.65rem;
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.homeowner-journal-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 0.9rem;
+}
+
 @media (max-width: 720px) {
   .homeowner-plant-detail-page {
     overflow-x: clip;
@@ -356,6 +449,11 @@
     max-width: 100%;
     min-width: 0;
     overflow-x: clip;
+  }
+
+  .homeowner-journal-form,
+  .homeowner-journal-entry-grid {
+    grid-template-columns: 1fr;
   }
 
   .homeowner-plant-detail-page img {

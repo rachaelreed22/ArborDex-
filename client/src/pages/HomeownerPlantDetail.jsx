@@ -76,6 +76,23 @@ function computeHazardState(diagnostics) {
   return { detected, details: normalizedDetails };
 }
 
+const JOURNAL_EVENT_OPTIONS = [
+  { value: 'planted', label: 'Planted' },
+  { value: 'harvested', label: 'Harvested' },
+  { value: 'fertilized', label: 'Fertilized' },
+  { value: 'watered', label: 'Watered' },
+  { value: 'note', label: 'Note' },
+];
+
+function toLocalDateTimeInputValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  const local = new Date(date.getTime() - offsetMs);
+  return local.toISOString().slice(0, 16);
+}
+
 export default function HomeownerPlantDetail() {
   const { id } = useParams();
   const location = useLocation();
@@ -102,6 +119,23 @@ export default function HomeownerPlantDetail() {
     name: previewPlant?.name || '',
     species: previewPlant?.species || '',
     room_or_bed: previewPlant?.room_or_bed || '',
+    bed_number: previewPlant?.bed_number ?? '',
+    row_section_id: previewPlant?.row_section_id || '',
+  });
+  const [journalEntries, setJournalEntries] = useState([]);
+  const [journalLoading, setJournalLoading] = useState(false);
+  const [journalError, setJournalError] = useState('');
+  const [journalSaving, setJournalSaving] = useState(false);
+  const [journalForm, setJournalForm] = useState({
+    event_type: 'watered',
+    occurred_at: toLocalDateTimeInputValue(new Date().toISOString()),
+    notes: '',
+  });
+  const [editingJournalId, setEditingJournalId] = useState('');
+  const [editingJournalForm, setEditingJournalForm] = useState({
+    event_type: 'watered',
+    occurred_at: '',
+    notes: '',
   });
 
   async function authFetch(path, options = {}) {
@@ -139,6 +173,8 @@ export default function HomeownerPlantDetail() {
         name: nextPlant?.name || '',
         species: nextPlant?.species || '',
         room_or_bed: nextPlant?.room_or_bed || '',
+        bed_number: nextPlant?.bed_number ?? '',
+        row_section_id: nextPlant?.row_section_id || '',
       });
     } catch (err) {
       setError(err.message || 'Failed to load plant profile');
@@ -149,6 +185,20 @@ export default function HomeownerPlantDetail() {
     }
   }
 
+  async function loadJournal() {
+    try {
+      setJournalLoading(true);
+      setJournalError('');
+      const payload = await authFetch(`/api/homeowners/plants/${id}/journal`);
+      setJournalEntries(Array.isArray(payload.entries) ? payload.entries : []);
+    } catch (err) {
+      setJournalEntries([]);
+      setJournalError(err.message || 'Failed to load journal entries');
+    } finally {
+      setJournalLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (previewPlant) {
       setPlant(previewPlant);
@@ -156,13 +206,17 @@ export default function HomeownerPlantDetail() {
         name: previewPlant.name || '',
         species: previewPlant.species || '',
         room_or_bed: previewPlant.room_or_bed || '',
+        bed_number: previewPlant.bed_number ?? '',
+        row_section_id: previewPlant.row_section_id || '',
       });
       setLoading(false);
       void loadPlant({ background: true });
+      void loadJournal();
       return;
     }
 
     void loadPlant();
+    void loadJournal();
   }, [id, previewPlant]);
 
   async function runDiagnostics() {
@@ -185,6 +239,8 @@ export default function HomeownerPlantDetail() {
       name: plant?.name || '',
       species: plant?.species || '',
       room_or_bed: plant?.room_or_bed || '',
+      bed_number: plant?.bed_number ?? '',
+      row_section_id: plant?.row_section_id || '',
     });
     setEditingDetails(true);
     setError('');
@@ -196,6 +252,8 @@ export default function HomeownerPlantDetail() {
       name: plant?.name || '',
       species: plant?.species || '',
       room_or_bed: plant?.room_or_bed || '',
+      bed_number: plant?.bed_number ?? '',
+      row_section_id: plant?.row_section_id || '',
     });
   }
 
@@ -205,13 +263,22 @@ export default function HomeownerPlantDetail() {
       return;
     }
 
+    if (detailForm.row_section_id && !/^[A-Z](100|[1-9][0-9]?)$/.test((detailForm.row_section_id || '').toUpperCase().trim())) {
+      setError('Row/Section ID must be in Letter+Number format like A1 through Z100.');
+      return;
+    }
+
     try {
       setSavingDetails(true);
       setError('');
       const payload = await authFetch(`/api/homeowners/plants/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(detailForm),
+        body: JSON.stringify({
+          ...detailForm,
+          row_section_id: (detailForm.row_section_id || '').toUpperCase().trim(),
+          bed_number: detailForm.bed_number === '' ? null : detailForm.bed_number,
+        }),
       });
       const nextPlant = payload.plant || null;
       setPlant(nextPlant);
@@ -220,6 +287,82 @@ export default function HomeownerPlantDetail() {
       setError(err.message || 'Failed to save plant details');
     } finally {
       setSavingDetails(false);
+    }
+  }
+
+  async function createJournalEntry(e) {
+    e.preventDefault();
+    try {
+      setJournalSaving(true);
+      setJournalError('');
+      await authFetch(`/api/homeowners/plants/${id}/journal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(journalForm),
+      });
+      setJournalForm({
+        event_type: journalForm.event_type || 'watered',
+        occurred_at: toLocalDateTimeInputValue(new Date().toISOString()),
+        notes: '',
+      });
+      await loadJournal();
+    } catch (err) {
+      setJournalError(err.message || 'Failed to save journal entry');
+    } finally {
+      setJournalSaving(false);
+    }
+  }
+
+  function startEditJournalEntry(entry) {
+    setEditingJournalId(entry.id);
+    setEditingJournalForm({
+      event_type: entry.event_type || 'note',
+      occurred_at: toLocalDateTimeInputValue(entry.occurred_at),
+      notes: entry.notes || '',
+    });
+  }
+
+  function cancelEditJournalEntry() {
+    setEditingJournalId('');
+    setEditingJournalForm({ event_type: 'note', occurred_at: '', notes: '' });
+  }
+
+  async function saveJournalEntry(entryId) {
+    try {
+      setJournalSaving(true);
+      setJournalError('');
+      await authFetch(`/api/homeowners/plants/${id}/journal/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingJournalForm),
+      });
+      setEditingJournalId('');
+      await loadJournal();
+    } catch (err) {
+      setJournalError(err.message || 'Failed to update journal entry');
+    } finally {
+      setJournalSaving(false);
+    }
+  }
+
+  async function deleteJournalEntry(entryId) {
+    const confirmed = window.confirm('Delete this journal entry?');
+    if (!confirmed) return;
+
+    try {
+      setJournalSaving(true);
+      setJournalError('');
+      await authFetch(`/api/homeowners/plants/${id}/journal/${entryId}`, {
+        method: 'DELETE',
+      });
+      if (editingJournalId === entryId) {
+        cancelEditJournalEntry();
+      }
+      await loadJournal();
+    } catch (err) {
+      setJournalError(err.message || 'Failed to delete journal entry');
+    } finally {
+      setJournalSaving(false);
     }
   }
 
@@ -343,14 +486,47 @@ export default function HomeownerPlantDetail() {
                         <option value="outdoor">Outdoor</option>
                       </select>
                     </label>
+                    <label className="homeowner-detail-label">
+                      Bed #
+                      <input
+                        className="homeowner-detail-input"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={detailForm.bed_number}
+                        onChange={(e) => setDetailForm((prev) => ({ ...prev, bed_number: e.target.value }))}
+                        disabled={savingDetails}
+                      />
+                    </label>
+                    <label className="homeowner-detail-label">
+                      Row / Section ID
+                      <input
+                        className="homeowner-detail-input"
+                        placeholder="A1"
+                        value={detailForm.row_section_id}
+                        onChange={(e) => setDetailForm((prev) => ({ ...prev, row_section_id: e.target.value.toUpperCase() }))}
+                        disabled={savingDetails}
+                      />
+                    </label>
                     <p className="detail-coords">Plant ID: {plant.id}</p>
+                    <p className="detail-coords">Bed #: {plant.bed_number ?? 'Not set'}</p>
+                    <p className="detail-coords">Row / Section: {plant.row_section_id || 'Not set'}</p>
                   </div>
                 ) : (
                   <>
                     <h1 className="detail-title">{plant.name}</h1>
                     <p className="detail-location">Species: {plant.species || 'Not set'}</p>
                     <p className="detail-location">Indoor / Outdoor: {getLocationLabel(plant.room_or_bed)}</p>
+                    <p className="detail-location">Bed #: {plant.bed_number ?? 'Not set'}</p>
+                    <p className="detail-location">Row / Section: {plant.row_section_id || 'Not set'}</p>
                     <p className="detail-coords">Plant ID: {plant.id}</p>
+                    {plant.qr_code_image_url && (
+                      <div className="homeowner-qr-preview">
+                        <p className="detail-location">Plant QR Tag</p>
+                        <img src={plant.qr_code_image_url} alt={`QR code for ${plant.name}`} className="homeowner-qr-image" />
+                        <p className="detail-coords homeowner-qr-payload">{plant.qr_code_payload}</p>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -382,6 +558,134 @@ export default function HomeownerPlantDetail() {
               </div>
             )}
           </section>
+
+          <section className="card homeowner-journal-section">
+            <h2>Plant Journal</h2>
+            <p className="homeowner-journal-subtext">
+              Track planted, harvested, fertilized, watered events plus notes over time.
+            </p>
+
+            <form className="homeowner-journal-form" onSubmit={createJournalEntry}>
+              <label className="homeowner-detail-label">
+                Entry Type
+                <select
+                  className="homeowner-detail-input"
+                  value={journalForm.event_type}
+                  onChange={(e) => setJournalForm((prev) => ({ ...prev, event_type: e.target.value }))}
+                  disabled={journalSaving}
+                >
+                  {JOURNAL_EVENT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="homeowner-detail-label">
+                Date / Time
+                <input
+                  className="homeowner-detail-input"
+                  type="datetime-local"
+                  value={journalForm.occurred_at}
+                  onChange={(e) => setJournalForm((prev) => ({ ...prev, occurred_at: e.target.value }))}
+                  disabled={journalSaving}
+                  required
+                />
+              </label>
+
+              <label className="homeowner-detail-label homeowner-journal-notes-field">
+                Notes
+                <textarea
+                  className="homeowner-detail-input homeowner-journal-notes"
+                  rows={3}
+                  value={journalForm.notes}
+                  onChange={(e) => setJournalForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  disabled={journalSaving}
+                  placeholder="Optional notes for this event"
+                />
+              </label>
+
+              <button className="btn btn-primary" type="submit" disabled={journalSaving}>
+                {journalSaving ? 'Saving...' : 'Add Journal Entry'}
+              </button>
+            </form>
+
+            {journalError && <p className="homeowner-detail-error homeowner-journal-error">{journalError}</p>}
+
+            {journalLoading ? (
+              <p>Loading journal entries...</p>
+            ) : journalEntries.length === 0 ? (
+              <p>No journal entries yet.</p>
+            ) : (
+              <div className="homeowner-journal-entry-list">
+                {journalEntries.map((entry) => (
+                  <article key={entry.id} className="homeowner-journal-entry">
+                    {editingJournalId === entry.id ? (
+                      <>
+                        <div className="homeowner-journal-entry-grid">
+                          <label className="homeowner-detail-label">
+                            Entry Type
+                            <select
+                              className="homeowner-detail-input"
+                              value={editingJournalForm.event_type}
+                              onChange={(e) => setEditingJournalForm((prev) => ({ ...prev, event_type: e.target.value }))}
+                              disabled={journalSaving}
+                            >
+                              {JOURNAL_EVENT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="homeowner-detail-label">
+                            Date / Time
+                            <input
+                              className="homeowner-detail-input"
+                              type="datetime-local"
+                              value={editingJournalForm.occurred_at}
+                              onChange={(e) => setEditingJournalForm((prev) => ({ ...prev, occurred_at: e.target.value }))}
+                              disabled={journalSaving}
+                            />
+                          </label>
+                        </div>
+                        <label className="homeowner-detail-label homeowner-journal-notes-field">
+                          Notes
+                          <textarea
+                            className="homeowner-detail-input homeowner-journal-notes"
+                            rows={3}
+                            value={editingJournalForm.notes}
+                            onChange={(e) => setEditingJournalForm((prev) => ({ ...prev, notes: e.target.value }))}
+                            disabled={journalSaving}
+                          />
+                        </label>
+                        <div className="homeowner-journal-entry-actions">
+                          <button className="btn btn-primary" onClick={() => saveJournalEntry(entry.id)} disabled={journalSaving}>
+                            Save Entry
+                          </button>
+                          <button className="btn btn-secondary" onClick={cancelEditJournalEntry} disabled={journalSaving}>
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="homeowner-journal-entry-type">{(entry.event_type || 'note').toUpperCase()}</p>
+                        <p className="homeowner-journal-entry-date">{new Date(entry.occurred_at).toLocaleString()}</p>
+                        <p className="homeowner-journal-entry-notes">{entry.notes || 'No notes'}</p>
+                        <div className="homeowner-journal-entry-actions">
+                          <button className="btn btn-secondary" onClick={() => startEditJournalEntry(entry)} disabled={journalSaving}>
+                            Edit
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => deleteJournalEntry(entry.id)} disabled={journalSaving}>
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
           <section className="homeowner-diagnostics-board">
             {!diagnostics && (
               <div className="card diag-card diag-card-span-full">

@@ -1177,6 +1177,10 @@ const HOMEOWNER_TIER_LIMITS = {
   estate: 65,
 };
 
+const HOMEOWNER_PLANT_SELECT = 'id, user_id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
+const HOMEOWNER_PLANT_PUBLIC_SELECT = 'id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
+const HOMEOWNER_JOURNAL_EVENT_TYPES = new Set(['planted', 'harvested', 'fertilized', 'watered', 'note']);
+
 function getHomeownerTierLimit(tier) {
   return HOMEOWNER_TIER_LIMITS[tier] || HOMEOWNER_TIER_LIMITS.free;
 }
@@ -1197,6 +1201,54 @@ function formatMoneyFromMinorUnits(amountMinor, currency = 'usd') {
   } catch {
     return `$${amount.toFixed(2)}`;
   }
+}
+
+function normalizeAppBaseUrl(value) {
+  const candidate = (value || '').toString().trim();
+  if (!candidate) return 'http://localhost:5173';
+  return candidate.replace(/\/$/, '');
+}
+
+function createHomeownerQrToken() {
+  return crypto.randomBytes(12).toString('hex');
+}
+
+function buildHomeownerPlantQrPayload(qrToken) {
+  const token = (qrToken || '').toString().trim();
+  if (!token) return '';
+  const appBaseUrl = normalizeAppBaseUrl(process.env.APP_BASE_URL || CLIENT_URL);
+  return `${appBaseUrl}/homeowners/plant-tag/${encodeURIComponent(token)}`;
+}
+
+function normalizeBedNumber(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+    return { error: 'Bed # must be an integer between 1 and 100.' };
+  }
+  return { value: parsed };
+}
+
+function normalizeRowSectionId(value) {
+  if (value == null || value === '') return null;
+  const normalized = (value || '').toString().trim().toUpperCase().replace(/\s+/g, '');
+  if (!normalized) return null;
+  if (!/^[A-Z](100|[1-9][0-9]?)$/.test(normalized)) {
+    return { error: 'Row/Section ID must follow Letter+Number format like A1 through Z100.' };
+  }
+  return { value: normalized };
+}
+
+function serializeHomeownerPlant(plant) {
+  if (!plant || typeof plant !== 'object') return plant;
+  const qrToken = (plant.qr_code_token || '').toString().trim() || null;
+  const qrPayload = qrToken ? buildHomeownerPlantQrPayload(qrToken) : null;
+  return {
+    ...plant,
+    qr_code_token: qrToken,
+    qr_code_payload: qrPayload,
+    qr_code_image_url: qrPayload ? buildQrImageUrl(qrPayload) : null,
+  };
 }
 
 function normalizeStripeCustomerId(value) {
@@ -1400,7 +1452,7 @@ function buildLockedPlantResponse(accessState) {
 async function getOwnedHomeownerPlant(userId, plantId) {
   const { data: plant, error } = await writeSupabase
     .from('homeowner_plants')
-    .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+    .select(HOMEOWNER_PLANT_SELECT)
     .eq('id', plantId)
     .eq('user_id', userId)
     .single();
@@ -1858,7 +1910,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
 
     const { data: plants, error: plantsError } = await writeSupabase
       .from('homeowner_plants')
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -1870,7 +1922,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
     if (accessState.error) {
       console.error('Homeowner tier/count error, returning safe defaults:', accessState.error.message || accessState.error);
       return res.json({
-        plants: (plantsError ? [] : (plants || [])).map((plant) => ({ ...plant, is_locked: false })),
+        plants: (plantsError ? [] : (plants || [])).map((plant) => ({ ...serializeHomeownerPlant(plant), is_locked: false })),
         tier: 'free',
         profile_limit: getHomeownerTierLimit('free'),
         active_profiles: Array.isArray(plants) ? plants.length : 0,
@@ -1879,7 +1931,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
     }
 
     const serializedPlants = (plantsError ? [] : (plants || [])).map((plant) => ({
-      ...plant,
+      ...serializeHomeownerPlant(plant),
       is_locked: isHomeownerPlantLocked(plant.id, accessState),
     }));
 
@@ -1920,7 +1972,7 @@ api.get('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
       return res.status(403).json(buildLockedPlantResponse(accessState));
     }
 
-    return res.json({ plant });
+    return res.json({ plant: serializeHomeownerPlant(plant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch plant profile' });
   }
@@ -1932,9 +1984,19 @@ api.post('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
     const name = (req.body?.name || '').toString().trim();
     const species = (req.body?.species || '').toString().trim();
     const roomOrBed = (req.body?.room_or_bed || '').toString().trim();
+    const normalizedBedNumber = normalizeBedNumber(req.body?.bed_number);
+    const normalizedRowSectionId = normalizeRowSectionId(req.body?.row_section_id);
 
     if (!name) {
       return res.status(400).json({ error: 'Plant name is required' });
+    }
+
+    if (normalizedBedNumber?.error) {
+      return res.status(400).json({ error: normalizedBedNumber.error });
+    }
+
+    if (normalizedRowSectionId?.error) {
+      return res.status(400).json({ error: normalizedRowSectionId.error });
     }
 
     const status = await getHomeownerTierAndCount(userId);
@@ -1959,17 +2021,20 @@ api.post('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
           name,
           species: species || null,
           room_or_bed: roomOrBed || null,
+          bed_number: normalizedBedNumber?.value ?? null,
+          row_section_id: normalizedRowSectionId?.value ?? null,
+          qr_code_token: createHomeownerQrToken(),
           photos: [],
         },
       ])
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .single();
 
     if (insertError) {
       return res.status(500).json({ error: insertError.message || 'Failed to create plant profile' });
     }
 
-    return res.status(201).json({ plant });
+    return res.status(201).json({ plant: serializeHomeownerPlant(plant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create homeowner plant' });
   }
@@ -1983,6 +2048,8 @@ api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
     const nextName = req.body?.name;
     const nextSpecies = req.body?.species;
     const nextRoomOrBed = req.body?.room_or_bed;
+    const nextBedNumber = req.body?.bed_number;
+    const nextRowSectionId = req.body?.row_section_id;
 
     const updateData = {};
     if (typeof nextName === 'string') {
@@ -1997,6 +2064,20 @@ api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
     }
     if (typeof nextRoomOrBed === 'string') {
       updateData.room_or_bed = nextRoomOrBed.trim() || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'bed_number')) {
+      const normalizedBedNumber = normalizeBedNumber(nextBedNumber);
+      if (normalizedBedNumber?.error) {
+        return res.status(400).json({ error: normalizedBedNumber.error });
+      }
+      updateData.bed_number = normalizedBedNumber?.value ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'row_section_id')) {
+      const normalizedRowSectionId = normalizeRowSectionId(nextRowSectionId);
+      if (normalizedRowSectionId?.error) {
+        return res.status(400).json({ error: normalizedRowSectionId.error });
+      }
+      updateData.row_section_id = normalizedRowSectionId?.value ?? null;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -2022,7 +2103,7 @@ api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
       .update(updateData)
       .eq('id', id)
       .eq('user_id', userId)
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .single();
 
     if (updateError) {
@@ -2033,9 +2114,234 @@ api.patch('/homeowners/plants/:id', requireHomeownerAuth, async (req, res) => {
       return res.status(404).json({ error: 'Plant profile not found' });
     }
 
-    return res.json({ plant });
+    return res.json({ plant: serializeHomeownerPlant(plant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update homeowner plant' });
+  }
+});
+
+api.get('/homeowners/plants/:id/journal', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
+    const { data: entries, error: journalError } = await writeSupabase
+      .from('homeowner_plant_journal_entries')
+      .select('id, plant_id, user_id, event_type, occurred_at, notes, created_at, updated_at')
+      .eq('plant_id', id)
+      .eq('user_id', userId)
+      .order('occurred_at', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (journalError) {
+      return res.status(500).json({ error: journalError.message || 'Failed to fetch plant journal' });
+    }
+
+    return res.json({ entries: entries || [] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load plant journal entries' });
+  }
+});
+
+api.post('/homeowners/plants/:id/journal', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
+    const eventType = (req.body?.event_type || '').toString().trim().toLowerCase();
+    const notes = (req.body?.notes || '').toString().trim();
+    const occurredAtRaw = req.body?.occurred_at;
+
+    if (!HOMEOWNER_JOURNAL_EVENT_TYPES.has(eventType)) {
+      return res.status(400).json({ error: 'event_type must be planted, harvested, fertilized, watered, or note.' });
+    }
+
+    const occurredAtDate = occurredAtRaw ? new Date(occurredAtRaw) : new Date();
+    if (Number.isNaN(occurredAtDate.getTime())) {
+      return res.status(400).json({ error: 'occurred_at must be a valid date-time value.' });
+    }
+
+    const { data: entry, error: insertError } = await writeSupabase
+      .from('homeowner_plant_journal_entries')
+      .insert([
+        {
+          plant_id: id,
+          user_id: userId,
+          event_type: eventType,
+          occurred_at: occurredAtDate.toISOString(),
+          notes: notes || null,
+        },
+      ])
+      .select('id, plant_id, user_id, event_type, occurred_at, notes, created_at, updated_at')
+      .single();
+
+    if (insertError) {
+      return res.status(500).json({ error: insertError.message || 'Failed to create journal entry' });
+    }
+
+    return res.status(201).json({ entry });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to create plant journal entry' });
+  }
+});
+
+api.patch('/homeowners/plants/:id/journal/:entryId', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const entryId = (req.params.entryId || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
+    const updateData = {};
+    if (typeof req.body?.event_type === 'string') {
+      const eventType = req.body.event_type.trim().toLowerCase();
+      if (!HOMEOWNER_JOURNAL_EVENT_TYPES.has(eventType)) {
+        return res.status(400).json({ error: 'event_type must be planted, harvested, fertilized, watered, or note.' });
+      }
+      updateData.event_type = eventType;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'notes')) {
+      const notes = (req.body?.notes || '').toString().trim();
+      updateData.notes = notes || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'occurred_at')) {
+      const occurredAtDate = new Date(req.body?.occurred_at);
+      if (Number.isNaN(occurredAtDate.getTime())) {
+        return res.status(400).json({ error: 'occurred_at must be a valid date-time value.' });
+      }
+      updateData.occurred_at = occurredAtDate.toISOString();
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update.' });
+    }
+
+    const { data: entry, error: updateError } = await writeSupabase
+      .from('homeowner_plant_journal_entries')
+      .update(updateData)
+      .eq('id', entryId)
+      .eq('plant_id', id)
+      .eq('user_id', userId)
+      .select('id, plant_id, user_id, event_type, occurred_at, notes, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Failed to update journal entry' });
+    }
+
+    if (!entry) {
+      return res.status(404).json({ error: 'Journal entry not found' });
+    }
+
+    return res.json({ entry });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update plant journal entry' });
+  }
+});
+
+api.delete('/homeowners/plants/:id/journal/:entryId', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const id = (req.params.id || '').toString().trim();
+    const entryId = (req.params.entryId || '').toString().trim();
+    const { plant, error } = await getOwnedHomeownerPlant(userId, id);
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'Plant profile not found' });
+    }
+
+    const accessState = await getHomeownerPlantAccessState(userId);
+    if (accessState.error) {
+      return res.status(500).json({ error: accessState.error.message || 'Failed to verify plan access' });
+    }
+
+    if (isHomeownerPlantLocked(id, accessState)) {
+      return res.status(403).json(buildLockedPlantResponse(accessState));
+    }
+
+    const { error: deleteError } = await writeSupabase
+      .from('homeowner_plant_journal_entries')
+      .delete()
+      .eq('id', entryId)
+      .eq('plant_id', id)
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message || 'Failed to delete journal entry' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete plant journal entry' });
+  }
+});
+
+api.get('/homeowners/qr/:token/resolve', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const token = (req.params.token || '').toString().trim();
+
+    if (!token) {
+      return res.status(400).json({ error: 'QR token is required.' });
+    }
+
+    const { data: plant, error } = await writeSupabase
+      .from('homeowner_plants')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('qr_code_token', token)
+      .single();
+
+    if (error || !plant) {
+      return res.status(404).json({ error: 'No plant was found for this QR token.' });
+    }
+
+    return res.json({ plant });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to resolve homeowner QR token' });
   }
 });
 
@@ -2143,14 +2449,14 @@ api.post('/homeowners/plants/:id/photos', requireHomeownerAuth, upload.single('p
       .update({ photos: nextPhotos })
       .eq('id', id)
       .eq('user_id', userId)
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .single();
 
     if (updateError) {
       return res.status(500).json({ error: updateError.message || 'Failed to save photo on profile' });
     }
 
-    return res.status(201).json({ plant: updatedPlant });
+    return res.status(201).json({ plant: serializeHomeownerPlant(updatedPlant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to upload homeowner plant photo' });
   }
@@ -2188,14 +2494,14 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
         .update({ last_diagnostics: fallbackDiagnostics })
         .eq('id', id)
         .eq('user_id', userId)
-        .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+        .select(HOMEOWNER_PLANT_SELECT)
         .single();
 
       if (updateError) {
         return res.status(500).json({ error: updateError.message || 'Failed to store diagnostics' });
       }
 
-      return res.json({ diagnostics: fallbackDiagnostics, plant: updatedPlant });
+      return res.json({ diagnostics: fallbackDiagnostics, plant: serializeHomeownerPlant(updatedPlant) });
     }
 
     const diagnosticsPrompt = `${ARBORAI_REGIONAL_SCOPE}
@@ -2444,14 +2750,14 @@ api.post('/homeowners/plants/:id/diagnostics', requireHomeownerAuth, async (req,
       .update({ last_diagnostics: normalized })
       .eq('id', id)
       .eq('user_id', userId)
-      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_SELECT)
       .single();
 
     if (updateError) {
       return res.status(500).json({ error: updateError.message || 'Failed to store diagnostics' });
     }
 
-    return res.json({ diagnostics: normalized, plant: updatedPlant });
+    return res.json({ diagnostics: normalized, plant: serializeHomeownerPlant(updatedPlant) });
   } catch (err) {
     console.error('Homeowner diagnostics error:', err);
     return res.status(500).json({ error: 'Failed to run homeowner diagnostics' });
@@ -2470,7 +2776,7 @@ api.delete('/homeowners/plants/:id/photos/:photoIndex', requireHomeownerAuth, as
 
     const { data: plant, error: findError } = await writeSupabase
       .from('homeowner_plants')
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -2501,7 +2807,7 @@ api.delete('/homeowners/plants/:id/photos/:photoIndex', requireHomeownerAuth, as
       .update({ photos: nextPhotos })
       .eq('id', id)
       .eq('user_id', userId)
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .single();
 
     if (updateError) {
@@ -2513,7 +2819,7 @@ api.delete('/homeowners/plants/:id/photos/:photoIndex', requireHomeownerAuth, as
       await writeSupabase.storage.from(PHOTO_BUCKET).remove([objectPath]);
     }
 
-    return res.json({ plant: updatedPlant });
+    return res.json({ plant: serializeHomeownerPlant(updatedPlant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete homeowner plant photo' });
   }
@@ -2535,7 +2841,7 @@ api.post('/homeowners/plants/:id/photos/:photoIndex/replace', requireHomeownerAu
 
     const { data: plant, error: findError } = await writeSupabase
       .from('homeowner_plants')
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -2582,7 +2888,7 @@ api.post('/homeowners/plants/:id/photos/:photoIndex/replace', requireHomeownerAu
       .update({ photos: nextPhotos })
       .eq('id', id)
       .eq('user_id', userId)
-      .select('id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
       .single();
 
     if (updateError) {
@@ -2594,7 +2900,7 @@ api.post('/homeowners/plants/:id/photos/:photoIndex/replace', requireHomeownerAu
       await writeSupabase.storage.from(PHOTO_BUCKET).remove([oldObjectPath]);
     }
 
-    return res.json({ plant: updatedPlant });
+    return res.json({ plant: serializeHomeownerPlant(updatedPlant) });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to replace homeowner plant photo' });
   }
@@ -2632,18 +2938,21 @@ api.post('/homeowners/ai/create-plant-from-scan', requireHomeownerAuth, async (r
           name: normalizedSpecies,
           species: normalizedSpecies,
           room_or_bed: null,
+          bed_number: null,
+          row_section_id: null,
+          qr_code_token: createHomeownerQrToken(),
           photos: normalizedUrls,
           last_diagnostics: diagnostics,
         },
       ])
-      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_SELECT)
       .single();
 
     if (insertError || !plant) {
       return res.status(500).json({ error: insertError?.message || 'Failed to create plant from scan' });
     }
 
-    return res.status(201).json({ plant, added_photos: normalizedUrls.length });
+    return res.status(201).json({ plant: serializeHomeownerPlant(plant), added_photos: normalizedUrls.length });
   } catch (err) {
     console.error('Unexpected homeowner create-plant-from-scan error:', err);
     return res.status(500).json({ error: 'Unexpected homeowner create-plant-from-scan error' });
@@ -2692,14 +3001,14 @@ api.post('/homeowners/ai/attach-scan-to-plant', requireHomeownerAuth, async (req
       .update({ photos: nextPhotos, last_diagnostics: diagnostics })
       .eq('id', plantId)
       .eq('user_id', userId)
-      .select('id, user_id, name, species, room_or_bed, photos, last_diagnostics, created_at, updated_at')
+      .select(HOMEOWNER_PLANT_SELECT)
       .single();
 
     if (updateError || !updatedPlant) {
       return res.status(500).json({ error: updateError?.message || 'Failed to attach scan to plant' });
     }
 
-    return res.json({ plant: updatedPlant, added_photos: urlsToAdd.length });
+    return res.json({ plant: serializeHomeownerPlant(updatedPlant), added_photos: urlsToAdd.length });
   } catch (err) {
     console.error('Unexpected homeowner attach-scan-to-plant error:', err);
     return res.status(500).json({ error: 'Unexpected homeowner attach-scan-to-plant error' });
@@ -5146,3 +5455,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
