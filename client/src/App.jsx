@@ -171,6 +171,7 @@ export default function App() {
                 <Route path="/trees" element={<DatabaseEntryRoute />} />
                 <Route path="/database" element={<DatabaseEntryRoute />} />
                 <Route path="/add" element={<AddTree />} />
+                <Route path="/listing/ed693588-c42c-473b-acc4-f9a51e426d96" element={<Navigate to="/homeowners/demo-garden" replace />} />
                 <Route path="/listing/:id" element={<TreeDetail />} />
                 <Route path="/tag/:id" element={<TreeDetail />} />
                 <Route path="/scan" element={<Scan />} />

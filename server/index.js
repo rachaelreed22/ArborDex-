@@ -1669,6 +1669,29 @@ api.post('/contact', publicContactLimiter, async (req, res) => {
   }
 });
 
+api.post('/demo-garden/queens-pass/verify', async (req, res) => {
+  const configuredEmail = (process.env.QUEENS_PASS_EMAIL || 'rachaelr@rrtech.dev').toString().trim().toLowerCase();
+  const configuredPassId = (process.env.QUEENS_PASS_ID || '').toString().trim();
+
+  if (!configuredPassId) {
+    return res.status(503).json({ error: 'Queen\'s Pass is not configured on the server yet.' });
+  }
+
+  const email = (req.body?.email || '').toString().trim().toLowerCase();
+  const passId = (req.body?.pass_id || '').toString().trim();
+
+  if (!email || !passId) {
+    return res.status(400).json({ error: 'Both email and pass_id are required.' });
+  }
+
+  const isMatch = email === configuredEmail && passId === configuredPassId;
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Queen\'s Pass validation failed.' });
+  }
+
+  return res.json({ ok: true });
+});
+
 // ===========================
 // HOMEOWNER BILLING (STRIPE)
 // ===========================
