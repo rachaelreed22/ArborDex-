@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fileToDataUrl, getCachedDemoGardenPlants, getDemoPlantById, saveDemoGardenPlants } from '../utils/demoGardenStore';
-import { getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
+import { clearDemoQueensPass, getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
 import './HomeownerTheme.css';
 import './TreeDetail.css';
 import './HomeownerPlantDetail.css';
@@ -107,6 +107,13 @@ function toTextArray(value) {
   if (value == null) return [];
   const text = value.toString().trim();
   return text ? [text] : [];
+}
+
+function isQueensPassAuthError(message) {
+  const text = (message || '').toString().toLowerCase();
+  return text.includes('queen\'s pass authorization is required')
+    || text.includes('queen\'s pass is required')
+    || text.includes('unauthorized');
 }
 
 export default function HomeownerDemoPlantDetail() {
@@ -218,7 +225,18 @@ export default function HomeownerDemoPlantDetail() {
   async function persistPlant(updater) {
     const plants = getCachedDemoGardenPlants();
     const updatedPlants = plants.map((entry) => (entry.id === id ? updater(entry) : entry));
-    const savedPlants = await saveDemoGardenPlants(updatedPlants, getDemoQueensPassToken());
+    let savedPlants = [];
+
+    try {
+      savedPlants = await saveDemoGardenPlants(updatedPlants, getDemoQueensPassToken());
+    } catch (err) {
+      if (isQueensPassAuthError(err?.message)) {
+        clearDemoQueensPass();
+        setPassError("Please verify Queen's Pass to continue editing.");
+        setShowPassGate(true);
+      }
+      throw err;
+    }
 
     const next = savedPlants.find((entry) => entry.id === id) || null;
     setPlant(next);

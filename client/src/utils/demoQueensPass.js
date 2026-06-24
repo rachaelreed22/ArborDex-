@@ -4,8 +4,18 @@ const DEMO_QUEENS_PASS_TOKEN_KEY = 'arbordex-demo-queens-pass-token';
 const DEMO_QUEENS_PASS_UNLOCKED_KEY = 'arbordex-demo-queens-pass-unlocked';
 
 export function isDemoQueensPassUnlocked() {
-  return Boolean(window.localStorage.getItem(DEMO_QUEENS_PASS_TOKEN_KEY))
-    || window.localStorage.getItem(DEMO_QUEENS_PASS_UNLOCKED_KEY) === '1';
+  const token = (window.localStorage.getItem(DEMO_QUEENS_PASS_TOKEN_KEY) || '').toString().trim();
+  if (token) {
+    window.localStorage.setItem(DEMO_QUEENS_PASS_UNLOCKED_KEY, '1');
+    return true;
+  }
+
+  // Remove stale legacy unlock flags that do not have a valid edit token.
+  if (window.localStorage.getItem(DEMO_QUEENS_PASS_UNLOCKED_KEY) === '1') {
+    window.localStorage.removeItem(DEMO_QUEENS_PASS_UNLOCKED_KEY);
+  }
+
+  return false;
 }
 
 export function getDemoQueensPassToken() {
@@ -20,6 +30,10 @@ export function setDemoQueensPassUnlocked(token) {
     window.localStorage.removeItem(DEMO_QUEENS_PASS_TOKEN_KEY);
     window.localStorage.removeItem(DEMO_QUEENS_PASS_UNLOCKED_KEY);
   }
+}
+
+export function clearDemoQueensPass() {
+  setDemoQueensPassUnlocked('');
 }
 
 export async function verifyDemoQueensPass(email, passId) {

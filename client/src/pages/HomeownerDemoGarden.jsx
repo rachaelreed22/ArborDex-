@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDemoGardenPlants, fileToDataUrl, getCachedDemoGardenPlants, saveDemoGardenPlants } from '../utils/demoGardenStore';
-import { getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
+import { clearDemoQueensPass, getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
 import './HomeownerTheme.css';
 import './TreeList.css';
 import './HomeownerPlants.css';
@@ -22,10 +22,16 @@ function getLocationLabel(value) {
   return 'Not set';
 }
 
+function isQueensPassAuthError(message) {
+  const text = (message || '').toString().toLowerCase();
+  return text.includes('queen\'s pass authorization is required')
+    || text.includes('queen\'s pass is required')
+    || text.includes('unauthorized');
+}
+
 export default function HomeownerDemoGarden() {
   const navigate = useNavigate();
   const [plants, setPlants] = useState([]);
-  const [queenPassUnlocked, setQueenPassUnlocked] = useState(isDemoQueensPassUnlocked());
   const [passError, setPassError] = useState('');
   const [passLoading, setPassLoading] = useState(false);
   const [showPassGate, setShowPassGate] = useState(false);
@@ -78,6 +84,11 @@ export default function HomeownerDemoGarden() {
       setPlants(savedPlants);
       return savedPlants;
     } catch (err) {
+      if (isQueensPassAuthError(err?.message)) {
+        clearDemoQueensPass();
+        setPassError("Please verify Queen's Pass to continue editing.");
+        setShowPassGate(true);
+      }
       setError(err.message || 'Could not save shared demo garden changes.');
       throw err;
     } finally {
@@ -86,11 +97,12 @@ export default function HomeownerDemoGarden() {
   }
 
   function withPassGate(action) {
-    if (queenPassUnlocked) {
-      action();
+    if (isDemoQueensPassUnlocked()) {
+      void Promise.resolve(action());
       return;
     }
 
+    setPassError('');
     pendingActionRef.current = action;
     setShowPassGate(true);
   }
@@ -102,12 +114,11 @@ export default function HomeownerDemoGarden() {
 
       await verifyDemoQueensPass(queenPassForm.email, queenPassForm.pass_id);
 
-      setQueenPassUnlocked(true);
       setShowPassGate(false);
       if (typeof pendingActionRef.current === 'function') {
         const action = pendingActionRef.current;
         pendingActionRef.current = null;
-        action();
+        void Promise.resolve(action());
       }
     } catch (err) {
       setPassError(err.message || "Queen's Pass verification failed.");
