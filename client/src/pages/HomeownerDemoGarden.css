@@ -1,0 +1,46 @@
+.homeowner-demo-page .homeowner-panel {
+  margin-top: 0;
+}
+
+.homeowner-demo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.homeowner-demo-plant-grid {
+  margin-top: 1.2rem;
+}
+
+.homeowner-demo-plant-card {
+  cursor: pointer;
+}
+
+.homeowner-demo-note {
+  margin-top: 1rem;
+}
+
+.homeowner-demo-actions-bottom {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.homeowner-queens-gate {
+  margin-top: 1rem;
+}
+
+.homeowner-queens-gate-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .homeowner-demo-header {
+    flex-direction: column;
+  }
+}
