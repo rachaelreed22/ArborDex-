@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useMode } from "../context/ModeContext";
 import { getNeedsAttention } from "../utils/attentionRules";
 import { apiUrl } from "../utils/apiUrl";
@@ -225,6 +225,7 @@ function shouldRedirectToDemoGarden(id) {
 
 export default function TreeDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const { mode } = useMode();
   const navigate = useNavigate();
 
@@ -280,7 +281,7 @@ export default function TreeDetail() {
   useEffect(() => {
     let cancelled = false;
 
-    if (shouldRedirectToDemoGarden(id)) {
+    if (location.pathname.startsWith('/tag/') && shouldRedirectToDemoGarden(id)) {
       navigate('/homeowners/demo-garden', { replace: true });
       return () => {
         cancelled = true;
@@ -311,7 +312,7 @@ export default function TreeDetail() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, mode]);
+  }, [id, location.pathname, mode]);
 
   async function fetchListing() {
     try {
