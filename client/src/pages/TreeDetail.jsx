@@ -218,6 +218,11 @@ function buildShortInternalId(listing) {
   return cleaned.slice(0, 8).toUpperCase();
 }
 
+function shouldRedirectToDemoGarden(id) {
+  const normalized = (id || '').toString().trim().toLowerCase();
+  return normalized === 'ed693588-c42c-473b-acc4-f9a51e426d96' || normalized === 'ed693588';
+}
+
 export default function TreeDetail() {
   const { id } = useParams();
   const { mode } = useMode();
@@ -274,6 +279,13 @@ export default function TreeDetail() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (shouldRedirectToDemoGarden(id)) {
+      navigate('/homeowners/demo-garden', { replace: true });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function loadTreeData() {
       const data = await fetchListing();
