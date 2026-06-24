@@ -907,6 +907,13 @@ export default function HomeownerPlantDetail() {
               <div className="homeowner-qr-preview">
                 <img src={plant.qr_code_image_url} alt={`QR code for ${plant.name}`} className="homeowner-qr-image" />
                 <p className="detail-coords homeowner-qr-payload">{plant.qr_code_payload}</p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => navigate('/homeowners/qr-tag-orders')}
+                >
+                  Order QR Tags
+                </button>
               </div>
             </section>
           </aside>
