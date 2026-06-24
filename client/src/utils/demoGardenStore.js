@@ -216,6 +216,10 @@ export async function saveDemoGardenPlants(plants, queensPassToken) {
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok || !Array.isArray(payload?.plants)) {
+    if (res.status === 413) {
+      throw new Error('Photo is too large to save. Please use a smaller image and try again.');
+    }
+
     throw new Error(payload.error || 'Failed to save demo garden');
   }
 
