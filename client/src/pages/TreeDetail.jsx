@@ -191,6 +191,17 @@ function resolveQrImageSrc(qrUrl) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(value)}`;
 }
 
+function buildListingQrPayload(listingId) {
+  const normalizedId = (listingId || '').toString().trim();
+  if (!normalizedId) return '';
+
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'https://arbordex.onrender.com';
+
+  return `${origin}/listing/${encodeURIComponent(normalizedId)}`;
+}
+
 function formatDateLabel(value) {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -825,7 +836,7 @@ export default function TreeDetail() {
     (typeof listing.managed_by === "string" && listing.managed_by.trim()) ||
     (typeof listing.owner_team === "string" && listing.owner_team.trim()) ||
     "ArborDex Staff";
-  const qrImageSrc = resolveQrImageSrc(listing.qr_url);
+  const qrImageSrc = resolveQrImageSrc(buildListingQrPayload(listing.id));
 
   const inspectionStatus = (() => {
     const explicitStatus =
