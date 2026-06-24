@@ -251,8 +251,8 @@ export default function HomeownerDemoGarden() {
       <div className="homeowner-surface mx-auto w-full max-w-5xl rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="homeowner-heading text-3xl font-bold">Demo Digital Garden</h1>
-            <p className="homeowner-subtext mt-2 text-sm">This mirrors the real Homeowner&apos;s Edition profile flow and layout.</p>
+            <h1 className="homeowner-heading text-3xl font-bold">🌱 Explore a Digital Garden</h1>
+            <p className="homeowner-subtext mt-2 text-sm">See how ArborTag helps you remember, organize, and care for every plant in your garden.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => navigate('/')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Home</button>
@@ -261,15 +261,24 @@ export default function HomeownerDemoGarden() {
         </div>
 
         <div className="homeowner-panel homeowner-panel-info mt-6">
-          Demo editing is locked by Queen&apos;s Pass for preview users. Plant cards and detail pages use the same theme and styling system as Homeowner profiles.
+          <p className="homeowner-heading text-base font-semibold">Welcome to the ArborTag Demo Garden</p>
+          <p className="homeowner-subtext mt-2 text-sm">Browse sample plant profiles to see how you can:</p>
+          <ul className="homeowner-subtext mt-2 space-y-1 text-sm">
+            <li>✅ Organize plants by location</li>
+            <li>✅ Keep photos and notes together</li>
+            <li>✅ Track watering, fertilizing, and harvests</li>
+            <li>✅ Store plant history in one place</li>
+            <li>✅ Build a living record of your garden over time</li>
+          </ul>
         </div>
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
-        {loading && <p className="homeowner-subtext mt-4 text-sm">Loading shared demo garden...</p>}
+        {loading && <p className="homeowner-subtext mt-4 text-sm">Loading demo garden plants...</p>}
         {!loading && saving && <p className="homeowner-subtext mt-4 text-sm">Saving shared demo garden changes...</p>}
 
         <form onSubmit={createPlant} className="homeowner-stat-card mt-6 rounded-xl p-4">
-          <h2 className="text-lg font-bold text-[#1d411d]">Add Demo Plant Profile</h2>
+          <h2 className="text-lg font-bold text-[#1d411d]">Create a Sample Plant</h2>
+          <p className="homeowner-subtext mt-1 text-sm">See how easy it is to build a digital profile for a plant in your garden.</p>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <input className="homeowner-input rounded-md px-3 py-2 text-sm" placeholder="Plant name *" value={createForm.name} onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))} />
             <input className="homeowner-input rounded-md px-3 py-2 text-sm" placeholder="Species" value={createForm.species} onChange={(e) => setCreateForm((prev) => ({ ...prev, species: e.target.value }))} />
@@ -455,7 +464,7 @@ export default function HomeownerDemoGarden() {
             className="homeowner-button-primary rounded-md px-5 py-2.5 text-sm font-semibold"
             onClick={() => navigate('/homeowners/signup')}
           >
-            Create My Digital Garden
+            🌿 Start My Garden
           </button>
         </div>
       </div>
