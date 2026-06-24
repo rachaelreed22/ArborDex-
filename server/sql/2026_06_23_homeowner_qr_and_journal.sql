@@ -3,6 +3,16 @@
 
 create extension if not exists "pgcrypto";
 
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
 alter table if exists public.homeowner_plants
   add column if not exists qr_code_token text,
   add column if not exists bed_number integer,
@@ -35,22 +45,26 @@ create index if not exists idx_homeowner_journal_user_id
 
 alter table public.homeowner_plant_journal_entries enable row level security;
 
+drop policy if exists homeowner_journal_select_own on public.homeowner_plant_journal_entries;
 create policy homeowner_journal_select_own
 on public.homeowner_plant_journal_entries
 for select
 using (auth.uid() = user_id);
 
+drop policy if exists homeowner_journal_insert_own on public.homeowner_plant_journal_entries;
 create policy homeowner_journal_insert_own
 on public.homeowner_plant_journal_entries
 for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists homeowner_journal_update_own on public.homeowner_plant_journal_entries;
 create policy homeowner_journal_update_own
 on public.homeowner_plant_journal_entries
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists homeowner_journal_delete_own on public.homeowner_plant_journal_entries;
 create policy homeowner_journal_delete_own
 on public.homeowner_plant_journal_entries
 for delete

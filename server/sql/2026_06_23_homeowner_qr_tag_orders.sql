@@ -3,6 +3,16 @@
 
 create extension if not exists "pgcrypto";
 
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
 create table if not exists public.homeowner_qr_tag_orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -19,22 +29,26 @@ create index if not exists idx_homeowner_qr_tag_orders_user_id
 
 alter table public.homeowner_qr_tag_orders enable row level security;
 
+drop policy if exists homeowner_qr_tag_orders_select_own on public.homeowner_qr_tag_orders;
 create policy homeowner_qr_tag_orders_select_own
 on public.homeowner_qr_tag_orders
 for select
 using (auth.uid() = user_id);
 
+drop policy if exists homeowner_qr_tag_orders_insert_own on public.homeowner_qr_tag_orders;
 create policy homeowner_qr_tag_orders_insert_own
 on public.homeowner_qr_tag_orders
 for insert
 with check (auth.uid() = user_id);
 
+drop policy if exists homeowner_qr_tag_orders_update_own on public.homeowner_qr_tag_orders;
 create policy homeowner_qr_tag_orders_update_own
 on public.homeowner_qr_tag_orders
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists homeowner_qr_tag_orders_delete_own on public.homeowner_qr_tag_orders;
 create policy homeowner_qr_tag_orders_delete_own
 on public.homeowner_qr_tag_orders
 for delete
