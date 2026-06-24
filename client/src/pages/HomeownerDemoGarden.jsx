@@ -274,7 +274,7 @@ export default function HomeownerDemoGarden() {
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
         {loading && <p className="homeowner-subtext mt-4 text-sm">Loading demo garden plants...</p>}
-        {!loading && saving && <p className="homeowner-subtext mt-4 text-sm">Saving shared demo garden changes...</p>}
+        {!loading && saving && <p className="homeowner-subtext mt-4 text-sm">Saving your demo garden updates...</p>}
 
         <form onSubmit={createPlant} className="homeowner-stat-card mt-6 rounded-xl p-4">
           <h2 className="text-lg font-bold text-[#1d411d]">Create a Sample Plant</h2>
