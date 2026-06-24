@@ -1,3 +1,6 @@
+import { apiUrl } from './apiUrl';
+import { getDemoQueensPassToken, isDemoQueensPassUnlocked } from './demoQueensPass';
+
 const DEMO_GARDEN_STORAGE_KEY = 'arbordex-demo-garden-plants';
 
 function buildDemoDiagnostics({ commonName, scientificName, condition }) {
@@ -147,7 +150,7 @@ function normalizePlant(plant) {
   return normalized;
 }
 
-export function loadDemoGardenPlants() {
+export function getCachedDemoGardenPlants() {
   const raw = window.localStorage.getItem(DEMO_GARDEN_STORAGE_KEY);
   const parsed = safeParse(raw || '');
 
@@ -158,13 +161,69 @@ export function loadDemoGardenPlants() {
   return parsed.map(normalizePlant);
 }
 
-export function saveDemoGardenPlants(plants) {
+export function cacheDemoGardenPlants(plants) {
   const normalized = (Array.isArray(plants) ? plants : []).map(normalizePlant);
   window.localStorage.setItem(DEMO_GARDEN_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
-export function getDemoPlantById(plantId) {
-  const plants = loadDemoGardenPlants();
+export async function fetchDemoGardenPlants() {
+  const cachedPlants = getCachedDemoGardenPlants();
+
+  try {
+    const res = await fetch(apiUrl('/api/demo-garden/plants'));
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(payload?.plants)) {
+      throw new Error(payload.error || 'Failed to load demo garden');
+    }
+
+    const normalizedDefaults = DEFAULT_DEMO_PLANTS.map(normalizePlant);
+    const normalizedCached = cachedPlants.map(normalizePlant);
+    const hasCustomizedCache = JSON.stringify(normalizedCached) !== JSON.stringify(normalizedDefaults);
+
+    if (payload.source === 'default' && hasCustomizedCache) {
+      const queensPassToken = getDemoQueensPassToken();
+      if (queensPassToken) {
+        try {
+          return await saveDemoGardenPlants(normalizedCached, queensPassToken);
+        } catch {
+          return cacheDemoGardenPlants(payload.plants);
+        }
+      }
+
+      if (isDemoQueensPassUnlocked()) {
+        return cacheDemoGardenPlants(normalizedCached);
+      }
+    }
+
+    return cacheDemoGardenPlants(payload.plants);
+  } catch {
+    return cachedPlants;
+  }
+}
+
+export async function saveDemoGardenPlants(plants, queensPassToken) {
+  const res = await fetch(apiUrl('/api/demo-garden/plants'), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(queensPassToken ? { 'x-demo-queens-pass-token': queensPassToken } : {}),
+    },
+    body: JSON.stringify({
+      plants: (Array.isArray(plants) ? plants : []).map(normalizePlant),
+    }),
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !Array.isArray(payload?.plants)) {
+    throw new Error(payload.error || 'Failed to save demo garden');
+  }
+
+  return cacheDemoGardenPlants(payload.plants);
+}
+
+export async function getDemoPlantById(plantId) {
+  const plants = await fetchDemoGardenPlants();
   return plants.find((plant) => plant.id === plantId) || null;
 }
 

@@ -1180,6 +1180,220 @@ const HOMEOWNER_TIER_LIMITS = {
 const HOMEOWNER_PLANT_SELECT = 'id, user_id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
 const HOMEOWNER_PLANT_PUBLIC_SELECT = 'id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
 const HOMEOWNER_JOURNAL_EVENT_TYPES = new Set(['planted', 'harvested', 'fertilized', 'watered', 'note']);
+const DEMO_GARDEN_STORAGE_OBJECT = 'demo-garden/state.json';
+const DEMO_GARDEN_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+function buildDemoGardenDiagnostics({ commonName, scientificName, condition }) {
+  return {
+    likely_identification: `${commonName} (${scientificName})`,
+    confidence: 'High',
+    overall_condition: condition,
+    summary: `${commonName} appears healthy with active growth and no urgent care threats in the current photos.`,
+    key_features_noticed: ['Leaf color and shape align with expected traits', 'Growth habit appears stable', 'No active pest clustering observed'],
+    primary_concerns: ['Monitor moisture consistency to avoid stress swings'],
+    care_notes: ['Rotate plant periodically for even light exposure', 'Inspect leaves weekly for early pest signs'],
+    common_issues_to_watch_for: ['Overwatering root stress', 'Leaf scorch from direct midday sun'],
+    watering_frequency_summer: 'Water when top inch of soil is dry; usually 1-2 times per week.',
+    watering_frequency_winter: 'Reduce watering cadence; typically every 7-14 days depending on indoor heat.',
+    under_over_watering_signs: ['Drooping with dry soil may indicate under-watering', 'Yellowing lower leaves with wet soil may indicate over-watering'],
+    light_requirements: 'Bright, indirect light for most of the day.',
+    temp_humidity_preferences: '65-80F with moderate humidity and good airflow.',
+    potting_soil_requirements: 'Well-draining potting mix with organic matter.',
+    warning_signs: ['Rapid leaf drop', 'Dark mushy stem/base tissue', 'Persistent foul soil odor'],
+    toxicity_info: 'Verify species-specific toxicity if pets or children have access.',
+    maintenance_requirements: 'Low to moderate maintenance with regular pruning and seasonal feeding.',
+    estimated_growth_rate: 'Moderate',
+    growing_difficulty_score: '3/10',
+    native_habitat: 'Humid woodland and understory regions.',
+    propagation_method: 'Division or stem cuttings depending on species.',
+    medicinal_qualities: 'No medicinal use claims included in this demo profile.',
+    uses_throughout_history: ['Popular ornamental in homes and conservatories'],
+    fun_facts: ['This profile demonstrates homeowner-style diagnostics layout.'],
+    hazards_detected: 'N',
+    hazard_details: [],
+    data_quality_flags: [],
+    photo_summaries: ['Photo set is clear enough for broad care guidance.'],
+  };
+}
+
+function buildDefaultDemoGardenPlants() {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: 'demo-plant-fern-01',
+      name: 'Front Porch Fern',
+      species: 'Boston Fern',
+      room_or_bed: 'indoor',
+      bed_number: null,
+      row_section_id: 'A1',
+      notes: 'This is how your homeowner plant profile cards will look and flow.',
+      photos: ['/images/RedMaple4ATag.jpg'],
+      last_diagnostics: buildDemoGardenDiagnostics({
+        commonName: 'Boston Fern',
+        scientificName: 'Nephrolepis exaltata',
+        condition: 'Healthy',
+      }),
+      journal_entries: [
+        {
+          id: 'demo-journal-fern-1',
+          event_type: 'watered',
+          occurred_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+          notes: 'Watered after topsoil dried to about 1 inch depth.',
+        },
+        {
+          id: 'demo-journal-fern-2',
+          event_type: 'fertilized',
+          occurred_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+          notes: 'Applied diluted balanced fertilizer.',
+        },
+      ],
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 'demo-plant-herbs-02',
+      name: 'Kitchen Herb Cluster',
+      species: 'Mixed Culinary Herbs',
+      room_or_bed: 'indoor',
+      bed_number: null,
+      row_section_id: 'B3',
+      notes: 'Tap into a profile to see full-page details, gallery, and editing flow.',
+      photos: [],
+      last_diagnostics: buildDemoGardenDiagnostics({
+        commonName: 'Herb Mix Cluster',
+        scientificName: 'Ocimum basilicum / Mentha spp.',
+        condition: 'Good',
+      }),
+      journal_entries: [
+        {
+          id: 'demo-journal-herbs-1',
+          event_type: 'planted',
+          occurred_at: new Date(Date.now() - 14 * 86400000).toISOString(),
+          notes: 'Started basil and mint together in shared container.',
+        },
+      ],
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+}
+
+function normalizeDemoGardenJournalEntry(entry) {
+  return {
+    id: (entry?.id || `demo-journal-${crypto.randomUUID()}`).toString(),
+    event_type: (entry?.event_type || 'note').toString(),
+    occurred_at: entry?.occurred_at || new Date().toISOString(),
+    notes: (entry?.notes || '').toString(),
+  };
+}
+
+function inferDemoGardenDiagnostics(plant) {
+  const commonName = (plant?.species || plant?.name || 'Demo Plant').toString().trim() || 'Demo Plant';
+  const scientificName = (plant?.species || 'Species not provided').toString().trim() || 'Species not provided';
+  return buildDemoGardenDiagnostics({ commonName, scientificName, condition: 'Good' });
+}
+
+function normalizeDemoGardenPlant(plant) {
+  const normalized = {
+    ...plant,
+    id: (plant?.id || `demo-plant-${crypto.randomUUID()}`).toString(),
+    name: (plant?.name || '').toString(),
+    species: (plant?.species || '').toString(),
+    room_or_bed: (plant?.room_or_bed || '').toString(),
+    bed_number: plant?.bed_number == null || plant?.bed_number === '' ? null : Number.parseInt(plant.bed_number, 10),
+    row_section_id: (plant?.row_section_id || '').toString(),
+    notes: (plant?.notes || '').toString(),
+    photos: Array.isArray(plant?.photos) ? plant.photos.filter(Boolean) : [],
+    last_diagnostics: plant?.last_diagnostics && typeof plant.last_diagnostics === 'object'
+      ? { ...inferDemoGardenDiagnostics(plant), ...plant.last_diagnostics }
+      : inferDemoGardenDiagnostics(plant),
+    journal_entries: Array.isArray(plant?.journal_entries)
+      ? plant.journal_entries.map(normalizeDemoGardenJournalEntry)
+      : [],
+    created_at: plant?.created_at || new Date().toISOString(),
+    updated_at: plant?.updated_at || new Date().toISOString(),
+  };
+
+  if (!Number.isInteger(normalized.bed_number)) {
+    normalized.bed_number = null;
+  }
+
+  return normalized;
+}
+
+function getQueensPassConfig() {
+  return {
+    email: (process.env.QUEENS_PASS_EMAIL || 'rachaelr@rrtech.dev').toString().trim().toLowerCase(),
+    passId: (process.env.QUEENS_PASS_ID || '').toString().trim(),
+  };
+}
+
+function createDemoGardenEditToken(email) {
+  const { passId } = getQueensPassConfig();
+  const payload = Buffer.from(
+    JSON.stringify({
+      email,
+      exp: Date.now() + DEMO_GARDEN_TOKEN_TTL_MS,
+    })
+  ).toString('base64url');
+  const signature = crypto.createHmac('sha256', passId).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyDemoGardenEditToken(token) {
+  const { email: configuredEmail, passId } = getQueensPassConfig();
+  if (!passId || !token) return false;
+
+  const [payload, signature] = token.toString().split('.');
+  if (!payload || !signature) return false;
+
+  const expectedSignature = crypto.createHmac('sha256', passId).update(payload).digest('base64url');
+  if (signature !== expectedSignature) return false;
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!decoded?.exp || Number(decoded.exp) < Date.now()) return false;
+    return (decoded.email || '').toString().trim().toLowerCase() === configuredEmail;
+  } catch {
+    return false;
+  }
+}
+
+async function readDemoGardenPlants() {
+  const fallback = buildDefaultDemoGardenPlants().map(normalizeDemoGardenPlant);
+
+  try {
+    const { data, error } = await writeSupabase.storage.from(PHOTO_BUCKET).download(DEMO_GARDEN_STORAGE_OBJECT);
+    if (error || !data) {
+      return { plants: fallback, source: 'default' };
+    }
+
+    const raw = await data.text();
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return { plants: fallback, source: 'default' };
+    }
+
+    return { plants: parsed.map(normalizeDemoGardenPlant), source: 'storage' };
+  } catch {
+    return { plants: fallback, source: 'default' };
+  }
+}
+
+async function writeDemoGardenPlants(plants) {
+  const normalizedPlants = (Array.isArray(plants) ? plants : []).map(normalizeDemoGardenPlant);
+  const payload = JSON.stringify(normalizedPlants, null, 2);
+  const { error } = await writeSupabase.storage.from(PHOTO_BUCKET).upload(DEMO_GARDEN_STORAGE_OBJECT, payload, {
+    contentType: 'application/json',
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to save demo garden state');
+  }
+
+  return normalizedPlants;
+}
 
 function getHomeownerTierLimit(tier) {
   return HOMEOWNER_TIER_LIMITS[tier] || HOMEOWNER_TIER_LIMITS.free;
@@ -1670,8 +1884,7 @@ api.post('/contact', publicContactLimiter, async (req, res) => {
 });
 
 api.post('/demo-garden/queens-pass/verify', async (req, res) => {
-  const configuredEmail = (process.env.QUEENS_PASS_EMAIL || 'rachaelr@rrtech.dev').toString().trim().toLowerCase();
-  const configuredPassId = (process.env.QUEENS_PASS_ID || '').toString().trim();
+  const { email: configuredEmail, passId: configuredPassId } = getQueensPassConfig();
 
   if (!configuredPassId) {
     return res.status(503).json({ error: 'Queen\'s Pass is not configured on the server yet.' });
@@ -1689,7 +1902,39 @@ api.post('/demo-garden/queens-pass/verify', async (req, res) => {
     return res.status(401).json({ error: 'Queen\'s Pass validation failed.' });
   }
 
-  return res.json({ ok: true });
+  return res.json({ ok: true, token: createDemoGardenEditToken(email) });
+});
+
+api.get('/demo-garden/plants', async (_req, res) => {
+  try {
+    const state = await readDemoGardenPlants();
+    return res.json(state);
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to load demo garden state.' });
+  }
+});
+
+api.put('/demo-garden/plants', async (req, res) => {
+  try {
+    if (!HAS_SERVICE_ROLE) {
+      return res.status(503).json({ error: 'Demo garden persistence is not configured on the server.' });
+    }
+
+    const token = (req.headers['x-demo-queens-pass-token'] || '').toString().trim();
+    if (!verifyDemoGardenEditToken(token)) {
+      return res.status(401).json({ error: 'Queen\'s Pass authorization is required for demo edits.' });
+    }
+
+    const plants = Array.isArray(req.body?.plants) ? req.body.plants : null;
+    if (!plants) {
+      return res.status(400).json({ error: 'plants must be an array.' });
+    }
+
+    const savedPlants = await writeDemoGardenPlants(plants);
+    return res.json({ plants: savedPlants });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to save demo garden state.' });
+  }
 });
 
 // ===========================

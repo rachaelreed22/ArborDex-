@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fileToDataUrl, loadDemoGardenPlants, saveDemoGardenPlants } from '../utils/demoGardenStore';
-import { isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
+import { fetchDemoGardenPlants, fileToDataUrl, getCachedDemoGardenPlants, saveDemoGardenPlants } from '../utils/demoGardenStore';
+import { getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
 import './HomeownerTheme.css';
 import './TreeList.css';
 import './HomeownerPlants.css';
@@ -38,16 +38,52 @@ export default function HomeownerDemoGarden() {
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const initial = loadDemoGardenPlants();
-    setPlants(initial);
+    let active = true;
+
+    async function loadPlants() {
+      try {
+        const initial = await fetchDemoGardenPlants();
+        if (active) {
+          setPlants(initial);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message || 'Could not load the shared demo garden.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPlants();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  useEffect(() => {
-    if (plants.length === 0) return;
-    saveDemoGardenPlants(plants);
-  }, [plants]);
+  async function persistPlants(updater) {
+    setSaving(true);
+    setError('');
+
+    try {
+      const nextPlants = typeof updater === 'function' ? updater(getCachedDemoGardenPlants()) : updater;
+      const savedPlants = await saveDemoGardenPlants(nextPlants, getDemoQueensPassToken());
+      setPlants(savedPlants);
+      return savedPlants;
+    } catch (err) {
+      setError(err.message || 'Could not save shared demo garden changes.');
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function withPassGate(action) {
     if (queenPassUnlocked) {
@@ -100,8 +136,8 @@ export default function HomeownerDemoGarden() {
   }
 
   function saveEdit(plantId) {
-    withPassGate(() => {
-      setPlants((prev) => prev.map((plant) => {
+    withPassGate(async () => {
+      await persistPlants((prev) => prev.map((plant) => {
         if (plant.id !== plantId) return plant;
         return {
           ...plant,
@@ -126,30 +162,31 @@ export default function HomeownerDemoGarden() {
       return;
     }
 
-    const nextPlant = {
-      id: `demo-plant-${Math.random().toString(36).slice(2, 10)}`,
-      name: createForm.name.trim(),
-      species: createForm.species.trim(),
-      room_or_bed: (createForm.room_or_bed || '').trim(),
-      bed_number: createForm.bed_number === '' ? null : Number.parseInt(createForm.bed_number, 10),
-      row_section_id: (createForm.row_section_id || '').toUpperCase().trim(),
-      notes: createForm.notes || '',
-      photos: [],
-      last_diagnostics: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    withPassGate(async () => {
+      const nextPlant = {
+        id: `demo-plant-${Math.random().toString(36).slice(2, 10)}`,
+        name: createForm.name.trim(),
+        species: createForm.species.trim(),
+        room_or_bed: (createForm.room_or_bed || '').trim(),
+        bed_number: createForm.bed_number === '' ? null : Number.parseInt(createForm.bed_number, 10),
+        row_section_id: (createForm.row_section_id || '').toUpperCase().trim(),
+        notes: createForm.notes || '',
+        photos: [],
+        last_diagnostics: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    setPlants((prev) => [nextPlant, ...prev]);
-    setCreateForm(EMPTY_FORM);
-    setError('');
+      await persistPlants((prev) => [nextPlant, ...prev]);
+      setCreateForm(EMPTY_FORM);
+    });
   }
 
   function deletePlant(plantId) {
-    withPassGate(() => {
+    withPassGate(async () => {
       const confirmed = window.confirm('Delete this demo plant profile?');
       if (!confirmed) return;
-      setPlants((prev) => prev.filter((plant) => plant.id !== plantId));
+      await persistPlants((prev) => prev.filter((plant) => plant.id !== plantId));
     });
   }
 
@@ -158,7 +195,7 @@ export default function HomeownerDemoGarden() {
     withPassGate(async () => {
       try {
         const dataUrl = await fileToDataUrl(file);
-        setPlants((prev) => prev.map((plant) => {
+        await persistPlants((prev) => prev.map((plant) => {
           if (plant.id !== plantId) return plant;
           const photos = Array.isArray(plant.photos) ? plant.photos : [];
           if (photos.length >= 5) return plant;
@@ -175,7 +212,7 @@ export default function HomeownerDemoGarden() {
     withPassGate(async () => {
       try {
         const dataUrl = await fileToDataUrl(file);
-        setPlants((prev) => prev.map((plant) => {
+        await persistPlants((prev) => prev.map((plant) => {
           if (plant.id !== plantId) return plant;
           const photos = Array.isArray(plant.photos) ? [...plant.photos] : [];
           if (photoIndex < 0 || photoIndex >= photos.length) return plant;
@@ -189,8 +226,8 @@ export default function HomeownerDemoGarden() {
   }
 
   function deletePhoto(plantId, photoIndex) {
-    withPassGate(() => {
-      setPlants((prev) => prev.map((plant) => {
+    withPassGate(async () => {
+      await persistPlants((prev) => prev.map((plant) => {
         if (plant.id !== plantId) return plant;
         const photos = Array.isArray(plant.photos) ? plant.photos.filter((_, index) => index !== photoIndex) : [];
         return { ...plant, photos, updated_at: new Date().toISOString() };
@@ -217,6 +254,8 @@ export default function HomeownerDemoGarden() {
         </div>
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
+        {loading && <p className="homeowner-subtext mt-4 text-sm">Loading shared demo garden...</p>}
+        {!loading && saving && <p className="homeowner-subtext mt-4 text-sm">Saving shared demo garden changes...</p>}
 
         <form onSubmit={createPlant} className="homeowner-stat-card mt-6 rounded-xl p-4">
           <h2 className="text-lg font-bold text-[#1d411d]">Add Demo Plant Profile</h2>

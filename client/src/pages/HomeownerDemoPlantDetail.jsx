@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fileToDataUrl, getDemoPlantById, loadDemoGardenPlants, saveDemoGardenPlants } from '../utils/demoGardenStore';
-import { isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
+import { fileToDataUrl, getCachedDemoGardenPlants, getDemoPlantById, saveDemoGardenPlants } from '../utils/demoGardenStore';
+import { getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
 import './HomeownerTheme.css';
 import './TreeDetail.css';
 import './HomeownerPlantDetail.css';
@@ -115,6 +115,7 @@ export default function HomeownerDemoPlantDetail() {
   const pendingActionRef = useRef(null);
 
   const [plant, setPlant] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingDetails, setEditingDetails] = useState(false);
   const [detailForm, setDetailForm] = useState({
@@ -147,21 +148,43 @@ export default function HomeownerDemoPlantDetail() {
   });
 
   useEffect(() => {
-    const nextPlant = getDemoPlantById(id || '');
-    if (!nextPlant) {
-      setError('Demo plant profile not found.');
-      return;
+    let active = true;
+
+    async function loadPlant() {
+      try {
+        const nextPlant = await getDemoPlantById(id || '');
+        if (!active) return;
+        if (!nextPlant) {
+          setError('Demo plant profile not found.');
+          setPlant(null);
+          return;
+        }
+
+        setPlant(nextPlant);
+        setDetailForm({
+          name: nextPlant.name || '',
+          species: nextPlant.species || '',
+          room_or_bed: nextPlant.room_or_bed || '',
+          bed_number: nextPlant.bed_number ?? '',
+          row_section_id: nextPlant.row_section_id || '',
+          notes: nextPlant.notes || '',
+        });
+      } catch (err) {
+        if (active) {
+          setError(err.message || 'Failed to load demo plant profile.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     }
 
-    setPlant(nextPlant);
-    setDetailForm({
-      name: nextPlant.name || '',
-      species: nextPlant.species || '',
-      room_or_bed: nextPlant.room_or_bed || '',
-      bed_number: nextPlant.bed_number ?? '',
-      row_section_id: nextPlant.row_section_id || '',
-      notes: nextPlant.notes || '',
-    });
+    void loadPlant();
+
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   function withPassGate(action) {
@@ -192,12 +215,12 @@ export default function HomeownerDemoPlantDetail() {
     }
   }
 
-  function persistPlant(updater) {
-    const plants = loadDemoGardenPlants();
+  async function persistPlant(updater) {
+    const plants = getCachedDemoGardenPlants();
     const updatedPlants = plants.map((entry) => (entry.id === id ? updater(entry) : entry));
-    saveDemoGardenPlants(updatedPlants);
+    const savedPlants = await saveDemoGardenPlants(updatedPlants, getDemoQueensPassToken());
 
-    const next = updatedPlants.find((entry) => entry.id === id) || null;
+    const next = savedPlants.find((entry) => entry.id === id) || null;
     setPlant(next);
 
     if (next) {
@@ -247,8 +270,8 @@ export default function HomeownerDemoPlantDetail() {
       return;
     }
 
-    withPassGate(() => {
-      persistPlant((entry) => ({
+    withPassGate(async () => {
+      await persistPlant((entry) => ({
         ...entry,
         name: detailForm.name.trim(),
         species: detailForm.species.trim(),
@@ -266,7 +289,7 @@ export default function HomeownerDemoPlantDetail() {
     e.preventDefault();
     setJournalError('');
 
-    withPassGate(() => {
+    withPassGate(async () => {
       try {
         setJournalSaving(true);
         const nextEntry = {
@@ -276,7 +299,7 @@ export default function HomeownerDemoPlantDetail() {
           notes: (journalForm.notes || '').trim(),
         };
 
-        persistPlant((entry) => {
+        await persistPlant((entry) => {
           const current = Array.isArray(entry.journal_entries) ? entry.journal_entries : [];
           return {
             ...entry,
@@ -315,10 +338,10 @@ export default function HomeownerDemoPlantDetail() {
   function saveJournalEntry(entryId) {
     setJournalError('');
 
-    withPassGate(() => {
+    withPassGate(async () => {
       try {
         setJournalSaving(true);
-        persistPlant((entry) => {
+        await persistPlant((entry) => {
           const current = Array.isArray(entry.journal_entries) ? entry.journal_entries : [];
           const nextEntries = current.map((item) => {
             if (item.id !== entryId) return item;
@@ -348,13 +371,13 @@ export default function HomeownerDemoPlantDetail() {
   function deleteJournalEntry(entryId) {
     setJournalError('');
 
-    withPassGate(() => {
+    withPassGate(async () => {
       const confirmed = window.confirm('Delete this journal entry?');
       if (!confirmed) return;
 
       try {
         setJournalSaving(true);
-        persistPlant((entry) => {
+        await persistPlant((entry) => {
           const current = Array.isArray(entry.journal_entries) ? entry.journal_entries : [];
           return {
             ...entry,
@@ -377,7 +400,7 @@ export default function HomeownerDemoPlantDetail() {
     if (!file) return;
     withPassGate(async () => {
       const dataUrl = await fileToDataUrl(file);
-      persistPlant((entry) => {
+      await persistPlant((entry) => {
         const photos = Array.isArray(entry.photos) ? entry.photos : [];
         if (photos.length >= 5) return entry;
         return { ...entry, photos: [...photos, dataUrl], updated_at: new Date().toISOString() };
@@ -389,7 +412,7 @@ export default function HomeownerDemoPlantDetail() {
     if (!file) return;
     withPassGate(async () => {
       const dataUrl = await fileToDataUrl(file);
-      persistPlant((entry) => {
+      await persistPlant((entry) => {
         const photos = Array.isArray(entry.photos) ? [...entry.photos] : [];
         if (photoIndex < 0 || photoIndex >= photos.length) return entry;
         photos[photoIndex] = dataUrl;
@@ -399,8 +422,8 @@ export default function HomeownerDemoPlantDetail() {
   }
 
   function deletePhoto(photoIndex) {
-    withPassGate(() => {
-      persistPlant((entry) => {
+    withPassGate(async () => {
+      await persistPlant((entry) => {
         const photos = Array.isArray(entry.photos) ? entry.photos.filter((_, index) => index !== photoIndex) : [];
         return { ...entry, photos, updated_at: new Date().toISOString() };
       });
@@ -425,6 +448,15 @@ export default function HomeownerDemoPlantDetail() {
   const funFacts = useMemo(() => toTextArray(diagnostics?.fun_facts), [diagnostics]);
   const dataQualityFlags = useMemo(() => toTextArray(diagnostics?.data_quality_flags), [diagnostics]);
   const photoSummaries = useMemo(() => toTextArray(diagnostics?.photo_summaries), [diagnostics]);
+
+  if (loading) {
+    return (
+      <div className="homeowner-detail-loading" role="status" aria-live="polite">
+        <span className="homeowner-spinner" aria-hidden="true" />
+        <span>Loading shared demo plant profile...</span>
+      </div>
+    );
+  }
 
   if (!plant) {
     return (
