@@ -341,23 +341,35 @@
 }
 
 .homeowner-qr-preview {
-  margin-top: 0.8rem;
+  margin-top: 0.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
+}
+
+.homeowner-qr-card {
+  position: sticky;
+  top: 0.9rem;
+}
+
+.homeowner-qr-card h2 {
+  margin: 0;
 }
 
 .homeowner-qr-image {
-  width: 170px;
+  width: min(220px, 100%);
   max-width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(20, 56, 38, 0.25);
   background: #fff;
-  padding: 0.35rem;
+  padding: 0.4rem;
 }
 
 .homeowner-qr-payload {
-  word-break: break-all;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .homeowner-journal-section {

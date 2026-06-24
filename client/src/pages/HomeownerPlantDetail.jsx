@@ -520,13 +520,6 @@ export default function HomeownerPlantDetail() {
                     <p className="detail-location">Bed #: {plant.bed_number ?? 'Not set'}</p>
                     <p className="detail-location">Row / Section: {plant.row_section_id || 'Not set'}</p>
                     <p className="detail-coords">Plant ID: {plant.id}</p>
-                    {plant.qr_code_image_url && (
-                      <div className="homeowner-qr-preview">
-                        <p className="detail-location">Plant QR Tag</p>
-                        <img src={plant.qr_code_image_url} alt={`QR code for ${plant.name}`} className="homeowner-qr-image" />
-                        <p className="detail-coords homeowner-qr-payload">{plant.qr_code_payload}</p>
-                      </div>
-                    )}
                   </>
                 )}
               </div>
@@ -906,6 +899,18 @@ export default function HomeownerPlantDetail() {
             )}
           </section>
         </div>
+
+        {plant.qr_code_image_url && (
+          <aside className="tree-detail-sidebar">
+            <section className="card section-qr homeowner-qr-card">
+              <h2>Plant QR Tag</h2>
+              <div className="homeowner-qr-preview">
+                <img src={plant.qr_code_image_url} alt={`QR code for ${plant.name}`} className="homeowner-qr-image" />
+                <p className="detail-coords homeowner-qr-payload">{plant.qr_code_payload}</p>
+              </div>
+            </section>
+          </aside>
+        )}
       </div>
     </div>
   );
