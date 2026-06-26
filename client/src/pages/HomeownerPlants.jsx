@@ -109,6 +109,10 @@ export default function HomeownerPlants() {
   const [companionLoading, setCompanionLoading] = useState(false);
   const [companionError, setCompanionError] = useState('');
   const [companionReady, setCompanionReady] = useState(false);
+  const [gardenLayout, setGardenLayout] = useState(null);
+  const [gardenLayoutNotes, setGardenLayoutNotes] = useState('');
+  const [gardenLayoutFile, setGardenLayoutFile] = useState(null);
+  const [gardenLayoutUploading, setGardenLayoutUploading] = useState(false);
 
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -165,6 +169,8 @@ export default function HomeownerPlants() {
       setGardenName(nextGardenName);
       setGardenNameInput(nextGardenName);
       setGardenSummary(payload.summary || null);
+      setGardenLayout(payload.garden_layout || null);
+      setGardenLayoutNotes((payload.garden_layout?.notes || '').toString());
       setCompanionMessages(Array.isArray(payload.messages) ? payload.messages.map(toCompanionMessage).filter(Boolean) : []);
       setCompanionReady(true);
     } catch (err) {
@@ -253,6 +259,10 @@ export default function HomeownerPlants() {
         setGardenSummary(payload.summary);
       }
 
+      if (payload?.garden_layout) {
+        setGardenLayout(payload.garden_layout);
+      }
+
       const assistantMessage = toCompanionMessage(payload.assistant_message);
       if (assistantMessage) {
         setCompanionMessages((prev) => [...prev, assistantMessage]);
@@ -262,6 +272,48 @@ export default function HomeownerPlants() {
       setCompanionError(err.message || 'Garden Companion could not send this message.');
     } finally {
       setCompanionLoading(false);
+    }
+  }
+
+  async function uploadGardenLayout(e) {
+    e.preventDefault();
+    if (!gardenLayoutFile) {
+      setCompanionError('Select a garden layout image before uploading.');
+      return;
+    }
+
+    try {
+      setGardenLayoutUploading(true);
+      setCompanionError('');
+
+      const token = await getAccessToken();
+      const formData = new FormData();
+      formData.append('layout_image', gardenLayoutFile);
+      formData.append('notes', gardenLayoutNotes || '');
+
+      const res = await fetch(apiUrl('/api/homeowners/garden-companion/layout'), {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to upload garden layout');
+      }
+
+      setGardenLayout(payload.layout || null);
+      if (payload?.summary) {
+        setGardenSummary(payload.summary);
+      }
+      setGardenLayoutFile(null);
+      setSuccess('Garden layout uploaded and saved to Garden Companion memory.');
+    } catch (err) {
+      setCompanionError(err.message || 'Failed to upload garden layout image.');
+    } finally {
+      setGardenLayoutUploading(false);
     }
   }
 
@@ -558,6 +610,59 @@ export default function HomeownerPlants() {
               <span>Photos: {gardenSummary?.photo_count ?? 0}</span>
             </div>
           </div>
+
+          <section className="companion-layout mt-4">
+            <h3 className="homeowner-heading text-sm font-semibold">Garden Layout Memory</h3>
+            <p className="homeowner-subtext mt-1 text-sm">
+              Upload a garden map or layout image so ArborAI can remember zones, sun exposure, and location-specific context.
+            </p>
+
+            <form className="companion-layout-form mt-2" onSubmit={uploadGardenLayout}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="homeowner-input rounded-md px-3 py-2 text-sm"
+                onChange={(e) => setGardenLayoutFile(e.target.files?.[0] || null)}
+                disabled={gardenLayoutUploading || !companionReady}
+              />
+              <textarea
+                className="homeowner-input companion-chat-input"
+                rows={2}
+                value={gardenLayoutNotes}
+                onChange={(e) => setGardenLayoutNotes(e.target.value)}
+                placeholder="Optional notes about orientation, beds, shade lines, or watering zones"
+                disabled={gardenLayoutUploading || !companionReady}
+              />
+              <button
+                type="submit"
+                className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+                disabled={gardenLayoutUploading || !gardenLayoutFile || !companionReady}
+              >
+                {gardenLayoutUploading ? 'Analyzing Layout...' : 'Upload Layout To Garden AI'}
+              </button>
+            </form>
+
+            {gardenLayout?.image_url && (
+              <div className="companion-layout-preview mt-3">
+                <img src={gardenLayout.image_url} alt="Saved garden layout" className="companion-layout-image" />
+                <div className="companion-layout-details">
+                  <p className="homeowner-subtext text-sm">{gardenLayout?.analysis?.summary || 'Layout saved to memory.'}</p>
+                  {gardenLayout?.analysis?.sun_exposure_overview && (
+                    <p className="homeowner-subtext text-sm">Sun Exposure: {gardenLayout.analysis.sun_exposure_overview}</p>
+                  )}
+                  {Array.isArray(gardenLayout?.analysis?.zones) && gardenLayout.analysis.zones.length > 0 && (
+                    <ul className="homeowner-subtext text-sm companion-layout-zones">
+                      {gardenLayout.analysis.zones.slice(0, 5).map((zone, index) => (
+                        <li key={`${zone.zone_label || 'zone'}-${index}`}>
+                          <strong>{zone.zone_label || `Zone ${index + 1}`}</strong>: {zone.sun_exposure || 'Unknown'}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
 
           {companionError && <p className="homeowner-alert homeowner-alert-error mt-3">{companionError}</p>}
 

@@ -1184,6 +1184,7 @@ const HOMEOWNER_GARDEN_DEFAULT_NAME = 'My Digital Garden';
 const HOMEOWNER_GARDEN_COMPANION_MAX_HISTORY = 120;
 const HOMEOWNER_GARDEN_COMPANION_NAME_PROMPT = 'Welcome! Before we get started, what would you like to name your garden?';
 const HOMEOWNER_GARDEN_COMPANION_POST_NAME_MESSAGE = "Great! I'll help you remember your plants, keep track of your garden history, and answer questions about this specific garden. You can ask me about your plants, your notes, reminders, or your garden as a whole anytime.";
+const HOMEOWNER_GARDEN_LAYOUT_ANALYSIS_MAX_ZONES = 12;
 const DEMO_GARDEN_STORAGE_OBJECT = 'demo-garden/state.json';
 const DEMO_GARDEN_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
@@ -1211,6 +1212,48 @@ function normalizeGardenName(value) {
   const normalized = (value || '').toString().trim().replace(/\s+/g, ' ');
   if (!normalized) return '';
   return normalized.slice(0, 80);
+}
+
+function normalizeLayoutAnalysis(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const zones = Array.isArray(source.zones)
+    ? source.zones
+      .slice(0, HOMEOWNER_GARDEN_LAYOUT_ANALYSIS_MAX_ZONES)
+      .map((zone, index) => ({
+        zone_label: (zone?.zone_label || zone?.label || `Zone ${index + 1}`).toString().trim() || `Zone ${index + 1}`,
+        sun_exposure: (zone?.sun_exposure || 'unknown').toString().trim() || 'unknown',
+        characteristics: (zone?.characteristics || '').toString().trim(),
+        recommended_plant_traits: (zone?.recommended_plant_traits || '').toString().trim(),
+        matched_plants: Array.isArray(zone?.matched_plants)
+          ? zone.matched_plants.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 8)
+          : [],
+      }))
+    : [];
+
+  return {
+    summary: (source.summary || 'Garden layout uploaded.').toString().trim(),
+    sun_exposure_overview: (source.sun_exposure_overview || '').toString().trim(),
+    layout_observations: Array.isArray(source.layout_observations)
+      ? source.layout_observations.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 10)
+      : [],
+    care_strategy: Array.isArray(source.care_strategy)
+      ? source.care_strategy.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 10)
+      : [],
+    zones,
+  };
+}
+
+function extractLocationSunMapFromLayout(analysis) {
+  if (!analysis || typeof analysis !== 'object' || !Array.isArray(analysis.zones)) {
+    return [];
+  }
+
+  return analysis.zones.map((zone) => ({
+    location: (zone?.zone_label || '').toString().trim(),
+    sun_exposure: (zone?.sun_exposure || '').toString().trim(),
+    matched_plants: Array.isArray(zone?.matched_plants) ? zone.matched_plants : [],
+    characteristics: (zone?.characteristics || '').toString().trim(),
+  })).filter((item) => item.location || item.sun_exposure || item.matched_plants.length > 0);
 }
 
 function extractAssistantTextFromOpenAiPayload(payload) {
@@ -1297,6 +1340,65 @@ async function setHomeownerGardenName(userId, name) {
   return { ok: true, missingColumn: false, error: null, gardenName: normalizedName || null };
 }
 
+async function getHomeownerGardenLayout(userId) {
+  const { data, error } = await writeSupabase
+    .from('homeowner_profiles')
+    .select('garden_layout_image_url, garden_layout_analysis, garden_layout_notes, garden_layout_updated_at')
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (error) {
+    if (isMissingColumnError(error, 'garden_layout_image_url') || isMissingColumnError(error, 'garden_layout_analysis')) {
+      return { layout: null, missingColumn: true, error: null };
+    }
+    return { layout: null, missingColumn: false, error };
+  }
+
+  const row = Array.isArray(data) ? (data[0] || null) : null;
+  if (!row) {
+    return { layout: null, missingColumn: false, error: null };
+  }
+
+  const imageUrl = (row.garden_layout_image_url || '').toString().trim();
+  const notes = (row.garden_layout_notes || '').toString().trim();
+  const analysis = normalizeLayoutAnalysis(row.garden_layout_analysis || {});
+  const hasLayout = Boolean(imageUrl);
+
+  if (!hasLayout) {
+    return { layout: null, missingColumn: false, error: null };
+  }
+
+  return {
+    layout: {
+      image_url: imageUrl,
+      notes,
+      analysis,
+      updated_at: row.garden_layout_updated_at || row.updated_at || null,
+    },
+    missingColumn: false,
+    error: null,
+  };
+}
+
+async function setHomeownerGardenLayout(userId, payload) {
+  const updatePayload = {
+    garden_layout_image_url: payload.image_url || null,
+    garden_layout_analysis: payload.analysis || null,
+    garden_layout_notes: payload.notes || null,
+    garden_layout_updated_at: new Date().toISOString(),
+  };
+
+  const error = await updateHomeownerProfileBy('user_id', userId, updatePayload);
+  if (error) {
+    if (isMissingColumnError(error, 'garden_layout_image_url') || isMissingColumnError(error, 'garden_layout_analysis')) {
+      return { ok: false, missingColumn: true, error: null };
+    }
+    return { ok: false, missingColumn: false, error };
+  }
+
+  return { ok: true, missingColumn: false, error: null };
+}
+
 async function listHomeownerGardenCompanionMessages(userId, limit = HOMEOWNER_GARDEN_COMPANION_MAX_HISTORY) {
   const { data, error } = await writeSupabase
     .from('homeowner_garden_companion_messages')
@@ -1354,6 +1456,11 @@ async function buildHomeownerGardenCompanionContext(userId) {
   const { gardenName, missingColumn, error: gardenNameError } = await getHomeownerGardenName(userId);
   if (gardenNameError) {
     throw gardenNameError;
+  }
+
+  const { layout, missingColumn: layoutMissingColumn, error: layoutError } = await getHomeownerGardenLayout(userId);
+  if (layoutError) {
+    throw layoutError;
   }
 
   const { data: plants, error: plantsError } = await writeSupabase
@@ -1437,13 +1544,17 @@ async function buildHomeownerGardenCompanionContext(userId) {
     diagnostics_count: diagnosticsRows.length,
     watering_event_count: wateringEntries.length,
     fertilizer_event_count: fertilizingEntries.length,
+    has_layout_memory: Boolean(layout?.image_url),
   };
+
+  const locationSunExposure = extractLocationSunMapFromLayout(layout?.analysis || null);
 
   return {
     garden_name: gardenName || HOMEOWNER_GARDEN_DEFAULT_NAME,
     has_custom_garden_name: Boolean(gardenName),
     requires_garden_name: !gardenName,
     schema_supports_garden_name: !missingColumn,
+    schema_supports_garden_layout: !layoutMissingColumn,
     plant_count: totalPlantCount,
     plant_species: species,
     plant_locations: locations,
@@ -1453,6 +1564,8 @@ async function buildHomeownerGardenCompanionContext(userId) {
       .filter(Boolean)
       .slice(0, 60),
     reminder_history: reminderHistory,
+    garden_layout: layout,
+    location_sun_exposure: locationSunExposure,
     watering_schedules: wateringScheduleHints,
     fertilizer_schedules: fertilizerScheduleDays ? [`About every ${fertilizerScheduleDays} days (derived from journal history).`] : [],
     previous_diagnostics: diagnosticsRows.slice(0, 40),
@@ -1472,6 +1585,7 @@ async function buildHomeownerGardenCompanionContext(userId) {
       location_count: locations.length,
       journal_entry_count: safeJournal.length,
       photo_count: totalPhotoCount,
+      has_layout_memory: Boolean(layout?.image_url),
     },
   };
 }
@@ -2565,11 +2679,193 @@ api.get('/homeowners/garden-companion/session', requireHomeownerAuth, async (req
       garden_name: context.garden_name,
       requires_garden_name: context.requires_garden_name,
       schema_supports_garden_name: context.schema_supports_garden_name,
+      garden_layout: context.garden_layout || null,
       summary: context.garden_summary,
       messages,
     });
   } catch (err) {
     return res.status(500).json({ error: err?.message || 'Failed to load Garden Companion session' });
+  }
+});
+
+api.get('/homeowners/garden-companion/layout', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const layoutResult = await getHomeownerGardenLayout(userId);
+    if (layoutResult.missingColumn) {
+      return res.status(503).json({ error: 'Garden layout memory is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (layoutResult.error) {
+      return res.status(500).json({ error: layoutResult.error.message || 'Failed to load garden layout' });
+    }
+
+    return res.json({ layout: layoutResult.layout });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to load garden layout memory' });
+  }
+});
+
+api.post('/homeowners/garden-companion/layout', requireHomeownerAuth, upload.single('layout_image'), async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Layout image file is required.' });
+    }
+
+    const previousLayoutResult = await getHomeownerGardenLayout(userId);
+    if (previousLayoutResult.missingColumn) {
+      return res.status(503).json({ error: 'Garden layout memory is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (previousLayoutResult.error) {
+      return res.status(500).json({ error: previousLayoutResult.error.message || 'Failed to read current garden layout memory' });
+    }
+
+    const validation = await validateRasterImageFile(req.file);
+    const objectPath = buildGeneratedObjectPath(`homeowner-garden-layouts/${userId}`, validation.mimeType);
+    const notes = (req.body?.notes || '').toString().trim().slice(0, 1200);
+
+    const { error: uploadError } = await writeSupabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(objectPath, req.file.buffer, {
+        contentType: validation.mimeType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return res.status(500).json({ error: uploadError.message || 'Failed to upload garden layout image' });
+    }
+
+    const { data: publicUrlData } = writeSupabase.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
+    const imageUrl = (publicUrlData?.publicUrl || '').toString();
+
+    let analysis = {
+      summary: 'Garden layout uploaded and saved.',
+      sun_exposure_overview: '',
+      layout_observations: [],
+      care_strategy: [],
+      zones: [],
+    };
+
+    if (OPENAI_API_KEY) {
+      const { data: plants, error: plantsError } = await writeSupabase
+        .from('homeowner_plants')
+        .select('id, name, species, room_or_bed, row_section_id, bed_number')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(150);
+
+      if (plantsError) {
+        return res.status(500).json({ error: plantsError.message || 'Failed to prepare layout analysis context' });
+      }
+
+      const plantContext = (Array.isArray(plants) ? plants : []).map((plant) => ({
+        id: plant.id,
+        name: (plant.name || '').toString(),
+        species: (plant.species || '').toString(),
+        location: ((plant.row_section_id || '').toString().trim() || (plant.room_or_bed || '').toString().trim() || (plant.bed_number ? `Bed ${plant.bed_number}` : '')).toString(),
+      }));
+
+      const systemPrompt = [
+        'You are ArborAI Garden Layout Analyst for gardeners.',
+        'Analyze the uploaded garden layout image and infer practical zones, sun exposure, and planting implications.',
+        'Use plain gardener language and avoid certainty when the image is ambiguous.',
+        'If hand-drawn map symbols are unclear, explicitly say what is uncertain.',
+        'Return strict JSON with keys: summary, sun_exposure_overview, layout_observations, care_strategy, zones.',
+        'zones must be an array of objects with keys: zone_label, sun_exposure, characteristics, recommended_plant_traits, matched_plants.',
+        `Known plant profiles to match if possible: ${JSON.stringify(plantContext)}`,
+      ].join('\n\n');
+
+      const userContent = [
+        {
+          type: 'text',
+          text: `Analyze this garden layout image. Optional user notes: ${notes || 'none provided'}. Focus on location zones and sun exposure that can guide plant placement and reminders.`,
+        },
+        {
+          type: 'image_url',
+          image_url: { url: imageUrl },
+        },
+      ];
+
+      const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: 1000,
+          temperature: 0.2,
+        }),
+      });
+
+      if (!aiRes.ok) {
+        const aiErrText = await aiRes.text();
+        console.error('Garden layout analysis AI error:', aiErrText);
+      } else {
+        const aiPayload = await aiRes.json().catch(() => ({}));
+        const aiText = extractAssistantTextFromOpenAiPayload(aiPayload) || '{}';
+        let parsed = {};
+        try {
+          parsed = JSON.parse(aiText);
+        } catch {
+          parsed = {};
+        }
+        analysis = normalizeLayoutAnalysis(parsed);
+      }
+    }
+
+    const saveResult = await setHomeownerGardenLayout(userId, {
+      image_url: imageUrl,
+      analysis,
+      notes,
+    });
+
+    if (saveResult.missingColumn) {
+      return res.status(503).json({ error: 'Garden layout memory is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (saveResult.error) {
+      return res.status(500).json({ error: saveResult.error.message || 'Failed to save garden layout memory' });
+    }
+
+    const previousImageUrl = (previousLayoutResult.layout?.image_url || '').toString().trim();
+    if (previousImageUrl && previousImageUrl !== imageUrl) {
+      const oldPath = getStorageObjectPathFromPublicUrl(previousImageUrl, PHOTO_BUCKET);
+      if (oldPath) {
+        await writeSupabase.storage.from(PHOTO_BUCKET).remove([oldPath]);
+      }
+    }
+
+    const context = await buildHomeownerGardenCompanionContext(userId);
+
+    return res.status(201).json({
+      layout: {
+        image_url: imageUrl,
+        notes,
+        analysis,
+        updated_at: new Date().toISOString(),
+      },
+      summary: context.garden_summary,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to upload garden layout image' });
   }
 });
 
@@ -2653,6 +2949,7 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
       return res.json({
         garden_name: nextContext.garden_name,
         requires_garden_name: false,
+        garden_layout: nextContext.garden_layout || null,
         summary: nextContext.garden_summary,
         assistant_message: assistantInsert.message,
       });
@@ -2724,6 +3021,7 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
     return res.json({
       garden_name: context.garden_name,
       requires_garden_name: false,
+      garden_layout: context.garden_layout || null,
       summary: context.garden_summary,
       assistant_message: assistantInsert.message,
     });

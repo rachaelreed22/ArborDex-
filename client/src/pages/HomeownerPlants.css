@@ -193,6 +193,43 @@
   gap: 0.6rem;
 }
 
+.companion-layout {
+  border: 1px solid rgba(20, 56, 38, 0.16);
+  border-radius: 10px;
+  background: rgba(247, 251, 242, 0.92);
+  padding: 0.75rem 0.85rem;
+}
+
+.companion-layout-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.companion-layout-preview {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 180px 1fr;
+  align-items: start;
+}
+
+.companion-layout-image {
+  width: 100%;
+  max-width: 180px;
+  border-radius: 10px;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  object-fit: cover;
+}
+
+.companion-layout-details {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.companion-layout-zones {
+  margin: 0;
+  padding-left: 1rem;
+}
+
 .companion-chat-messages {
   max-height: 320px;
   overflow: auto;
@@ -294,5 +331,9 @@
   .companion-name-controls .homeowner-button-secondary,
   .companion-chat-form .homeowner-button-primary {
     width: 100%;
+  }
+
+  .companion-layout-preview {
+    grid-template-columns: 1fr;
   }
 }
