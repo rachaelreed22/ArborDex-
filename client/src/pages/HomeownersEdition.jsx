@@ -16,19 +16,38 @@ export default function HomeownersEdition() {
             Explore a Demo Digital Garden
           </button>
           <h1>Homeowner's Edition</h1>
-          <p className="coming-soon-text">Now Available</p>
+          <p className="coming-soon-text">Never Forget Your Garden Again.</p>
           <p className="coming-soon-description">
-            Personalized plant care guidance and profile tracking for your home, garden beds, and indoor rooms.
+            ArborTag is your garden's memory.
           </p>
           <p className="coming-soon-description">
-            Create private plant profiles for your houseplants, garden plants, flowers, shrubs, and backyard trees. Add photos, notes, updates, and use ArborAI for plant guidance.
+            Meet Your Garden Companion.
           </p>
           <p className="coming-soon-description">
-            ArborTag Homeowner Edition is currently in early access. Early users are helping shape the app by sharing honest feedback about setup, plant profiles, photo uploads, and ArborAI guidance.
+            ArborTag helps you build a living memory of your garden, and Garden Companion personalizes guidance from what you record over time.
+          </p>
+          <div className="homeowners-why-block" role="region" aria-label="Why ArborTag">
+            <p className="homeowners-why-title">Why not just use ChatGPT?</p>
+            <p className="coming-soon-description">ChatGPT answers gardening questions. ArborTag remembers your garden history from what you record.</p>
+            <ul className="homeowners-why-list">
+              <li>✔ Your plant profiles</li>
+              <li>✔ Your garden layout</li>
+              <li>✔ Your photos</li>
+              <li>✔ Your journals</li>
+              <li>✔ Your reminders</li>
+              <li>✔ Your gardening history</li>
+            </ul>
+          </div>
+          <p className="coming-soon-description">
+            Garden Companion learns from your plant profiles, journals, photos, reminders, layout, and notes so answers reflect your own garden, not just general advice.
           </p>
           <p className="coming-soon-description">
-            Homeowner Edition is built around the relationship between each person and each plant. Save photos, notes, and care history so every recommendation reflects your real plant journey.
+            Use Plant Diagnostics for one-plant analysis (pests, disease, deficiencies, and species-specific care), and use Garden Companion for whole-garden planning and memory.
           </p>
+          <p className="coming-soon-description">
+            The more you record, the more personalized your Garden Companion becomes.
+          </p>
+          <p className="coming-soon-description">The memory behind every garden.</p>
           <p className="coming-soon-description">Your plant profiles are private to your account.</p>
           <p className="coming-soon-description">
             ArborAI provides educational plant guidance and does not replace professional arborist, medical, legal, or chemical-treatment advice.

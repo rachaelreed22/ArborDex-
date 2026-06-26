@@ -17,8 +17,23 @@ const EMPTY_FORM = {
 };
 
 const DEMO_COMPANION_STORAGE_KEY = 'arbordex-demo-garden-companion-v1';
-const DEMO_GARDEN_NAME_PROMPT = 'Welcome to ArborTag! Before we get started, what would you like to name your garden?';
-const DEMO_GARDEN_AFTER_NAME_PROMPT = "Great! I'll help you remember your plants, keep track of your garden history, and answer questions about this specific garden. You can ask me about your plants, your notes, reminders, or your garden as a whole anytime.";
+const DEMO_GARDEN_NAME_PROMPT = [
+  'Welcome!',
+  '',
+  "I'm your Garden Companion.",
+  '',
+  "I'll remember your plants, your photos, your journals, your garden layout, and everything you teach me over time.",
+  '',
+  "Let's start by giving your garden a name.",
+  'What would you like to call it?',
+].join('\n');
+const DEMO_GARDEN_AFTER_NAME_PROMPT = "Great! I'll help you remember what you planted, where it lives, and what changed season to season. Ask me anything about this specific garden anytime.";
+const DEMO_COMPANION_SUGGESTED_PROMPTS = [
+  '🌱 What should I work on today?',
+  '📒 Summarize my garden.',
+  '🌼 Help me plan next season.',
+  '📷 Which plants need updates?',
+];
 
 function getLocationLabel(value) {
   if (value === 'indoor') return 'Indoor';
@@ -276,6 +291,12 @@ export default function HomeownerDemoGarden() {
     }, 320);
   }
 
+  function useSuggestedPrompt(prompt) {
+    const cleaned = (prompt || '').toString().replace(/^[^A-Za-z0-9]+\s*/, '').trim();
+    if (!cleaned) return;
+    setCompanionInput(cleaned);
+  }
+
   async function persistPlants(updater) {
     setSaving(true);
     setError('');
@@ -453,13 +474,26 @@ export default function HomeownerDemoGarden() {
       <div className="homeowner-surface mx-auto w-full max-w-5xl rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="homeowner-heading text-3xl font-bold">🌱 Explore a Digital Garden</h1>
-            <p className="homeowner-subtext mt-2 text-sm">See how ArborTag helps you remember, organize, and care for every plant in your garden.</p>
+            <h1 className="homeowner-heading text-3xl font-bold">Never Forget Your Garden Again.</h1>
+            <p className="homeowner-subtext mt-2 text-sm">ArborTag is your garden's memory. Garden Companion personalizes guidance from what you record.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => navigate('/')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Home</button>
             <button onClick={() => navigate('/homeowners')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Back</button>
           </div>
+        </div>
+
+        <div className="homeowner-panel homeowner-panel-info mt-6">
+          <p className="homeowner-heading text-base font-semibold">Why not just use ChatGPT?</p>
+          <p className="homeowner-subtext mt-2 text-sm">ChatGPT answers gardening questions. ArborTag remembers this garden from what you record.</p>
+          <ul className="homeowner-subtext mt-2 space-y-1 text-sm">
+            <li>✔ Plant profiles</li>
+            <li>✔ Photos</li>
+            <li>✔ Journal history</li>
+            <li>✔ Growing locations</li>
+            <li>✔ Ongoing garden context</li>
+          </ul>
+          <p className="homeowner-subtext mt-2 text-sm">The more you record, the more personalized your Garden Companion becomes.</p>
         </div>
 
         <div className="homeowner-panel homeowner-panel-info mt-6">
@@ -477,9 +511,27 @@ export default function HomeownerDemoGarden() {
         <section className="homeowner-panel homeowner-panel-info mt-6 companion-section">
           <div className="companion-header">
             <div>
-              <h2 className="homeowner-heading text-xl font-bold">Garden Companion</h2>
-              <p className="homeowner-subtext text-sm">A whole-garden memory guide for this demo garden.</p>
+              <p className="homeowner-heading text-base font-semibold">ArborTag is your garden's memory.</p>
+              <h2 className="homeowner-heading text-xl font-bold mt-1">🌿 Meet Your Garden Companion</h2>
+              <p className="homeowner-subtext text-sm">It learns from your records in this garden and responds with that context.</p>
             </div>
+          </div>
+
+          <p className="homeowner-subtext mt-3 text-sm">
+            Garden Companion is for whole-garden memory and planning. Plant Diagnostics remains focused on one plant at a time.
+          </p>
+
+          <div className="companion-summary mt-4">
+            <p className="homeowner-heading text-sm font-semibold">I currently know:</p>
+            <div className="companion-summary-grid mt-2">
+              <span>🌱 {companionSummary.plant_count} plant profile{companionSummary.plant_count === 1 ? '' : 's'}</span>
+              <span>📷 {companionSummary.photo_count} photo{companionSummary.photo_count === 1 ? '' : 's'}</span>
+              <span>📍 {companionSummary.location_count} growing location{companionSummary.location_count === 1 ? '' : 's'}</span>
+              <span>📝 {companionSummary.journal_entry_count} journal entr{companionSummary.journal_entry_count === 1 ? 'y' : 'ies'}</span>
+              <span>🗺 Garden layout: {companionSummary.location_count > 0 ? 'Mapped by saved locations' : 'Not mapped yet'}</span>
+            </div>
+            <p className="homeowner-subtext mt-2 text-sm">Ask me anything about THIS garden.</p>
+            <p className="homeowner-subtext mt-1 text-sm">The memory behind every garden.</p>
           </div>
 
           <form onSubmit={saveDemoGardenName} className="companion-name-form mt-3">
@@ -513,6 +565,19 @@ export default function HomeownerDemoGarden() {
           </div>
 
           <div className="companion-chat mt-4">
+            <div className="flex flex-wrap gap-2">
+              {DEMO_COMPANION_SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className="homeowner-button-secondary rounded-md px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => useSuggestedPrompt(prompt)}
+                  disabled={companionLoading}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
             <div className="companion-chat-messages" role="log" aria-live="polite">
               {companionMessages.map((message) => (
                 <article

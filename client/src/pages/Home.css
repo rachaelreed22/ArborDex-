@@ -93,6 +93,37 @@
   line-height: 1.6;
 }
 
+.why-arbortag {
+  margin-top: 1rem;
+  border: 1px solid rgba(61, 110, 79, 0.22);
+  border-radius: 16px;
+  padding: 0.85rem;
+  background: linear-gradient(120deg, rgba(236, 249, 232, 0.9), rgba(210, 234, 212, 0.88));
+}
+
+.why-arbortag h2 {
+  margin: 0;
+  color: #1d4a32;
+  font-size: 0.98rem;
+}
+
+.why-arbortag p {
+  margin: 0.45rem 0 0;
+  color: #315544;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.why-arbortag ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  color: #2e4d3d;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
 .neighbor-moment {
   margin-top: 1rem;
   display: grid;

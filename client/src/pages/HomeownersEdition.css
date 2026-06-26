@@ -69,6 +69,31 @@
   line-height: 1.6;
 }
 
+.homeowners-why-block {
+  margin-top: 1rem;
+  border: 1px solid rgb(29 65 29 / 35%);
+  border-radius: 12px;
+  padding: 0.8rem;
+  text-align: left;
+  background: rgb(241 248 232 / 82%);
+}
+
+.homeowners-why-title {
+  margin: 0;
+  color: #1d411d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.homeowners-why-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1rem;
+  color: #1f3f1f;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
 .homeowners-feature-strip {
   margin-top: 1.4rem;
   display: flex;

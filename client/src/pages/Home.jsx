@@ -36,12 +36,26 @@ export default function Home() {
       <div className="home-container">
         <section className="hero-panel reveal">
           <p className="hero-kicker">ArborDex Platform • Powered by ArborTag</p>
-          <h1 className="hero-title">Turn Every Tree Into a Story, a Record, and a Resource</h1>
+          <h1 className="hero-title">Never Forget Your Garden Again.</h1>
           <p className="hero-subheading">
-            Think of ArborTag like that friendly neighbor who always knows why leaves are curling,
-            when to water, and what to prune next. Scan a tree, get clear guidance, and keep care
-            notes that actually make sense.
+            ArborTag is your garden's memory. Meet Your Garden Companion: it learns from what you
+            record and uses that memory to give personalized guidance, while Plant Diagnostics helps
+            you care for individual plants.
           </p>
+
+          <section className="why-arbortag" aria-label="Why ArborTag">
+            <h2>Why not just use ChatGPT?</h2>
+            <p>ChatGPT answers gardening questions. ArborTag remembers your garden history from what you record.</p>
+            <ul>
+              <li>✔ Your plant profiles</li>
+              <li>✔ Your garden layout</li>
+              <li>✔ Your photos</li>
+              <li>✔ Your journals</li>
+              <li>✔ Your reminders</li>
+              <li>✔ Your gardening history</li>
+            </ul>
+            <p>The more you record, the more personalized your Garden Companion becomes.</p>
+          </section>
 
           <div className="neighbor-moment" aria-label="Friendly plant care introduction">
             <img src={arborTagLogo} alt="ArborTag logo" className="neighbor-avatar" />
@@ -60,7 +74,7 @@ export default function Home() {
 
           <div className="trust-strip" aria-label="ArborTag trust cues">
             <p>No complicated setup.</p>
-            <p>Useful guidance in minutes.</p>
+            <p>Useful guidance grounded in your garden.</p>
             <p>Built for real gardens and real schedules.</p>
           </div>
 
@@ -83,21 +97,21 @@ export default function Home() {
         <section className="capability-panel reveal reveal-delay-1">
           <header className="section-header">
             <p className="section-eyebrow">Homeowner Edition</p>
-            <h2>Your Backyard Buddy For Better Plant Care</h2>
+            <h2>A Memory That Grows With Your Garden</h2>
           </header>
 
           <div className="business-grid">
             <article className="business-card">
-              <h3>Easy Plant Profiles</h3>
-              <p>Name each plant once and keep all the updates, photos, and care notes in one cozy place.</p>
+              <h3>🌿 Garden Companion</h3>
+              <p>Whole-garden memory for planning, history, reminders, notes, layouts, and seasonal questions.</p>
             </article>
             <article className="business-card">
-              <h3>Helpful Checkups</h3>
-              <p>Ask what looks wrong and get practical steps you can try this week, not vague advice.</p>
+              <h3>🌱 Plant Diagnostics</h3>
+              <p>Plant-by-plant diagnostics for pests, disease, nutrient issues, and species-specific care.</p>
             </article>
             <article className="business-card">
-              <h3>Grows With You</h3>
-              <p>Start simple, then add more plants and deeper tracking as your garden journey grows.</p>
+              <h3>Memory That Grows With You</h3>
+              <p>Every profile, journal entry, and photo builds long-term context your Garden Companion can use later.</p>
             </article>
           </div>
 
@@ -175,8 +189,7 @@ export default function Home() {
           </div>
 
           <p className="trust-note">
-            Whether you care for one backyard tree or a whole park, ArborTag keeps care friendly,
-            organized, and easy to share.
+            The memory behind every garden.
           </p>
         </section>
       </div>
