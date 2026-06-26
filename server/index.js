@@ -1224,14 +1224,16 @@ function normalizeLayoutAnalysis(raw) {
         sun_exposure: (zone?.sun_exposure || 'unknown').toString().trim() || 'unknown',
         characteristics: (zone?.characteristics || '').toString().trim(),
         recommended_plant_traits: (zone?.recommended_plant_traits || '').toString().trim(),
-        matched_plants: Array.isArray(zone?.matched_plants)
-          ? zone.matched_plants.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 8)
-          : [],
+        suggested_plant_matches: Array.isArray(zone?.suggested_plant_matches)
+          ? zone.suggested_plant_matches.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 8)
+          : Array.isArray(zone?.matched_plants)
+            ? zone.matched_plants.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 8)
+            : [],
       }))
     : [];
 
   return {
-    summary: (source.summary || 'Garden layout uploaded.').toString().trim(),
+    summary: (source.summary || 'Garden layout saved. AI interpretation is available below.').toString().trim(),
     sun_exposure_overview: (source.sun_exposure_overview || '').toString().trim(),
     layout_observations: Array.isArray(source.layout_observations)
       ? source.layout_observations.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean).slice(0, 10)
@@ -1251,9 +1253,13 @@ function extractLocationSunMapFromLayout(analysis) {
   return analysis.zones.map((zone) => ({
     location: (zone?.zone_label || '').toString().trim(),
     sun_exposure: (zone?.sun_exposure || '').toString().trim(),
-    matched_plants: Array.isArray(zone?.matched_plants) ? zone.matched_plants : [],
+    suggested_plant_matches: Array.isArray(zone?.suggested_plant_matches)
+      ? zone.suggested_plant_matches
+      : Array.isArray(zone?.matched_plants)
+        ? zone.matched_plants
+        : [],
     characteristics: (zone?.characteristics || '').toString().trim(),
-  })).filter((item) => item.location || item.sun_exposure || item.matched_plants.length > 0);
+  })).filter((item) => item.location || item.sun_exposure || item.suggested_plant_matches.length > 0);
 }
 
 function extractAssistantTextFromOpenAiPayload(payload) {
@@ -1564,6 +1570,14 @@ async function buildHomeownerGardenCompanionContext(userId) {
       .filter(Boolean)
       .slice(0, 60),
     reminder_history: reminderHistory,
+    garden_layout_truth: layout
+      ? {
+        image_url: layout.image_url,
+        notes: layout.notes,
+        updated_at: layout.updated_at,
+      }
+      : null,
+    garden_layout_ai_interpretation: layout?.analysis || null,
     garden_layout: layout,
     location_sun_exposure: locationSunExposure,
     watering_schedules: wateringScheduleHints,
@@ -2751,7 +2765,7 @@ api.post('/homeowners/garden-companion/layout', requireHomeownerAuth, upload.sin
     const imageUrl = (publicUrlData?.publicUrl || '').toString();
 
     let analysis = {
-      summary: 'Garden layout uploaded and saved.',
+      summary: 'Garden layout uploaded and saved. AI interpretation is available.',
       sun_exposure_overview: '',
       layout_observations: [],
       care_strategy: [],
@@ -2782,9 +2796,11 @@ api.post('/homeowners/garden-companion/layout', requireHomeownerAuth, upload.sin
         'Analyze the uploaded garden layout image and infer practical zones, sun exposure, and planting implications.',
         'Use plain gardener language and avoid certainty when the image is ambiguous.',
         'If hand-drawn map symbols are unclear, explicitly say what is uncertain.',
+        'Do not assert exact plant placement as fact unless it is explicitly visible in the image or explicitly stated in user notes.',
+        'Treat this output as interpretation suggestions, not as source-of-truth records.',
         'Return strict JSON with keys: summary, sun_exposure_overview, layout_observations, care_strategy, zones.',
-        'zones must be an array of objects with keys: zone_label, sun_exposure, characteristics, recommended_plant_traits, matched_plants.',
-        `Known plant profiles to match if possible: ${JSON.stringify(plantContext)}`,
+        'zones must be an array of objects with keys: zone_label, sun_exposure, characteristics, recommended_plant_traits, suggested_plant_matches.',
+        `Known plant profiles to suggest for matching when confidence is reasonable: ${JSON.stringify(plantContext)}`,
       ].join('\n\n');
 
       const userContent = [
@@ -2972,6 +2988,7 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
     const systemPrompt = [
       'You are Garden Companion for ArborTag Homeowner Edition.',
       'Your role is whole-garden support: organization, history, seasonal planning, reminder recommendations, and pattern detection across multiple plants.',
+      'Data authority boundary: user-saved garden records are truth (layout image, layout notes, plant records, journal entries). AI interpretations are suggestions, not authoritative facts.',
       'Do not replace or duplicate individual plant diagnostics. When user asks for disease/pest diagnosis on one plant, direct them to that plant\'s diagnostics while still offering garden-level planning support.',
       'Use this garden context as primary source of truth and cite specific plants/entries when possible.',
       `Garden context JSON: ${JSON.stringify(context)}`,

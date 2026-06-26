@@ -612,9 +612,12 @@ export default function HomeownerPlants() {
           </div>
 
           <section className="companion-layout mt-4">
-            <h3 className="homeowner-heading text-sm font-semibold">Garden Layout Memory</h3>
+            <h3 className="homeowner-heading text-sm font-semibold">Garden Layout</h3>
             <p className="homeowner-subtext mt-1 text-sm">
-              Upload a garden map or layout image so ArborAI can remember zones, sun exposure, and location-specific context.
+              Upload a garden map or layout image to store your layout records and help ArborAI suggest zone-aware care guidance.
+            </p>
+            <p className="homeowner-subtext mt-1 text-sm">
+              Your uploaded layout image and notes are the source of truth. ArborAI suggestions are interpretations.
             </p>
 
             <form className="companion-layout-form mt-2" onSubmit={uploadGardenLayout}>
@@ -638,7 +641,7 @@ export default function HomeownerPlants() {
                 className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
                 disabled={gardenLayoutUploading || !gardenLayoutFile || !companionReady}
               >
-                {gardenLayoutUploading ? 'Analyzing Layout...' : 'Upload Layout To Garden AI'}
+                {gardenLayoutUploading ? 'Analyzing Layout...' : 'Upload Garden Layout'}
               </button>
             </form>
 
