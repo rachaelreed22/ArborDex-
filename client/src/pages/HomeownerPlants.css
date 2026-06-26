@@ -146,6 +146,102 @@
   padding: 0.35rem 0.7rem;
 }
 
+.companion-section {
+  border-color: rgba(19, 67, 44, 0.28);
+  background: linear-gradient(165deg, rgba(237, 247, 236, 0.95), rgba(229, 241, 223, 0.93));
+}
+
+.companion-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.companion-name-form {
+  width: 100%;
+}
+
+.companion-name-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.companion-name-controls .homeowner-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.companion-summary {
+  border: 1px solid rgba(20, 56, 38, 0.16);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(248, 252, 244, 0.9);
+}
+
+.companion-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #1a3f2d;
+}
+
+.companion-chat {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.companion-chat-messages {
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border-radius: 12px;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  background: rgba(249, 252, 247, 0.95);
+}
+
+.companion-message {
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(20, 56, 38, 0.16);
+}
+
+.companion-message-assistant {
+  background: rgba(236, 246, 231, 0.92);
+}
+
+.companion-message-user {
+  background: rgba(248, 240, 224, 0.9);
+}
+
+.companion-message-role {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #1b4a34;
+}
+
+.companion-message-text {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  color: #163a2a;
+  white-space: pre-wrap;
+}
+
+.companion-chat-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.companion-chat-input {
+  resize: vertical;
+}
+
 .homeowner-spinner {
   width: 0.95rem;
   height: 0.95rem;
@@ -192,5 +288,11 @@
 
   .homeowner-plant-info {
     min-height: 150px;
+  }
+
+  .companion-name-controls .homeowner-input,
+  .companion-name-controls .homeowner-button-secondary,
+  .companion-chat-form .homeowner-button-primary {
+    width: 100%;
   }
 }

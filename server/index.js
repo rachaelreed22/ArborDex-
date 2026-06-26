@@ -1180,8 +1180,301 @@ const HOMEOWNER_TIER_LIMITS = {
 const HOMEOWNER_PLANT_SELECT = 'id, user_id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
 const HOMEOWNER_PLANT_PUBLIC_SELECT = 'id, name, species, room_or_bed, bed_number, row_section_id, qr_code_token, photos, last_diagnostics, created_at, updated_at';
 const HOMEOWNER_JOURNAL_EVENT_TYPES = new Set(['planted', 'harvested', 'fertilized', 'watered', 'note']);
+const HOMEOWNER_GARDEN_DEFAULT_NAME = 'My Digital Garden';
+const HOMEOWNER_GARDEN_COMPANION_MAX_HISTORY = 120;
+const HOMEOWNER_GARDEN_COMPANION_NAME_PROMPT = 'Welcome! Before we get started, what would you like to name your garden?';
+const HOMEOWNER_GARDEN_COMPANION_POST_NAME_MESSAGE = "Great! I'll help you remember your plants, keep track of your garden history, and answer questions about this specific garden. You can ask me about your plants, your notes, reminders, or your garden as a whole anytime.";
 const DEMO_GARDEN_STORAGE_OBJECT = 'demo-garden/state.json';
 const DEMO_GARDEN_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+function isMissingColumnError(error, columnName) {
+  const text = (error?.message || '').toString().toLowerCase();
+  return text.includes(columnName.toLowerCase()) && text.includes('column');
+}
+
+function isMissingRelationError(error, relationName) {
+  // PostgreSQL error code 42P01 = undefined_table
+  const code = (error?.code || '').toString().trim();
+  if (code === '42P01') return true;
+
+  const text = (error?.message || '').toString().toLowerCase();
+  const nameMatch = !relationName || text.includes(relationName.toLowerCase());
+  return nameMatch && (
+    (text.includes('relation') && text.includes('does not exist'))
+    || text.includes('undefined table')
+    || text.includes('table not found')
+    || (text.includes('no such table'))
+  );
+}
+
+function normalizeGardenName(value) {
+  const normalized = (value || '').toString().trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  return normalized.slice(0, 80);
+}
+
+function extractAssistantTextFromOpenAiPayload(payload) {
+  const content = payload?.choices?.[0]?.message?.content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        return (part?.text || '').toString();
+      })
+      .join('\n')
+      .trim();
+  }
+
+  return (content || '').toString().trim();
+}
+
+function toCompanionMessage(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    id: row.id,
+    role: (row.role || 'assistant').toString(),
+    content: (row.content || '').toString(),
+    created_at: row.created_at || new Date().toISOString(),
+  };
+}
+
+function computeAverageScheduleDays(entries) {
+  if (!Array.isArray(entries) || entries.length < 2) return null;
+
+  const ordered = [...entries]
+    .map((entry) => new Date(entry.occurred_at).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((a, b) => a - b);
+
+  if (ordered.length < 2) return null;
+
+  let totalGapMs = 0;
+  let totalIntervals = 0;
+
+  for (let index = 1; index < ordered.length; index += 1) {
+    const gap = ordered[index] - ordered[index - 1];
+    if (gap > 0) {
+      totalGapMs += gap;
+      totalIntervals += 1;
+    }
+  }
+
+  if (totalIntervals === 0) return null;
+
+  const avgDays = totalGapMs / totalIntervals / (1000 * 60 * 60 * 24);
+  return Math.max(1, Math.round(avgDays));
+}
+
+async function getHomeownerGardenName(userId) {
+  const { data, error } = await writeSupabase
+    .from('homeowner_profiles')
+    .select('garden_name')
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (error) {
+    if (isMissingColumnError(error, 'garden_name')) {
+      return { gardenName: null, missingColumn: true, error: null };
+    }
+    return { gardenName: null, missingColumn: false, error };
+  }
+
+  const row = Array.isArray(data) ? (data[0] || null) : null;
+  const gardenName = normalizeGardenName(row?.garden_name || '');
+  return { gardenName: gardenName || null, missingColumn: false, error: null };
+}
+
+async function setHomeownerGardenName(userId, name) {
+  const normalizedName = normalizeGardenName(name);
+  const error = await updateHomeownerProfileBy('user_id', userId, { garden_name: normalizedName || null });
+  if (error) {
+    if (isMissingColumnError(error, 'garden_name')) {
+      return { ok: false, missingColumn: true, error: null };
+    }
+    return { ok: false, missingColumn: false, error };
+  }
+
+  return { ok: true, missingColumn: false, error: null, gardenName: normalizedName || null };
+}
+
+async function listHomeownerGardenCompanionMessages(userId, limit = HOMEOWNER_GARDEN_COMPANION_MAX_HISTORY) {
+  const { data, error } = await writeSupabase
+    .from('homeowner_garden_companion_messages')
+    .select('id, role, content, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingRelationError(error, 'homeowner_garden_companion_messages')) {
+      return { messages: [], missingTable: true, error: null };
+    }
+    return { messages: [], missingTable: false, error };
+  }
+
+  const messages = Array.isArray(data) ? data.map(toCompanionMessage).filter(Boolean) : [];
+  return { messages, missingTable: false, error: null };
+}
+
+async function createHomeownerGardenCompanionMessage(userId, role, content) {
+  const normalizedRole = (role || '').toString().trim().toLowerCase();
+  const normalizedContent = (content || '').toString().trim();
+
+  if (!['assistant', 'user'].includes(normalizedRole) || !normalizedContent) {
+    return { message: null, missingTable: false, error: new Error('Invalid companion message payload') };
+  }
+
+  const { data, error } = await writeSupabase
+    .from('homeowner_garden_companion_messages')
+    .insert([
+      {
+        user_id: userId,
+        role: normalizedRole,
+        content: normalizedContent,
+      },
+    ])
+    .select('id, role, content, created_at')
+    .single();
+
+  if (error) {
+    if (isMissingRelationError(error, 'homeowner_garden_companion_messages')) {
+      return { message: null, missingTable: true, error: null };
+    }
+    return { message: null, missingTable: false, error };
+  }
+
+  return {
+    message: toCompanionMessage(data),
+    missingTable: false,
+    error: null,
+  };
+}
+
+async function buildHomeownerGardenCompanionContext(userId) {
+  const { gardenName, missingColumn, error: gardenNameError } = await getHomeownerGardenName(userId);
+  if (gardenNameError) {
+    throw gardenNameError;
+  }
+
+  const { data: plants, error: plantsError } = await writeSupabase
+    .from('homeowner_plants')
+    .select(HOMEOWNER_PLANT_PUBLIC_SELECT)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (plantsError) {
+    throw plantsError;
+  }
+
+  const safePlants = Array.isArray(plants) ? plants : [];
+
+  const { data: journalRows, error: journalError } = await writeSupabase
+    .from('homeowner_plant_journal_entries')
+    .select('id, plant_id, event_type, occurred_at, notes, created_at')
+    .eq('user_id', userId)
+    .order('occurred_at', { ascending: false })
+    .limit(400);
+
+  if (journalError && !isMissingRelationError(journalError, 'homeowner_plant_journal_entries')) {
+    throw journalError;
+  }
+
+  const safeJournal = Array.isArray(journalRows) ? journalRows : [];
+  const totalPlantCount = safePlants.length;
+  const species = Array.from(new Set(safePlants.map((plant) => (plant.species || '').toString().trim()).filter(Boolean))).sort();
+  const locations = Array.from(new Set(safePlants.map((plant) => {
+    const rowSection = (plant.row_section_id || '').toString().trim();
+    const roomOrBed = (plant.room_or_bed || '').toString().trim();
+    return rowSection || roomOrBed || '';
+  }).filter(Boolean))).sort();
+
+  const totalPhotoCount = safePlants.reduce((sum, plant) => {
+    const photos = Array.isArray(plant.photos) ? plant.photos : [];
+    return sum + photos.length;
+  }, 0);
+
+  const diagnosticsRows = safePlants
+    .filter((plant) => plant.last_diagnostics && typeof plant.last_diagnostics === 'object')
+    .map((plant) => ({
+      plant_id: plant.id,
+      plant_name: (plant.name || '').toString(),
+      overall_condition: (plant.last_diagnostics?.overall_condition || '').toString(),
+      summary: (plant.last_diagnostics?.summary || '').toString(),
+      updated_at: plant.updated_at || plant.created_at || null,
+    }));
+
+  const wateringEntries = safeJournal.filter((entry) => (entry.event_type || '').toString().toLowerCase() === 'watered');
+  const fertilizingEntries = safeJournal.filter((entry) => (entry.event_type || '').toString().toLowerCase() === 'fertilized');
+
+  const wateringScheduleHints = Array.from(new Set(
+    safePlants
+      .map((plant) => [
+        plant?.last_diagnostics?.watering_frequency_summer,
+        plant?.last_diagnostics?.watering_frequency_winter,
+      ])
+      .flat()
+      .map((item) => (item || '').toString().trim())
+      .filter(Boolean)
+  )).slice(0, 12);
+
+  const fertilizerScheduleDays = computeAverageScheduleDays(fertilizingEntries);
+  const reminderHistory = safeJournal
+    .filter((entry) => /remind|reminder|schedule|check[-\s]?in/i.test((entry.notes || '').toString()))
+    .slice(0, 25)
+    .map((entry) => ({
+      event_type: entry.event_type,
+      occurred_at: entry.occurred_at,
+      notes: (entry.notes || '').toString(),
+      plant_id: entry.plant_id,
+    }));
+
+  const gardenStatistics = {
+    plant_count: totalPlantCount,
+    species_count: species.length,
+    location_count: locations.length,
+    photo_count: totalPhotoCount,
+    journal_entry_count: safeJournal.length,
+    diagnostics_count: diagnosticsRows.length,
+    watering_event_count: wateringEntries.length,
+    fertilizer_event_count: fertilizingEntries.length,
+  };
+
+  return {
+    garden_name: gardenName || HOMEOWNER_GARDEN_DEFAULT_NAME,
+    has_custom_garden_name: Boolean(gardenName),
+    requires_garden_name: !gardenName,
+    schema_supports_garden_name: !missingColumn,
+    plant_count: totalPlantCount,
+    plant_species: species,
+    plant_locations: locations,
+    journal_entries: safeJournal.slice(0, 60),
+    notes: safeJournal
+      .map((entry) => (entry.notes || '').toString().trim())
+      .filter(Boolean)
+      .slice(0, 60),
+    reminder_history: reminderHistory,
+    watering_schedules: wateringScheduleHints,
+    fertilizer_schedules: fertilizerScheduleDays ? [`About every ${fertilizerScheduleDays} days (derived from journal history).`] : [],
+    previous_diagnostics: diagnosticsRows.slice(0, 40),
+    photo_counts: {
+      total: totalPhotoCount,
+      by_plant: safePlants.map((plant) => ({
+        plant_id: plant.id,
+        plant_name: (plant.name || '').toString(),
+        count: Array.isArray(plant.photos) ? plant.photos.length : 0,
+      })),
+    },
+    garden_statistics: gardenStatistics,
+    garden_summary: {
+      headline: `${gardenName || HOMEOWNER_GARDEN_DEFAULT_NAME}: ${totalPlantCount} plant profile${totalPlantCount === 1 ? '' : 's'} tracked.`,
+      plant_count: totalPlantCount,
+      species_count: species.length,
+      location_count: locations.length,
+      journal_entry_count: safeJournal.length,
+      photo_count: totalPhotoCount,
+    },
+  };
+}
 
 function buildDemoGardenDiagnostics({ commonName, scientificName, condition }) {
   return {
@@ -2233,9 +2526,222 @@ api.post('/homeowners/qr-tag-orders', requireHomeownerAuth, async (req, res) => 
   }
 });
 
+api.get('/homeowners/garden-companion/session', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const context = await buildHomeownerGardenCompanionContext(userId);
+    const messagesResult = await listHomeownerGardenCompanionMessages(userId);
+
+    if (messagesResult.missingTable) {
+      return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (messagesResult.error) {
+      return res.status(500).json({ error: messagesResult.error.message || 'Failed to load Garden Companion messages' });
+    }
+
+    let messages = messagesResult.messages;
+    if (messages.length === 0) {
+      const starterText = context.requires_garden_name
+        ? HOMEOWNER_GARDEN_COMPANION_NAME_PROMPT
+        : HOMEOWNER_GARDEN_COMPANION_POST_NAME_MESSAGE;
+
+      const createdStarter = await createHomeownerGardenCompanionMessage(userId, 'assistant', starterText);
+      if (createdStarter.missingTable) {
+        return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+      }
+      if (createdStarter.error) {
+        return res.status(500).json({ error: createdStarter.error.message || 'Failed to initialize Garden Companion' });
+      }
+
+      messages = createdStarter.message ? [createdStarter.message] : [];
+    }
+
+    return res.json({
+      garden_name: context.garden_name,
+      requires_garden_name: context.requires_garden_name,
+      schema_supports_garden_name: context.schema_supports_garden_name,
+      summary: context.garden_summary,
+      messages,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to load Garden Companion session' });
+  }
+});
+
+api.patch('/homeowners/garden-companion/name', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const gardenName = normalizeGardenName(req.body?.garden_name || '');
+    if (!gardenName) {
+      return res.status(400).json({ error: 'Garden name is required.' });
+    }
+
+    const updateResult = await setHomeownerGardenName(userId, gardenName);
+    if (updateResult.missingColumn) {
+      return res.status(503).json({ error: 'Garden naming is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (updateResult.error) {
+      return res.status(500).json({ error: updateResult.error.message || 'Failed to save garden name' });
+    }
+
+    return res.json({
+      ok: true,
+      garden_name: gardenName,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to update garden name' });
+  }
+});
+
+api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const userMessage = (req.body?.message || '').toString().trim();
+
+    if (!userMessage) {
+      return res.status(400).json({ error: 'Message is required.' });
+    }
+
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const contextBeforeMessage = await buildHomeownerGardenCompanionContext(userId);
+    const messageInsert = await createHomeownerGardenCompanionMessage(userId, 'user', userMessage);
+    if (messageInsert.missingTable) {
+      return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (messageInsert.error) {
+      return res.status(500).json({ error: messageInsert.error.message || 'Failed to save Garden Companion message' });
+    }
+
+    if (contextBeforeMessage.requires_garden_name) {
+      const nextGardenName = normalizeGardenName(userMessage);
+      if (!nextGardenName) {
+        return res.status(400).json({ error: 'Please provide a valid garden name.' });
+      }
+
+      const saveNameResult = await setHomeownerGardenName(userId, nextGardenName);
+      if (saveNameResult.missingColumn) {
+        return res.status(503).json({ error: 'Garden naming is not configured yet. Run the latest homeowner SQL migration.' });
+      }
+      if (saveNameResult.error) {
+        return res.status(500).json({ error: saveNameResult.error.message || 'Failed to save garden name' });
+      }
+
+      const onboardingMessage = `Great, ${nextGardenName}! ${HOMEOWNER_GARDEN_COMPANION_POST_NAME_MESSAGE}`;
+      const assistantInsert = await createHomeownerGardenCompanionMessage(userId, 'assistant', onboardingMessage);
+      if (assistantInsert.missingTable) {
+        return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+      }
+      if (assistantInsert.error) {
+        return res.status(500).json({ error: assistantInsert.error.message || 'Failed to save Garden Companion response' });
+      }
+
+      const nextContext = await buildHomeownerGardenCompanionContext(userId);
+      return res.json({
+        garden_name: nextContext.garden_name,
+        requires_garden_name: false,
+        summary: nextContext.garden_summary,
+        assistant_message: assistantInsert.message,
+      });
+    }
+
+    const context = await buildHomeownerGardenCompanionContext(userId);
+    const messagesResult = await listHomeownerGardenCompanionMessages(userId, 24);
+    if (messagesResult.missingTable) {
+      return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (messagesResult.error) {
+      return res.status(500).json({ error: messagesResult.error.message || 'Failed to load Garden Companion history' });
+    }
+
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY is not set' });
+    }
+
+    const systemPrompt = [
+      'You are Garden Companion for ArborTag Homeowner Edition.',
+      'Your role is whole-garden support: organization, history, seasonal planning, reminder recommendations, and pattern detection across multiple plants.',
+      'Do not replace or duplicate individual plant diagnostics. When user asks for disease/pest diagnosis on one plant, direct them to that plant\'s diagnostics while still offering garden-level planning support.',
+      'Use this garden context as primary source of truth and cite specific plants/entries when possible.',
+      `Garden context JSON: ${JSON.stringify(context)}`,
+      'Tone: warm, practical, concise, memory-oriented, and specific to this user\'s garden.',
+    ].join('\n\n');
+
+    const conversation = messagesResult.messages
+      .slice(-16)
+      .map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content,
+      }));
+
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.4,
+        max_tokens: 700,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversation,
+        ],
+      }),
+    });
+
+    const aiPayload = await aiResponse.json().catch(() => ({}));
+    if (!aiResponse.ok) {
+      return res.status(502).json({ error: aiPayload?.error?.message || 'Failed to generate Garden Companion response' });
+    }
+
+    const assistantText = extractAssistantTextFromOpenAiPayload(aiPayload)
+      || 'I am here to help with your whole garden. Ask me about organization, schedules, or patterns across your plants.';
+
+    const assistantInsert = await createHomeownerGardenCompanionMessage(userId, 'assistant', assistantText);
+    if (assistantInsert.missingTable) {
+      return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (assistantInsert.error) {
+      return res.status(500).json({ error: assistantInsert.error.message || 'Failed to save Garden Companion response' });
+    }
+
+    return res.json({
+      garden_name: context.garden_name,
+      requires_garden_name: false,
+      summary: context.garden_summary,
+      assistant_message: assistantInsert.message,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to process Garden Companion message' });
+  }
+});
+
 api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
   try {
     const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const gardenNameResult = await getHomeownerGardenName(userId);
+    const gardenName = gardenNameResult.gardenName || HOMEOWNER_GARDEN_DEFAULT_NAME;
 
     const { data: plants, error: plantsError } = await writeSupabase
       .from('homeowner_plants')
@@ -2252,6 +2758,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
       console.error('Homeowner tier/count error, returning safe defaults:', accessState.error.message || accessState.error);
       return res.json({
         plants: (plantsError ? [] : (plants || [])).map((plant) => ({ ...serializeHomeownerPlant(plant), is_locked: false })),
+        garden_name: gardenName,
         tier: 'free',
         profile_limit: getHomeownerTierLimit('free'),
         active_profiles: Array.isArray(plants) ? plants.length : 0,
@@ -2266,6 +2773,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
 
     return res.json({
       plants: serializedPlants,
+      garden_name: gardenName,
       tier: accessState.tier,
       profile_limit: accessState.profileLimit,
       active_profiles: accessState.activeProfiles,
@@ -2275,6 +2783,7 @@ api.get('/homeowners/plants', requireHomeownerAuth, async (req, res) => {
     console.error('Unexpected homeowner plants error, returning safe defaults:', err?.message || err);
     return res.json({
       plants: [],
+      garden_name: HOMEOWNER_GARDEN_DEFAULT_NAME,
       tier: 'free',
       profile_limit: getHomeownerTierLimit('free'),
       active_profiles: 0,

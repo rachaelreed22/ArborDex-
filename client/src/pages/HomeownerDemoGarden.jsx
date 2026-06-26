@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDemoGardenPlants, fileToDataUrl, getCachedDemoGardenPlants, saveDemoGardenPlants } from '../utils/demoGardenStore';
 import { clearDemoQueensPass, getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
@@ -16,6 +16,10 @@ const EMPTY_FORM = {
   notes: '',
 };
 
+const DEMO_COMPANION_STORAGE_KEY = 'arbordex-demo-garden-companion-v1';
+const DEMO_GARDEN_NAME_PROMPT = 'Welcome to ArborTag! Before we get started, what would you like to name your garden?';
+const DEMO_GARDEN_AFTER_NAME_PROMPT = "Great! I'll help you remember your plants, keep track of your garden history, and answer questions about this specific garden. You can ask me about your plants, your notes, reminders, or your garden as a whole anytime.";
+
 function getLocationLabel(value) {
   if (value === 'indoor') return 'Indoor';
   if (value === 'outdoor') return 'Outdoor';
@@ -27,6 +31,131 @@ function isQueensPassAuthError(message) {
   return text.includes('queen\'s pass authorization is required')
     || text.includes('queen\'s pass is required')
     || text.includes('unauthorized');
+}
+
+function toDemoCompanionMessage(message) {
+  if (!message || typeof message !== 'object') return null;
+  const role = (message.role || '').toString();
+  if (!['assistant', 'user'].includes(role)) return null;
+  const content = (message.content || '').toString();
+  if (!content.trim()) return null;
+  return {
+    id: message.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role,
+    content,
+    created_at: message.created_at || new Date().toISOString(),
+  };
+}
+
+function readDemoCompanionState() {
+  const raw = window.localStorage.getItem(DEMO_COMPANION_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const gardenName = (parsed.garden_name || '').toString();
+    const messages = Array.isArray(parsed.messages)
+      ? parsed.messages.map(toDemoCompanionMessage).filter(Boolean)
+      : [];
+    return { gardenName, messages };
+  } catch {
+    return null;
+  }
+}
+
+function saveDemoCompanionState(gardenName, messages) {
+  const payload = {
+    garden_name: (gardenName || '').toString(),
+    messages: Array.isArray(messages) ? messages.map(toDemoCompanionMessage).filter(Boolean) : [],
+  };
+  window.localStorage.setItem(DEMO_COMPANION_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function createDemoCompanionMessage(role, content) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role,
+    content,
+    created_at: new Date().toISOString(),
+  };
+}
+
+function buildDemoCompanionSummary(gardenName, plants) {
+  const safePlants = Array.isArray(plants) ? plants : [];
+  const speciesSet = new Set();
+  const locationSet = new Set();
+  let photoCount = 0;
+  let journalCount = 0;
+  const allNotes = [];
+
+  safePlants.forEach((plant) => {
+    const species = (plant?.species || '').toString().trim();
+    if (species) speciesSet.add(species);
+
+    const location = (plant?.row_section_id || plant?.room_or_bed || '').toString().trim();
+    if (location) locationSet.add(location);
+
+    const photos = Array.isArray(plant?.photos) ? plant.photos : [];
+    photoCount += photos.length;
+
+    const journalEntries = Array.isArray(plant?.journal_entries) ? plant.journal_entries : [];
+    journalCount += journalEntries.length;
+    journalEntries.forEach((entry) => {
+      const notes = (entry?.notes || '').toString().trim();
+      if (notes) allNotes.push(notes);
+    });
+
+    const plantNotes = (plant?.notes || '').toString().trim();
+    if (plantNotes) allNotes.push(plantNotes);
+  });
+
+  return {
+    headline: `${gardenName || 'Demo Digital Garden'}: ${safePlants.length} plant profile${safePlants.length === 1 ? '' : 's'} tracked.`,
+    plant_count: safePlants.length,
+    species_count: speciesSet.size,
+    location_count: locationSet.size,
+    photo_count: photoCount,
+    journal_entry_count: journalCount,
+    recent_notes: allNotes.slice(-8).reverse(),
+    species: Array.from(speciesSet).sort(),
+    locations: Array.from(locationSet).sort(),
+  };
+}
+
+function buildDemoCompanionReply(question, summary) {
+  const text = (question || '').toString().toLowerCase();
+  const speciesText = summary.species.length > 0 ? summary.species.slice(0, 6).join(', ') : 'No species saved yet';
+  const locationText = summary.locations.length > 0 ? summary.locations.slice(0, 8).join(', ') : 'No locations set yet';
+
+  if (/remind|schedule|watering|fertiliz/i.test(text)) {
+    return [
+      `From ${summary.plant_count} plants and ${summary.journal_entry_count} journal entries, this garden looks active enough for a weekly check-in rhythm.`,
+      'Try this simple plan: Monday watering check, Thursday pest/stress check, and a Sunday notes update for anything that changed.',
+      `Current locations tracked: ${locationText}.`,
+    ].join(' ');
+  }
+
+  if (/history|journal|remember|notes/i.test(text)) {
+    const notesPreview = summary.recent_notes.length > 0
+      ? `Recent notes: ${summary.recent_notes.slice(0, 3).join(' | ')}`
+      : 'No recent notes yet, so adding short weekly notes will quickly build useful memory.';
+    return `Your demo garden history currently has ${summary.journal_entry_count} journal entries and ${summary.photo_count} photos. ${notesPreview}`;
+  }
+
+  if (/organize|location|map|layout|where/i.test(text)) {
+    return `You currently have ${summary.location_count} location tags (${locationText}). A good next step is to standardize each plant with row/section labels (A1, B3) plus indoor/outdoor so it stays searchable over time.`;
+  }
+
+  if (/species|pattern|trend|across|overall/i.test(text)) {
+    return `Across your demo garden I see ${summary.species_count} species and ${summary.plant_count} total profiles. Species tracked: ${speciesText}. Use monthly photo snapshots to spot garden-wide trends early.`;
+  }
+
+  return [
+    `I can help with whole-garden planning using what is already tracked in ${summary.plant_count} plant profiles.`,
+    `Right now you have ${summary.photo_count} photos, ${summary.journal_entry_count} journal entries, and ${summary.location_count} locations saved.`,
+    'Ask me about reminders, organizing plant locations, history notes, or seasonal planning across the whole garden.',
+  ].join(' ');
 }
 
 export default function HomeownerDemoGarden() {
@@ -46,6 +175,42 @@ export default function HomeownerDemoGarden() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [demoGardenName, setDemoGardenName] = useState('');
+  const [demoGardenNameInput, setDemoGardenNameInput] = useState('');
+  const [companionMessages, setCompanionMessages] = useState([]);
+  const [companionInput, setCompanionInput] = useState('');
+  const [companionLoading, setCompanionLoading] = useState(false);
+  const companionBottomRef = useRef(null);
+
+  const companionSummary = useMemo(
+    () => buildDemoCompanionSummary(demoGardenName || 'Demo Digital Garden', plants),
+    [demoGardenName, plants]
+  );
+
+  useEffect(() => {
+    const savedState = readDemoCompanionState();
+    if (savedState) {
+      setDemoGardenName(savedState.gardenName || '');
+      setDemoGardenNameInput(savedState.gardenName || '');
+      if (savedState.messages.length > 0) {
+        setCompanionMessages(savedState.messages);
+      } else {
+        setCompanionMessages([createDemoCompanionMessage('assistant', DEMO_GARDEN_NAME_PROMPT)]);
+      }
+      return;
+    }
+
+    setCompanionMessages([createDemoCompanionMessage('assistant', DEMO_GARDEN_NAME_PROMPT)]);
+  }, []);
+
+  useEffect(() => {
+    if (companionMessages.length === 0) return;
+    saveDemoCompanionState(demoGardenName, companionMessages);
+  }, [demoGardenName, companionMessages]);
+
+  useEffect(() => {
+    companionBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [companionMessages, companionLoading]);
 
   useEffect(() => {
     let active = true;
@@ -73,6 +238,43 @@ export default function HomeownerDemoGarden() {
       active = false;
     };
   }, []);
+
+  function saveDemoGardenName(e) {
+    e.preventDefault();
+    const nextName = demoGardenNameInput.trim();
+    if (!nextName) return;
+    setDemoGardenName(nextName);
+    setDemoGardenNameInput(nextName);
+  }
+
+  function sendCompanionMessage(e) {
+    e.preventDefault();
+    const message = companionInput.trim();
+    if (!message || companionLoading) return;
+
+    const nextUserMessage = createDemoCompanionMessage('user', message);
+    setCompanionMessages((prev) => [...prev, nextUserMessage]);
+    setCompanionInput('');
+    setCompanionLoading(true);
+
+    window.setTimeout(() => {
+      if (!demoGardenName.trim()) {
+        const nextGardenName = message.slice(0, 80).trim();
+        setDemoGardenName(nextGardenName);
+        setDemoGardenNameInput(nextGardenName);
+        setCompanionMessages((prev) => [
+          ...prev,
+          createDemoCompanionMessage('assistant', `Great, ${nextGardenName}! ${DEMO_GARDEN_AFTER_NAME_PROMPT}`),
+        ]);
+        setCompanionLoading(false);
+        return;
+      }
+
+      const reply = buildDemoCompanionReply(message, companionSummary);
+      setCompanionMessages((prev) => [...prev, createDemoCompanionMessage('assistant', reply)]);
+      setCompanionLoading(false);
+    }, 320);
+  }
 
   async function persistPlants(updater) {
     setSaving(true);
@@ -271,6 +473,84 @@ export default function HomeownerDemoGarden() {
             <li>✅ Build a living record of your garden over time</li>
           </ul>
         </div>
+
+        <section className="homeowner-panel homeowner-panel-info mt-6 companion-section">
+          <div className="companion-header">
+            <div>
+              <h2 className="homeowner-heading text-xl font-bold">Garden Companion</h2>
+              <p className="homeowner-subtext text-sm">A whole-garden memory guide for this demo garden.</p>
+            </div>
+          </div>
+
+          <form onSubmit={saveDemoGardenName} className="companion-name-form mt-3">
+            <label className="homeowner-heading block text-sm font-semibold" htmlFor="demo-garden-name-input">
+              Demo Garden Name
+            </label>
+            <div className="companion-name-controls mt-1">
+              <input
+                id="demo-garden-name-input"
+                className="homeowner-input rounded-md px-3 py-2 text-sm"
+                value={demoGardenNameInput}
+                onChange={(e) => setDemoGardenNameInput(e.target.value)}
+                maxLength={80}
+              />
+              <button type="submit" className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">
+                Save Name
+              </button>
+            </div>
+          </form>
+
+          <div className="companion-summary mt-4">
+            <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
+            <p className="homeowner-subtext text-sm">{companionSummary.headline}</p>
+            <div className="companion-summary-grid mt-2">
+              <span>Plants: {companionSummary.plant_count}</span>
+              <span>Species: {companionSummary.species_count}</span>
+              <span>Locations: {companionSummary.location_count}</span>
+              <span>Journal Entries: {companionSummary.journal_entry_count}</span>
+              <span>Photos: {companionSummary.photo_count}</span>
+            </div>
+          </div>
+
+          <div className="companion-chat mt-4">
+            <div className="companion-chat-messages" role="log" aria-live="polite">
+              {companionMessages.map((message) => (
+                <article
+                  key={message.id}
+                  className={`companion-message ${message.role === 'assistant' ? 'companion-message-assistant' : 'companion-message-user'}`}
+                >
+                  <p className="companion-message-role">{message.role === 'assistant' ? 'Garden Companion' : 'You'}</p>
+                  <p className="companion-message-text">{message.content}</p>
+                </article>
+              ))}
+              {companionLoading && (
+                <article className="companion-message companion-message-assistant">
+                  <p className="companion-message-role">Garden Companion</p>
+                  <p className="companion-message-text">Thinking about your garden...</p>
+                </article>
+              )}
+              <div ref={companionBottomRef} />
+            </div>
+
+            <form className="companion-chat-form" onSubmit={sendCompanionMessage}>
+              <textarea
+                className="homeowner-input companion-chat-input"
+                rows={3}
+                value={companionInput}
+                onChange={(e) => setCompanionInput(e.target.value)}
+                placeholder="Ask about reminders, notes, patterns, seasonal planning, or plant organization..."
+                disabled={companionLoading}
+              />
+              <button
+                type="submit"
+                className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
+                disabled={companionLoading || !companionInput.trim()}
+              >
+                {companionLoading ? 'Sending...' : 'Send'}
+              </button>
+            </form>
+          </div>
+        </section>
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
         {loading && <p className="homeowner-subtext mt-4 text-sm">Loading demo garden plants...</p>}

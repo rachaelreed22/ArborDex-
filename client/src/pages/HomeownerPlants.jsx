@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { getTierLabel, getTierLimit } from '../utils/homeownerTier';
@@ -22,6 +22,16 @@ function getLocationLabel(value) {
   if (value === 'indoor') return 'Indoor';
   if (value === 'outdoor') return 'Outdoor';
   return 'Not set';
+}
+
+function toCompanionMessage(item) {
+  if (!item || typeof item !== 'object') return null;
+  return {
+    id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role: (item.role || 'assistant').toString(),
+    content: (item.content || '').toString(),
+    created_at: item.created_at || new Date().toISOString(),
+  };
 }
 
 function hasObservedHazardEvidence(text) {
@@ -76,6 +86,7 @@ function inferHazardFromDiagnostics(diagnostics) {
 export default function HomeownerPlants() {
   const navigate = useNavigate();
   const { getAccessToken, logout } = useHomeownerAuth();
+  const companionBottomRef = useRef(null);
 
   const [plants, setPlants] = useState([]);
   const [tier, setTier] = useState('free');
@@ -89,6 +100,15 @@ export default function HomeownerPlants() {
   const [editingId, setEditingId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [gardenName, setGardenName] = useState('My Digital Garden');
+  const [gardenNameInput, setGardenNameInput] = useState('');
+  const [renamingGarden, setRenamingGarden] = useState(false);
+  const [gardenSummary, setGardenSummary] = useState(null);
+  const [companionMessages, setCompanionMessages] = useState([]);
+  const [companionInput, setCompanionInput] = useState('');
+  const [companionLoading, setCompanionLoading] = useState(false);
+  const [companionError, setCompanionError] = useState('');
+  const [companionReady, setCompanionReady] = useState(false);
 
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -121,6 +141,11 @@ export default function HomeownerPlants() {
       setError('');
       const payload = await authFetch('/api/homeowners/plants');
       setPlants(Array.isArray(payload.plants) ? payload.plants : []);
+      if (payload?.garden_name) {
+        const nextGardenName = payload.garden_name.toString();
+        setGardenName(nextGardenName);
+        setGardenNameInput(nextGardenName);
+      }
       setTier(payload.tier || 'free');
       setProfileLimit(payload.profile_limit || getTierLimit(payload.tier || 'free'));
       setActiveProfiles(payload.active_profiles || 0);
@@ -132,10 +157,113 @@ export default function HomeownerPlants() {
     }
   }
 
+  async function loadGardenCompanion() {
+    try {
+      setCompanionError('');
+      const payload = await authFetch('/api/homeowners/garden-companion/session');
+      const nextGardenName = (payload.garden_name || 'My Digital Garden').toString();
+      setGardenName(nextGardenName);
+      setGardenNameInput(nextGardenName);
+      setGardenSummary(payload.summary || null);
+      setCompanionMessages(Array.isArray(payload.messages) ? payload.messages.map(toCompanionMessage).filter(Boolean) : []);
+      setCompanionReady(true);
+    } catch (err) {
+      const message = err.message || 'Failed to load Garden Companion.';
+      const needsMigration = /migration|not configured|503/i.test(message);
+      setCompanionError(
+        needsMigration
+          ? 'Garden Companion needs a one-time database setup. Run the SQL migration in server/sql/2026_06_26_homeowner_garden_companion.sql in your Supabase editor to enable this feature.'
+          : message
+      );
+      setCompanionReady(false);
+    }
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPlants();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadGardenCompanion();
   }, []);
+
+  useEffect(() => {
+    companionBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [companionMessages, companionLoading]);
+
+  async function saveGardenName(e) {
+    e.preventDefault();
+    const nextName = gardenNameInput.trim();
+    if (!nextName) {
+      setCompanionError('Garden name is required.');
+      return;
+    }
+
+    try {
+      setRenamingGarden(true);
+      setCompanionError('');
+      const payload = await authFetch('/api/homeowners/garden-companion/name', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ garden_name: nextName }),
+      });
+
+      const savedName = (payload.garden_name || nextName).toString();
+      setGardenName(savedName);
+      setGardenNameInput(savedName);
+      setSuccess('Garden name updated');
+      await loadGardenCompanion();
+    } catch (err) {
+      setCompanionError(err.message || 'Failed to update garden name.');
+    } finally {
+      setRenamingGarden(false);
+    }
+  }
+
+  async function sendCompanionMessage(e) {
+    e.preventDefault();
+    const message = companionInput.trim();
+    if (!message || companionLoading) return;
+
+    const optimisticMessage = {
+      id: `local-${Date.now()}`,
+      role: 'user',
+      content: message,
+      created_at: new Date().toISOString(),
+    };
+
+    setCompanionMessages((prev) => [...prev, optimisticMessage]);
+    setCompanionInput('');
+
+    try {
+      setCompanionLoading(true);
+      setCompanionError('');
+      const payload = await authFetch('/api/homeowners/garden-companion/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+
+      if (payload?.garden_name) {
+        const nextGardenName = payload.garden_name.toString();
+        setGardenName(nextGardenName);
+        setGardenNameInput(nextGardenName);
+      }
+
+      if (payload?.summary) {
+        setGardenSummary(payload.summary);
+      }
+
+      const assistantMessage = toCompanionMessage(payload.assistant_message);
+      if (assistantMessage) {
+        setCompanionMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (err) {
+      setCompanionMessages((prev) => prev.filter((entry) => entry.id !== optimisticMessage.id));
+      setCompanionError(err.message || 'Garden Companion could not send this message.');
+    } finally {
+      setCompanionLoading(false);
+    }
+  }
 
   async function handleCreatePlant(e) {
     e.preventDefault();
@@ -333,6 +461,7 @@ export default function HomeownerPlants() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="homeowner-heading text-3xl font-bold">Welcome to Your Digital Garden</h1>
+            <p className="homeowner-subtext mt-1 text-sm">Garden Name: {gardenName}</p>
             <p className="homeowner-subtext mt-2 text-sm">
               {getTierLabel(tier)}: {activeProfiles}/{profileLimit} active profiles
             </p>
@@ -382,6 +511,96 @@ export default function HomeownerPlants() {
             ArborAI provides educational plant guidance and does not replace professional arborist, medical, legal, or chemical-treatment advice.
           </p>
         </div>
+
+        <section className="homeowner-panel homeowner-panel-info mt-6 companion-section">
+          <div className="companion-header">
+            <div>
+              <h2 className="homeowner-heading text-xl font-bold">Garden Companion</h2>
+              <p className="homeowner-subtext text-sm">Your whole-garden ArborAI memory assistant.</p>
+            </div>
+          </div>
+
+          <div className="companion-name-row mt-3">
+            <form onSubmit={saveGardenName} className="companion-name-form">
+              <label className="homeowner-heading block text-sm font-semibold" htmlFor="garden-name-input">
+                Garden Name
+              </label>
+              <div className="companion-name-controls mt-1">
+                <input
+                  id="garden-name-input"
+                  className="homeowner-input rounded-md px-3 py-2 text-sm"
+                  value={gardenNameInput}
+                  onChange={(e) => setGardenNameInput(e.target.value)}
+                  maxLength={80}
+                  disabled={renamingGarden}
+                />
+                <button
+                  type="submit"
+                  className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+                  disabled={renamingGarden}
+                >
+                  {renamingGarden ? 'Saving...' : 'Save Name'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="companion-summary mt-4">
+            <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
+            <p className="homeowner-subtext text-sm">
+              {gardenSummary?.headline || `${gardenName}: ${plants.length} plant profile${plants.length === 1 ? '' : 's'} tracked.`}
+            </p>
+            <div className="companion-summary-grid mt-2">
+              <span>Plants: {gardenSummary?.plant_count ?? plants.length}</span>
+              <span>Species: {gardenSummary?.species_count ?? 0}</span>
+              <span>Locations: {gardenSummary?.location_count ?? 0}</span>
+              <span>Journal Entries: {gardenSummary?.journal_entry_count ?? 0}</span>
+              <span>Photos: {gardenSummary?.photo_count ?? 0}</span>
+            </div>
+          </div>
+
+          {companionError && <p className="homeowner-alert homeowner-alert-error mt-3">{companionError}</p>}
+
+          <div className="companion-chat mt-4">
+            <div className="companion-chat-messages" role="log" aria-live="polite">
+              {companionMessages.map((message) => (
+                <article
+                  key={message.id}
+                  className={`companion-message ${message.role === 'assistant' ? 'companion-message-assistant' : 'companion-message-user'}`}
+                >
+                  <p className="companion-message-role">{message.role === 'assistant' ? 'Garden Companion' : 'You'}</p>
+                  <p className="companion-message-text">{message.content}</p>
+                </article>
+              ))}
+              {companionLoading && (
+                <article className="companion-message companion-message-assistant">
+                  <p className="companion-message-role">Garden Companion</p>
+                  <p className="companion-message-text">Thinking about your garden...</p>
+                </article>
+              )}
+              <div ref={companionBottomRef} />
+            </div>
+
+            <form className="companion-chat-form" onSubmit={sendCompanionMessage}>
+              <textarea
+                className="homeowner-input companion-chat-input"
+                rows={3}
+                value={companionInput}
+                onChange={(e) => setCompanionInput(e.target.value)}
+                placeholder={companionReady ? 'Ask about reminders, scheduling, notes, patterns, or seasonal planning for this garden...' : 'Garden Companion setup required — see message above.'}
+                disabled={companionLoading || !companionReady}
+              />
+              <button
+                type="submit"
+                className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
+                disabled={companionLoading || !companionInput.trim() || !companionReady}
+              >
+                {companionLoading ? 'Sending...' : 'Send'}
+              </button>
+            </form>
+          </div>
+        </section>
+
         {loading && (
           <div className="homeowner-plants-loading" role="status" aria-live="polite">
             <span className="homeowner-spinner" aria-hidden="true" />
