@@ -205,6 +205,19 @@
   gap: 0.5rem;
 }
 
+.companion-layout-form > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.companion-layout-form input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .companion-layout-preview {
   display: grid;
   gap: 0.6rem;
@@ -335,5 +348,16 @@
 
   .companion-layout-preview {
     grid-template-columns: 1fr;
+  }
+
+  .companion-layout {
+    overflow-x: hidden;
+  }
+
+  .companion-layout-form input[type="file"],
+  .companion-layout-form textarea,
+  .companion-layout-form .homeowner-button-secondary {
+    width: 100%;
+    min-width: 0;
   }
 }
