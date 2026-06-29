@@ -34,6 +34,17 @@ function toCompanionMessage(item) {
   };
 }
 
+function toDocumentedEntry(item) {
+  if (!item || typeof item !== 'object') return null;
+  const details = (item.details || '').toString().trim();
+  if (!details) return null;
+  return {
+    id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    details,
+    created_at: item.created_at || new Date().toISOString(),
+  };
+}
+
 function hasObservedHazardEvidence(text) {
   const sample = (text || '').toString();
   if (!sample.trim()) return false;
@@ -113,11 +124,21 @@ export default function HomeownerPlants() {
   const [gardenLayoutNotes, setGardenLayoutNotes] = useState('');
   const [gardenLayoutFile, setGardenLayoutFile] = useState(null);
   const [gardenLayoutUploading, setGardenLayoutUploading] = useState(false);
+  const [documentedNotes, setDocumentedNotes] = useState([]);
 
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
 
   const atLimit = useMemo(() => activeProfiles >= profileLimit, [activeProfiles, profileLimit]);
+  const documentationStorageKey = useMemo(() => {
+    const slug = (gardenName || 'my-digital-garden')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return `arbordex-garden-memory-notes-${slug || 'default'}`;
+  }, [gardenName]);
 
   async function authFetch(path, options = {}) {
     const token = await getAccessToken();
@@ -195,6 +216,25 @@ export default function HomeownerPlants() {
   useEffect(() => {
     companionBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [companionMessages, companionLoading]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(documentationStorageKey);
+      if (!raw) {
+        setDocumentedNotes([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const nextEntries = Array.isArray(parsed) ? parsed.map(toDocumentedEntry).filter(Boolean) : [];
+      setDocumentedNotes(nextEntries);
+    } catch {
+      setDocumentedNotes([]);
+    }
+  }, [documentationStorageKey]);
+
+  useEffect(() => {
+    window.localStorage.setItem(documentationStorageKey, JSON.stringify(documentedNotes));
+  }, [documentationStorageKey, documentedNotes]);
 
   async function saveGardenName(e) {
     e.preventDefault();
@@ -315,6 +355,33 @@ export default function HomeownerPlants() {
     } finally {
       setGardenLayoutUploading(false);
     }
+  }
+
+  function documentLatestDiscussion() {
+    const mostRecentAssistant = [...companionMessages].reverse().find((entry) => entry.role === 'assistant');
+    const mostRecentUser = [...companionMessages].reverse().find((entry) => entry.role === 'user');
+
+    const parts = [];
+    if (mostRecentUser?.content) {
+      parts.push(`You: ${mostRecentUser.content}`);
+    }
+    if (mostRecentAssistant?.content) {
+      parts.push(`Garden Partner: ${mostRecentAssistant.content}`);
+    }
+
+    const details = parts.join('\n\n').trim();
+    if (!details) {
+      setCompanionError('Start a chat first, then tap Document This to log the discussion.');
+      return;
+    }
+
+    const entry = {
+      id: `note-${Date.now()}`,
+      details,
+      created_at: new Date().toISOString(),
+    };
+    setDocumentedNotes((prev) => [entry, ...prev]);
+    setSuccess('Latest chat discussion documented in garden memory notes.');
   }
 
   async function handleCreatePlant(e) {
@@ -508,8 +575,8 @@ export default function HomeownerPlants() {
   }
 
   return (
-    <main className="homeowner-shell min-h-screen px-4 py-10">
-      <div className="homeowner-surface mx-auto w-full max-w-5xl rounded-2xl p-8 shadow-2xl">
+    <main className="homeowner-shell min-h-screen px-4 py-8 md:py-10">
+      <div className="homeowner-surface mx-auto w-full max-w-6xl rounded-2xl p-6 md:p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="homeowner-heading text-3xl font-bold">Welcome to Your Digital Garden</h1>
@@ -549,12 +616,12 @@ export default function HomeownerPlants() {
           </div>
         </div>
 
-        <div className="homeowner-panel homeowner-panel-info mt-6">
+        <div className="homeowner-panel homeowner-panel-info mt-4">
           {atLimit
             ? 'You are at your profile limit for this tier. Upgrade or delete a profile to add more.'
             : 'Add and manage plant profiles here. You can attach up to 5 photos per profile.'}
         </div>
-        <div className="homeowner-panel homeowner-panel-info mt-3 space-y-2 text-sm">
+        <div className="homeowner-panel homeowner-panel-info mt-2 space-y-2 text-sm">
           <p>
             Tip: The more photos, notes, and updates you add, the more useful ArborAI's plant guidance can become.
           </p>
@@ -564,20 +631,20 @@ export default function HomeownerPlants() {
           </p>
         </div>
 
-        <section className="homeowner-panel homeowner-panel-info mt-6 companion-section">
+        <section className="homeowner-panel homeowner-panel-info mt-4 companion-section">
           <div className="companion-header">
             <div>
-              <h2 className="homeowner-heading text-xl font-bold">Garden Companion</h2>
-              <p className="homeowner-subtext text-sm">Your whole-garden ArborAI memory assistant.</p>
+              <h2 className="homeowner-heading text-xl font-bold">I Am Your Garden Partner</h2>
+              <p className="homeowner-subtext text-sm">Chat with ArborAI to plan, remember, and document your garden partnership over time.</p>
             </div>
           </div>
 
-          <div className="companion-name-row mt-3">
+          <div className="companion-name-row mt-2">
             <form onSubmit={saveGardenName} className="companion-name-form">
-              <label className="homeowner-heading block text-sm font-semibold" htmlFor="garden-name-input">
-                Garden Name
-              </label>
-              <div className="companion-name-controls mt-1">
+              <div className="companion-name-controls companion-name-controls-compact mt-1">
+                <label className="homeowner-heading text-sm font-semibold" htmlFor="garden-name-input">
+                  Garden Name
+                </label>
                 <input
                   id="garden-name-input"
                   className="homeowner-input rounded-md px-3 py-2 text-sm"
@@ -597,79 +664,9 @@ export default function HomeownerPlants() {
             </form>
           </div>
 
-          <div className="companion-summary mt-4">
-            <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
-            <p className="homeowner-subtext text-sm">
-              {gardenSummary?.headline || `${gardenName}: ${plants.length} plant profile${plants.length === 1 ? '' : 's'} tracked.`}
-            </p>
-            <div className="companion-summary-grid mt-2">
-              <span>Plants: {gardenSummary?.plant_count ?? plants.length}</span>
-              <span>Species: {gardenSummary?.species_count ?? 0}</span>
-              <span>Locations: {gardenSummary?.location_count ?? 0}</span>
-              <span>Journal Entries: {gardenSummary?.journal_entry_count ?? 0}</span>
-              <span>Photos: {gardenSummary?.photo_count ?? 0}</span>
-            </div>
-          </div>
-
-          <section className="companion-layout mt-4">
-            <h3 className="homeowner-heading text-sm font-semibold">Garden Layout</h3>
-            <p className="homeowner-subtext mt-1 text-sm">
-              Upload a garden map or layout image to store your layout records and help ArborAI suggest zone-aware care guidance.
-            </p>
-            <p className="homeowner-subtext mt-1 text-sm">
-              Your uploaded layout image and notes are the source of truth. ArborAI suggestions are interpretations.
-            </p>
-
-            <form className="companion-layout-form mt-2" onSubmit={uploadGardenLayout}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="homeowner-input rounded-md px-3 py-2 text-sm"
-                onChange={(e) => setGardenLayoutFile(e.target.files?.[0] || null)}
-                disabled={gardenLayoutUploading || !companionReady}
-              />
-              <textarea
-                className="homeowner-input companion-chat-input"
-                rows={2}
-                value={gardenLayoutNotes}
-                onChange={(e) => setGardenLayoutNotes(e.target.value)}
-                placeholder="Optional notes about orientation, beds, shade lines, or watering zones"
-                disabled={gardenLayoutUploading || !companionReady}
-              />
-              <button
-                type="submit"
-                className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
-                disabled={gardenLayoutUploading || !gardenLayoutFile || !companionReady}
-              >
-                {gardenLayoutUploading ? 'Analyzing Layout...' : 'Upload Garden Layout'}
-              </button>
-            </form>
-
-            {gardenLayout?.image_url && (
-              <div className="companion-layout-preview mt-3">
-                <img src={gardenLayout.image_url} alt="Saved garden layout" className="companion-layout-image" />
-                <div className="companion-layout-details">
-                  <p className="homeowner-subtext text-sm">{gardenLayout?.analysis?.summary || 'Layout saved to memory.'}</p>
-                  {gardenLayout?.analysis?.sun_exposure_overview && (
-                    <p className="homeowner-subtext text-sm">Sun Exposure: {gardenLayout.analysis.sun_exposure_overview}</p>
-                  )}
-                  {Array.isArray(gardenLayout?.analysis?.zones) && gardenLayout.analysis.zones.length > 0 && (
-                    <ul className="homeowner-subtext text-sm companion-layout-zones">
-                      {gardenLayout.analysis.zones.slice(0, 5).map((zone, index) => (
-                        <li key={`${zone.zone_label || 'zone'}-${index}`}>
-                          <strong>{zone.zone_label || `Zone ${index + 1}`}</strong>: {zone.sun_exposure || 'Unknown'}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-
           {companionError && <p className="homeowner-alert homeowner-alert-error mt-3">{companionError}</p>}
 
-          <div className="companion-chat mt-4">
+          <div className="companion-chat companion-chat-focus mt-3">
             <div className="companion-chat-messages" role="log" aria-live="polite">
               {companionMessages.map((message) => (
                 <article
@@ -698,14 +695,114 @@ export default function HomeownerPlants() {
                 placeholder={companionReady ? 'Ask about reminders, scheduling, notes, patterns, or seasonal planning for this garden...' : 'Garden Companion setup required — see message above.'}
                 disabled={companionLoading || !companionReady}
               />
-              <button
-                type="submit"
-                className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
-                disabled={companionLoading || !companionInput.trim() || !companionReady}
-              >
-                {companionLoading ? 'Sending...' : 'Send'}
-              </button>
+              <div className="companion-chat-actions">
+                <button
+                  type="button"
+                  className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+                  onClick={documentLatestDiscussion}
+                  disabled={companionLoading || companionMessages.length === 0}
+                >
+                  Document This
+                </button>
+                <button
+                  type="submit"
+                  className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
+                  disabled={companionLoading || !companionInput.trim() || !companionReady}
+                >
+                  {companionLoading ? 'Sending...' : 'Send'}
+                </button>
+              </div>
             </form>
+          </div>
+
+          <section className="companion-docs mt-3">
+            <h3 className="homeowner-heading text-sm font-semibold">Event / Notes Documentation</h3>
+            <p className="homeowner-subtext mt-1 text-sm">
+              This is your garden memory log. Use Document This after a chat to capture key decisions with time and date.
+            </p>
+            <div className="companion-doc-list mt-2">
+              {documentedNotes.length === 0 && (
+                <p className="homeowner-subtext text-sm">No documented notes yet. Start a chat, then tap Document This.</p>
+              )}
+              {documentedNotes.map((entry) => (
+                <article key={entry.id} className="companion-doc-item">
+                  <p className="companion-doc-meta">{new Date(entry.created_at).toLocaleString()}</p>
+                  <p className="companion-doc-text">{entry.details}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div className="companion-secondary mt-3">
+            <div className="companion-summary">
+              <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
+              <p className="homeowner-subtext text-sm">
+                {gardenSummary?.headline || `${gardenName}: ${plants.length} plant profile${plants.length === 1 ? '' : 's'} tracked.`}
+              </p>
+              <div className="companion-summary-grid mt-2">
+                <span>Plants: {gardenSummary?.plant_count ?? plants.length}</span>
+                <span>Species: {gardenSummary?.species_count ?? 0}</span>
+                <span>Locations: {gardenSummary?.location_count ?? 0}</span>
+                <span>Journal Entries: {gardenSummary?.journal_entry_count ?? 0}</span>
+                <span>Photos: {gardenSummary?.photo_count ?? 0}</span>
+              </div>
+            </div>
+
+            <section className="companion-layout mt-3">
+              <h3 className="homeowner-heading text-sm font-semibold">Garden Layout</h3>
+              <p className="homeowner-subtext mt-1 text-sm">
+                Upload a garden map or layout image to store your layout records and help ArborAI suggest zone-aware care guidance.
+              </p>
+              <p className="homeowner-subtext mt-1 text-sm">
+                Your uploaded layout image and notes are the source of truth. ArborAI suggestions are interpretations.
+              </p>
+
+              <form className="companion-layout-form mt-2" onSubmit={uploadGardenLayout}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="homeowner-input rounded-md px-3 py-2 text-sm"
+                  onChange={(e) => setGardenLayoutFile(e.target.files?.[0] || null)}
+                  disabled={gardenLayoutUploading || !companionReady}
+                />
+                <textarea
+                  className="homeowner-input companion-chat-input"
+                  rows={2}
+                  value={gardenLayoutNotes}
+                  onChange={(e) => setGardenLayoutNotes(e.target.value)}
+                  placeholder="Optional notes about orientation, beds, shade lines, or watering zones"
+                  disabled={gardenLayoutUploading || !companionReady}
+                />
+                <button
+                  type="submit"
+                  className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+                  disabled={gardenLayoutUploading || !gardenLayoutFile || !companionReady}
+                >
+                  {gardenLayoutUploading ? 'Analyzing Layout...' : 'Upload Garden Layout'}
+                </button>
+              </form>
+
+              {gardenLayout?.image_url && (
+                <div className="companion-layout-preview mt-3">
+                  <img src={gardenLayout.image_url} alt="Saved garden layout" className="companion-layout-image" />
+                  <div className="companion-layout-details">
+                    <p className="homeowner-subtext text-sm">{gardenLayout?.analysis?.summary || 'Layout saved to memory.'}</p>
+                    {gardenLayout?.analysis?.sun_exposure_overview && (
+                      <p className="homeowner-subtext text-sm">Sun Exposure: {gardenLayout.analysis.sun_exposure_overview}</p>
+                    )}
+                    {Array.isArray(gardenLayout?.analysis?.zones) && gardenLayout.analysis.zones.length > 0 && (
+                      <ul className="homeowner-subtext text-sm companion-layout-zones">
+                        {gardenLayout.analysis.zones.slice(0, 5).map((zone, index) => (
+                          <li key={`${zone.zone_label || 'zone'}-${index}`}>
+                            <strong>{zone.zone_label || `Zone ${index + 1}`}</strong>: {zone.sun_exposure || 'Unknown'}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         </section>
 
@@ -719,7 +816,7 @@ export default function HomeownerPlants() {
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
         {success && <p className="homeowner-alert homeowner-alert-success">{success}</p>}
 
-        <form onSubmit={handleCreatePlant} className="homeowner-stat-card mt-6 rounded-xl p-4">
+        <form onSubmit={handleCreatePlant} className="homeowner-stat-card mt-5 rounded-xl p-4">
           <h2 className="text-lg font-bold text-[#1d411d]">Add Plant Profile</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <input
@@ -768,7 +865,7 @@ export default function HomeownerPlants() {
           </div>
         </form>
 
-        <div className="mt-6">
+        <div className="mt-5">
           {loading && <p className="homeowner-muted">Loading profiles...</p>}
           {!loading && plants.length === 0 && (
             <div className="homeowner-panel homeowner-panel-info border-dashed p-6 text-sm">

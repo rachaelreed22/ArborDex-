@@ -17,6 +17,7 @@ const EMPTY_FORM = {
 };
 
 const DEMO_COMPANION_STORAGE_KEY = 'arbordex-demo-garden-companion-v1';
+const DEMO_COMPANION_DOCS_STORAGE_KEY = 'arbordex-demo-garden-docs-v1';
 const DEMO_GARDEN_NAME_PROMPT = [
   'Welcome!',
   '',
@@ -63,7 +64,7 @@ function toDemoCompanionMessage(message) {
 }
 
 function readDemoCompanionState() {
-  const raw = window.localStorage.getItem(DEMO_COMPANION_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(DEMO_COMPANION_STORAGE_KEY);
   if (!raw) return null;
 
   try {
@@ -84,7 +85,7 @@ function saveDemoCompanionState(gardenName, messages) {
     garden_name: (gardenName || '').toString(),
     messages: Array.isArray(messages) ? messages.map(toDemoCompanionMessage).filter(Boolean) : [],
   };
-  window.localStorage.setItem(DEMO_COMPANION_STORAGE_KEY, JSON.stringify(payload));
+  window.sessionStorage.setItem(DEMO_COMPANION_STORAGE_KEY, JSON.stringify(payload));
 }
 
 function createDemoCompanionMessage(role, content) {
@@ -93,6 +94,17 @@ function createDemoCompanionMessage(role, content) {
     role,
     content,
     created_at: new Date().toISOString(),
+  };
+}
+
+function toDemoDocumentedEntry(item) {
+  if (!item || typeof item !== 'object') return null;
+  const details = (item.details || '').toString().trim();
+  if (!details) return null;
+  return {
+    id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    details,
+    created_at: item.created_at || new Date().toISOString(),
   };
 }
 
@@ -195,6 +207,7 @@ export default function HomeownerDemoGarden() {
   const [companionMessages, setCompanionMessages] = useState([]);
   const [companionInput, setCompanionInput] = useState('');
   const [companionLoading, setCompanionLoading] = useState(false);
+  const [documentedNotes, setDocumentedNotes] = useState([]);
   const companionBottomRef = useRef(null);
 
   const companionSummary = useMemo(
@@ -222,6 +235,25 @@ export default function HomeownerDemoGarden() {
     if (companionMessages.length === 0) return;
     saveDemoCompanionState(demoGardenName, companionMessages);
   }, [demoGardenName, companionMessages]);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(DEMO_COMPANION_DOCS_STORAGE_KEY);
+      if (!raw) {
+        setDocumentedNotes([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const nextEntries = Array.isArray(parsed) ? parsed.map(toDemoDocumentedEntry).filter(Boolean) : [];
+      setDocumentedNotes(nextEntries);
+    } catch {
+      setDocumentedNotes([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(DEMO_COMPANION_DOCS_STORAGE_KEY, JSON.stringify(documentedNotes));
+  }, [documentedNotes]);
 
   useEffect(() => {
     companionBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -295,6 +327,32 @@ export default function HomeownerDemoGarden() {
     const cleaned = (prompt || '').toString().replace(/^[^A-Za-z0-9]+\s*/, '').trim();
     if (!cleaned) return;
     setCompanionInput(cleaned);
+  }
+
+  function documentLatestDiscussion() {
+    const mostRecentAssistant = [...companionMessages].reverse().find((entry) => entry.role === 'assistant');
+    const mostRecentUser = [...companionMessages].reverse().find((entry) => entry.role === 'user');
+
+    const parts = [];
+    if (mostRecentUser?.content) {
+      parts.push(`You: ${mostRecentUser.content}`);
+    }
+    if (mostRecentAssistant?.content) {
+      parts.push(`Garden Partner: ${mostRecentAssistant.content}`);
+    }
+
+    const details = parts.join('\n\n').trim();
+    if (!details) {
+      setError('Start a chat first, then tap Document This to log the discussion.');
+      return;
+    }
+
+    const entry = {
+      id: `demo-note-${Date.now()}`,
+      details,
+      created_at: new Date().toISOString(),
+    };
+    setDocumentedNotes((prev) => [entry, ...prev]);
   }
 
   async function persistPlants(updater) {
@@ -470,8 +528,8 @@ export default function HomeownerDemoGarden() {
   }
 
   return (
-    <main className="homeowner-shell min-h-screen px-4 py-10">
-      <div className="homeowner-surface mx-auto w-full max-w-5xl rounded-2xl p-8 shadow-2xl">
+    <main className="homeowner-shell min-h-screen px-4 py-8 md:py-10">
+      <div className="homeowner-surface mx-auto w-full max-w-6xl rounded-2xl p-6 md:p-8 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="homeowner-heading text-3xl font-bold">Never Forget Your Garden Again.</h1>
@@ -483,10 +541,10 @@ export default function HomeownerDemoGarden() {
           </div>
         </div>
 
-        <div className="homeowner-panel homeowner-panel-info mt-6">
+        <div className="homeowner-panel homeowner-panel-info mt-4">
           <p className="homeowner-heading text-base font-semibold">Why not just use ChatGPT?</p>
           <p className="homeowner-subtext mt-2 text-sm">ChatGPT answers gardening questions. ArborTag remembers this garden from what you record.</p>
-          <ul className="homeowner-subtext mt-2 space-y-1 text-sm">
+          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
             <li>✔ Plant profiles</li>
             <li>✔ Photos</li>
             <li>✔ Journal history</li>
@@ -496,10 +554,10 @@ export default function HomeownerDemoGarden() {
           <p className="homeowner-subtext mt-2 text-sm">The more you record, the more personalized your Garden Companion becomes.</p>
         </div>
 
-        <div className="homeowner-panel homeowner-panel-info mt-6">
+        <div className="homeowner-panel homeowner-panel-info mt-4">
           <p className="homeowner-heading text-base font-semibold">Welcome to the ArborTag Demo Garden</p>
           <p className="homeowner-subtext mt-2 text-sm">Browse sample plant profiles to see how you can:</p>
-          <ul className="homeowner-subtext mt-2 space-y-1 text-sm">
+          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
             <li>✅ Organize plants by location</li>
             <li>✅ Keep photos and notes together</li>
             <li>✅ Track watering, fertilizing, and harvests</li>
@@ -508,12 +566,12 @@ export default function HomeownerDemoGarden() {
           </ul>
         </div>
 
-        <section className="homeowner-panel homeowner-panel-info mt-6 companion-section">
+        <section className="homeowner-panel homeowner-panel-info mt-4 companion-section">
           <div className="companion-header">
             <div>
               <p className="homeowner-heading text-base font-semibold">ArborTag is your garden's memory.</p>
-              <h2 className="homeowner-heading text-xl font-bold mt-1">🌿 Meet Your Garden Companion</h2>
-              <p className="homeowner-subtext text-sm">It learns from your records in this garden and responds with that context.</p>
+              <h2 className="homeowner-heading text-xl font-bold mt-1">I Am Your Garden Partner</h2>
+              <p className="homeowner-subtext text-sm">Talk with Garden Companion, then document important decisions to build long-term garden memory.</p>
             </div>
           </div>
 
@@ -521,50 +579,7 @@ export default function HomeownerDemoGarden() {
             Garden Companion is for whole-garden memory and planning. Plant Diagnostics remains focused on one plant at a time.
           </p>
 
-          <div className="companion-summary mt-4">
-            <p className="homeowner-heading text-sm font-semibold">I currently know:</p>
-            <div className="companion-summary-grid mt-2">
-              <span>🌱 {companionSummary.plant_count} plant profile{companionSummary.plant_count === 1 ? '' : 's'}</span>
-              <span>📷 {companionSummary.photo_count} photo{companionSummary.photo_count === 1 ? '' : 's'}</span>
-              <span>📍 {companionSummary.location_count} growing location{companionSummary.location_count === 1 ? '' : 's'}</span>
-              <span>📝 {companionSummary.journal_entry_count} journal entr{companionSummary.journal_entry_count === 1 ? 'y' : 'ies'}</span>
-              <span>🗺 Garden layout: {companionSummary.location_count > 0 ? 'Mapped by saved locations' : 'Not mapped yet'}</span>
-            </div>
-            <p className="homeowner-subtext mt-2 text-sm">Ask me anything about THIS garden.</p>
-            <p className="homeowner-subtext mt-1 text-sm">The memory behind every garden.</p>
-          </div>
-
-          <form onSubmit={saveDemoGardenName} className="companion-name-form mt-3">
-            <label className="homeowner-heading block text-sm font-semibold" htmlFor="demo-garden-name-input">
-              Demo Garden Name
-            </label>
-            <div className="companion-name-controls mt-1">
-              <input
-                id="demo-garden-name-input"
-                className="homeowner-input rounded-md px-3 py-2 text-sm"
-                value={demoGardenNameInput}
-                onChange={(e) => setDemoGardenNameInput(e.target.value)}
-                maxLength={80}
-              />
-              <button type="submit" className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">
-                Save Name
-              </button>
-            </div>
-          </form>
-
-          <div className="companion-summary mt-4">
-            <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
-            <p className="homeowner-subtext text-sm">{companionSummary.headline}</p>
-            <div className="companion-summary-grid mt-2">
-              <span>Plants: {companionSummary.plant_count}</span>
-              <span>Species: {companionSummary.species_count}</span>
-              <span>Locations: {companionSummary.location_count}</span>
-              <span>Journal Entries: {companionSummary.journal_entry_count}</span>
-              <span>Photos: {companionSummary.photo_count}</span>
-            </div>
-          </div>
-
-          <div className="companion-chat mt-4">
+          <div className="companion-chat companion-chat-focus mt-3">
             <div className="flex flex-wrap gap-2">
               {DEMO_COMPANION_SUGGESTED_PROMPTS.map((prompt) => (
                 <button
@@ -606,14 +621,69 @@ export default function HomeownerDemoGarden() {
                 placeholder="Ask about reminders, notes, patterns, seasonal planning, or plant organization..."
                 disabled={companionLoading}
               />
-              <button
-                type="submit"
-                className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
-                disabled={companionLoading || !companionInput.trim()}
-              >
-                {companionLoading ? 'Sending...' : 'Send'}
-              </button>
+              <div className="companion-chat-actions">
+                <button
+                  type="button"
+                  className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+                  onClick={documentLatestDiscussion}
+                  disabled={companionLoading || companionMessages.length === 0}
+                >
+                  Document This
+                </button>
+                <button
+                  type="submit"
+                  className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
+                  disabled={companionLoading || !companionInput.trim()}
+                >
+                  {companionLoading ? 'Sending...' : 'Send'}
+                </button>
+              </div>
             </form>
+          </div>
+
+          <section className="companion-docs mt-3">
+            <h3 className="homeowner-heading text-sm font-semibold">Event / Notes Documentation</h3>
+            <p className="homeowner-subtext mt-1 text-sm">
+              This is the memory backbone for the demo garden. Capture discussion highlights with date and time.
+            </p>
+            <div className="companion-doc-list mt-2">
+              {documentedNotes.length === 0 && (
+                <p className="homeowner-subtext text-sm">No documented notes yet. Start a chat, then tap Document This.</p>
+              )}
+              {documentedNotes.map((entry) => (
+                <article key={entry.id} className="companion-doc-item">
+                  <p className="companion-doc-meta">{new Date(entry.created_at).toLocaleString()}</p>
+                  <p className="companion-doc-text">{entry.details}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div className="companion-secondary mt-3">
+            <div className="companion-summary">
+              <p className="homeowner-heading text-sm font-semibold">I currently know:</p>
+              <div className="companion-summary-grid mt-2">
+                <span>🌱 {companionSummary.plant_count} plant profile{companionSummary.plant_count === 1 ? '' : 's'}</span>
+                <span>📷 {companionSummary.photo_count} photo{companionSummary.photo_count === 1 ? '' : 's'}</span>
+                <span>📍 {companionSummary.location_count} growing location{companionSummary.location_count === 1 ? '' : 's'}</span>
+                <span>📝 {companionSummary.journal_entry_count} journal entr{companionSummary.journal_entry_count === 1 ? 'y' : 'ies'}</span>
+                <span>🗺 Garden layout: {companionSummary.location_count > 0 ? 'Mapped by saved locations' : 'Not mapped yet'}</span>
+              </div>
+              <p className="homeowner-subtext mt-2 text-sm">Ask me anything about THIS garden.</p>
+              <p className="homeowner-subtext mt-1 text-sm">The memory behind every garden.</p>
+            </div>
+
+            <div className="companion-summary mt-3">
+              <p className="homeowner-heading text-sm font-semibold">Garden Summary</p>
+              <p className="homeowner-subtext text-sm">{companionSummary.headline}</p>
+              <div className="companion-summary-grid mt-2">
+                <span>Plants: {companionSummary.plant_count}</span>
+                <span>Species: {companionSummary.species_count}</span>
+                <span>Locations: {companionSummary.location_count}</span>
+                <span>Journal Entries: {companionSummary.journal_entry_count}</span>
+                <span>Photos: {companionSummary.photo_count}</span>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -621,7 +691,7 @@ export default function HomeownerDemoGarden() {
         {loading && <p className="homeowner-subtext mt-4 text-sm">Loading demo garden plants...</p>}
         {!loading && saving && <p className="homeowner-subtext mt-4 text-sm">Saving your demo garden updates...</p>}
 
-        <form onSubmit={createPlant} className="homeowner-stat-card mt-6 rounded-xl p-4">
+        <form onSubmit={createPlant} className="homeowner-stat-card mt-5 rounded-xl p-4">
           <h2 className="text-lg font-bold text-[#1d411d]">Create a Sample Plant</h2>
           <p className="homeowner-subtext mt-1 text-sm">See how easy it is to build a digital profile for a plant in your garden.</p>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -638,7 +708,7 @@ export default function HomeownerDemoGarden() {
           </div>
         </form>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <div className="tree-grid homeowner-plant-grid">
             {plants.map((plant) => {
               const photos = Array.isArray(plant.photos) ? plant.photos : [];
@@ -796,7 +866,7 @@ export default function HomeownerDemoGarden() {
           </section>
         )}
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             className="homeowner-button-secondary rounded-md px-5 py-2.5 text-sm font-semibold"

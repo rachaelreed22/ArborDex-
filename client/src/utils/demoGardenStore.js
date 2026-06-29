@@ -1,7 +1,8 @@
 import { apiUrl } from './apiUrl';
-import { getDemoQueensPassToken, isDemoQueensPassUnlocked } from './demoQueensPass';
 
 const DEMO_GARDEN_STORAGE_KEY = 'arbordex-demo-garden-plants';
+const DEMO_GARDEN_STORAGE_TS_KEY = 'arbordex-demo-garden-plants-ts';
+const DEMO_GARDEN_SESSION_TTL_MS = 3 * 60 * 60 * 1000;
 
 function buildDemoDiagnostics({ commonName, scientificName, condition }) {
   return {
@@ -151,7 +152,14 @@ function normalizePlant(plant) {
 }
 
 export function getCachedDemoGardenPlants() {
-  const raw = window.localStorage.getItem(DEMO_GARDEN_STORAGE_KEY);
+  const tsRaw = window.sessionStorage.getItem(DEMO_GARDEN_STORAGE_TS_KEY);
+  const ts = Number.parseInt((tsRaw || '').toString(), 10);
+  if (!Number.isFinite(ts) || Date.now() - ts > DEMO_GARDEN_SESSION_TTL_MS) {
+    window.sessionStorage.removeItem(DEMO_GARDEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(DEMO_GARDEN_STORAGE_TS_KEY);
+  }
+
+  const raw = window.sessionStorage.getItem(DEMO_GARDEN_STORAGE_KEY);
   const parsed = safeParse(raw || '');
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
@@ -163,67 +171,32 @@ export function getCachedDemoGardenPlants() {
 
 export function cacheDemoGardenPlants(plants) {
   const normalized = (Array.isArray(plants) ? plants : []).map(normalizePlant);
-  window.localStorage.setItem(DEMO_GARDEN_STORAGE_KEY, JSON.stringify(normalized));
+  window.sessionStorage.setItem(DEMO_GARDEN_STORAGE_KEY, JSON.stringify(normalized));
+  window.sessionStorage.setItem(DEMO_GARDEN_STORAGE_TS_KEY, Date.now().toString());
   return normalized;
 }
 
 export async function fetchDemoGardenPlants() {
   const cachedPlants = getCachedDemoGardenPlants();
-
-  try {
-    const res = await fetch(apiUrl('/api/demo-garden/plants'));
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || !Array.isArray(payload?.plants)) {
-      throw new Error(payload.error || 'Failed to load demo garden');
-    }
-
-    const normalizedDefaults = DEFAULT_DEMO_PLANTS.map(normalizePlant);
-    const normalizedCached = cachedPlants.map(normalizePlant);
-    const hasCustomizedCache = JSON.stringify(normalizedCached) !== JSON.stringify(normalizedDefaults);
-
-    if (payload.source === 'default' && hasCustomizedCache) {
-      const queensPassToken = getDemoQueensPassToken();
-      if (queensPassToken) {
-        try {
-          return await saveDemoGardenPlants(normalizedCached, queensPassToken);
-        } catch {
-          return cacheDemoGardenPlants(payload.plants);
-        }
-      }
-
-      if (isDemoQueensPassUnlocked()) {
-        return cacheDemoGardenPlants(normalizedCached);
-      }
-    }
-
-    return cacheDemoGardenPlants(payload.plants);
-  } catch {
+  if (Array.isArray(cachedPlants) && cachedPlants.length > 0) {
     return cachedPlants;
   }
+
+  // Demo data should be temporary only, so we seed from defaults and keep it in session storage.
+  return cacheDemoGardenPlants(DEFAULT_DEMO_PLANTS);
 }
 
-export async function saveDemoGardenPlants(plants, queensPassToken) {
-  const res = await fetch(apiUrl('/api/demo-garden/plants'), {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(queensPassToken ? { 'x-demo-queens-pass-token': queensPassToken } : {}),
-    },
-    body: JSON.stringify({
-      plants: (Array.isArray(plants) ? plants : []).map(normalizePlant),
-    }),
-  });
+export async function saveDemoGardenPlants(plants) {
+  const normalizedPlants = (Array.isArray(plants) ? plants : []).map(normalizePlant);
 
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok || !Array.isArray(payload?.plants)) {
-    if (res.status === 413) {
-      throw new Error('Photo is too large to save. Please use a smaller image and try again.');
-    }
-
-    throw new Error(payload.error || 'Failed to save demo garden');
+  const tooLargePhoto = normalizedPlants.some((plant) =>
+    Array.isArray(plant.photos) && plant.photos.some((photo) => typeof photo === 'string' && photo.length > 8_000_000)
+  );
+  if (tooLargePhoto) {
+    throw new Error('Photo is too large to save. Please use a smaller image and try again.');
   }
 
-  return cacheDemoGardenPlants(payload.plants);
+  return cacheDemoGardenPlants(normalizedPlants);
 }
 
 export async function getDemoPlantById(plantId) {

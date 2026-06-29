@@ -5,9 +5,17 @@
 .homeowner-plant-card {
   cursor: default;
   background: linear-gradient(165deg, rgba(250, 248, 241, 0.98), rgba(237, 232, 214, 0.96));
-  border: 1px solid rgba(20, 56, 38, 0.2);
-  box-shadow: 0 8px 18px rgba(8, 27, 18, 0.16);
+  border: 2px solid rgba(20, 56, 38, 0.22);
+  box-shadow: 0 12px 24px rgba(8, 27, 18, 0.16);
   position: relative;
+  border-radius: 16px;
+}
+
+.homeowner-surface .homeowner-panel,
+.homeowner-surface .homeowner-stat-card {
+  border: 2px solid rgba(20, 56, 38, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 10px 20px rgba(8, 27, 18, 0.1);
 }
 
 .homeowner-plant-card-locked {
@@ -34,7 +42,7 @@
 }
 
 .homeowner-plant-info {
-  min-height: 165px;
+  min-height: 140px;
 }
 
 .homeowner-plant-title {
@@ -133,6 +141,17 @@
   background: #fff2f2;
 }
 
+.homeowner-feature-list {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding-left: 0;
+}
+
+.homeowner-feature-list li {
+  margin: 0;
+  line-height: 1.45;
+}
+
 .homeowner-plants-loading {
   margin-top: 0.9rem;
   display: inline-flex;
@@ -147,8 +166,13 @@
 }
 
 .companion-section {
-  border-color: rgba(19, 67, 44, 0.28);
+  border: 2px solid rgba(19, 67, 44, 0.32);
   background: linear-gradient(165deg, rgba(237, 247, 236, 0.95), rgba(229, 241, 223, 0.93));
+  border-radius: 16px;
+  padding: 0.85rem;
+  box-shadow: 0 10px 22px rgba(8, 27, 18, 0.12);
+  display: grid;
+  gap: 0.6rem;
 }
 
 .companion-header {
@@ -156,6 +180,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.companion-header h2 {
+  font-size: 1.45rem;
+  line-height: 1.2;
 }
 
 .companion-name-form {
@@ -168,15 +197,38 @@
   flex-wrap: wrap;
 }
 
+.companion-name-controls-compact {
+  align-items: center;
+  border: 1px solid rgba(20, 56, 38, 0.2);
+  border-radius: 14px;
+  background: rgba(248, 252, 244, 0.92);
+  padding: 0.55rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+}
+
+.companion-name-controls-compact label {
+  min-width: 110px;
+}
+
 .companion-name-controls .homeowner-input {
   flex: 1;
   min-width: 220px;
 }
 
+.companion-chat-focus {
+  border: 2px solid rgba(20, 56, 38, 0.26);
+  border-radius: 14px;
+  background: rgba(249, 252, 247, 0.95);
+  padding: 0.75rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
 .companion-summary {
   border: 1px solid rgba(20, 56, 38, 0.16);
-  border-radius: 10px;
-  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  padding: 0.8rem 0.9rem;
   background: rgba(248, 252, 244, 0.9);
 }
 
@@ -193,11 +245,62 @@
   gap: 0.6rem;
 }
 
+.companion-chat-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.companion-chat-actions .homeowner-button-primary,
+.companion-chat-actions .homeowner-button-secondary {
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+.companion-docs {
+  border: 2px solid rgba(20, 56, 38, 0.24);
+  border-radius: 14px;
+  background: rgba(246, 251, 239, 0.95);
+  padding: 0.78rem;
+}
+
+.companion-doc-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.companion-doc-item {
+  border: 1px solid rgba(20, 56, 38, 0.18);
+  border-radius: 12px;
+  background: #f9f6ec;
+  padding: 0.65rem 0.72rem;
+}
+
+.companion-doc-meta {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #1f4a35;
+}
+
+.companion-doc-text {
+  margin: 0.32rem 0 0;
+  font-size: 0.84rem;
+  color: #173a2a;
+  white-space: pre-wrap;
+}
+
+.companion-secondary {
+  margin-top: 0.5rem;
+}
+
 .companion-layout {
-  border: 1px solid rgba(20, 56, 38, 0.16);
-  border-radius: 10px;
+  border: 2px solid rgba(20, 56, 38, 0.18);
+  border-radius: 14px;
   background: rgba(247, 251, 242, 0.92);
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 0.95rem;
 }
 
 .companion-layout-form {
@@ -244,19 +347,20 @@
 }
 
 .companion-chat-messages {
-  max-height: 320px;
+  min-height: 180px;
+  max-height: 300px;
   overflow: auto;
   display: grid;
   gap: 0.45rem;
-  padding: 0.7rem;
-  border-radius: 12px;
-  border: 1px solid rgba(20, 56, 38, 0.2);
+  padding: 0.8rem;
+  border-radius: 14px;
+  border: 2px solid rgba(20, 56, 38, 0.2);
   background: rgba(249, 252, 247, 0.95);
 }
 
 .companion-message {
-  border-radius: 10px;
-  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  padding: 0.62rem 0.72rem;
   border: 1px solid rgba(20, 56, 38, 0.16);
 }
 
@@ -337,13 +441,28 @@
   }
 
   .homeowner-plant-info {
-    min-height: 150px;
+    min-height: 128px;
   }
 
   .companion-name-controls .homeowner-input,
   .companion-name-controls .homeowner-button-secondary,
-  .companion-chat-form .homeowner-button-primary {
+  .companion-chat-form .homeowner-button-primary,
+  .companion-chat-actions .homeowner-button-secondary,
+  .companion-chat-actions .homeowner-button-primary {
     width: 100%;
+  }
+
+  .companion-name-controls-compact label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .companion-name-controls-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .companion-header h2 {
+    font-size: 1.25rem;
   }
 
   .companion-layout-preview {
