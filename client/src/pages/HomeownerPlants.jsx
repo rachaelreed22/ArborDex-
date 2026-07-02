@@ -601,6 +601,12 @@ export default function HomeownerPlants() {
               Home
             </button>
             <button
+              onClick={() => navigate('/help')}
+              className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
+            >
+              Help / FAQ
+            </button>
+            <button
               onClick={() => navigate('/homeowners/ask-arborai')}
               className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold"
             >
@@ -709,7 +715,7 @@ export default function HomeownerPlants() {
                   className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
                   disabled={companionLoading || !companionInput.trim() || !companionReady}
                 >
-                  {companionLoading ? 'Sending...' : 'Send'}
+                  {companionLoading ? 'Sending...' : 'Enter'}
                 </button>
               </div>
             </form>

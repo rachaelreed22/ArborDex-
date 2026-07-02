@@ -2,6 +2,53 @@
   margin-top: 0;
 }
 
+.homeowner-demo-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+
+.homeowner-demo-hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-self: end;
+  margin-top: 0.35rem;
+}
+
+.homeowner-demo-hero-tagline {
+  width: min(980px, 100%);
+  margin: 0.15rem auto 0.55rem;
+  text-align: center;
+  color: #1e4a35;
+  font-size: clamp(1.04rem, 2vw, 1.24rem);
+  line-height: 1.45;
+  font-family: "Fraunces", "Georgia", "Times New Roman", serif;
+  font-weight: 600;
+}
+
+.homeowner-demo-page .homeowner-surface {
+  max-width: 1180px;
+}
+
+.homeowner-demo-page .homeowner-surface > .homeowner-panel,
+.homeowner-demo-page .homeowner-surface > .companion-section,
+.homeowner-demo-page .homeowner-surface > .homeowner-stat-card,
+.homeowner-demo-page .homeowner-surface > .homeowner-alert,
+.homeowner-demo-page .homeowner-surface > .homeowner-subtext,
+.homeowner-demo-page .homeowner-surface > .mt-5,
+.homeowner-demo-page .homeowner-surface > .mt-6 {
+  width: min(980px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.homeowner-demo-page .homeowner-surface > .mt-6 > .tree-grid,
+.homeowner-demo-page .homeowner-surface > .mt-5 > .tree-grid {
+  width: 100%;
+}
+
 .homeowner-demo-header {
   display: flex;
   align-items: flex-start;
@@ -40,6 +87,31 @@
 }
 
 @media (max-width: 720px) {
+  .homeowner-demo-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .homeowner-demo-hero-actions {
+    justify-self: start;
+    margin-top: 0;
+  }
+
+  .homeowner-demo-hero-tagline {
+    width: 100%;
+    text-align: left;
+    font-size: 1rem;
+  }
+
+  .homeowner-demo-page .homeowner-surface > .homeowner-panel,
+  .homeowner-demo-page .homeowner-surface > .companion-section,
+  .homeowner-demo-page .homeowner-surface > .homeowner-stat-card,
+  .homeowner-demo-page .homeowner-surface > .homeowner-alert,
+  .homeowner-demo-page .homeowner-surface > .homeowner-subtext,
+  .homeowner-demo-page .homeowner-surface > .mt-5,
+  .homeowner-demo-page .homeowner-surface > .mt-6 {
+    width: 100%;
+  }
+
   .homeowner-demo-header {
     flex-direction: column;
   }

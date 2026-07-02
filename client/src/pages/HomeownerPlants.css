@@ -249,12 +249,15 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .companion-chat-actions .homeowner-button-primary,
 .companion-chat-actions .homeowner-button-secondary {
   min-height: 44px;
   border-radius: 12px;
+  min-width: 140px;
 }
 
 .companion-docs {

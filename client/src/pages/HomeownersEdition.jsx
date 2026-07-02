@@ -67,6 +67,9 @@ export default function HomeownersEdition() {
             <button className="btn btn-secondary" onClick={() => navigate('/homeowners/ask-arborai')}>
               Ask ArborAI
             </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/help')}>
+              Help / FAQ
+            </button>
           </div>
         </div>
       </div>

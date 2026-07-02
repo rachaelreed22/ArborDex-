@@ -528,56 +528,29 @@ export default function HomeownerDemoGarden() {
   }
 
   return (
-    <main className="homeowner-shell min-h-screen px-4 py-8 md:py-10">
+    <main className="homeowner-shell homeowner-demo-page min-h-screen px-4 py-8 md:py-10">
       <div className="homeowner-surface mx-auto w-full max-w-6xl rounded-2xl p-6 md:p-8 shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="homeowner-demo-hero">
           <div>
-            <h1 className="homeowner-heading text-3xl font-bold">Never Forget Your Garden Again.</h1>
-            <p className="homeowner-subtext mt-2 text-sm">ArborTag is your garden's memory. Garden Companion personalizes guidance from what you record.</p>
+            <h1 className="homeowner-heading text-3xl font-bold">Never forget what you planted, where you planted it or how it grew</h1>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="homeowner-demo-hero-actions">
             <button onClick={() => navigate('/')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Home</button>
             <button onClick={() => navigate('/homeowners')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Back</button>
+            <button onClick={() => navigate('/help')} className="homeowner-button-secondary rounded-md px-4 py-2 text-sm font-semibold">Help / FAQ</button>
           </div>
         </div>
 
-        <div className="homeowner-panel homeowner-panel-info mt-4">
-          <p className="homeowner-heading text-base font-semibold">Why not just use ChatGPT?</p>
-          <p className="homeowner-subtext mt-2 text-sm">ChatGPT answers gardening questions. ArborTag remembers this garden from what you record.</p>
-          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
-            <li>✔ Plant profiles</li>
-            <li>✔ Photos</li>
-            <li>✔ Journal history</li>
-            <li>✔ Growing locations</li>
-            <li>✔ Ongoing garden context</li>
-          </ul>
-          <p className="homeowner-subtext mt-2 text-sm">The more you record, the more personalized your Garden Companion becomes.</p>
-        </div>
-
-        <div className="homeowner-panel homeowner-panel-info mt-4">
-          <p className="homeowner-heading text-base font-semibold">Welcome to the ArborTag Demo Garden</p>
-          <p className="homeowner-subtext mt-2 text-sm">Browse sample plant profiles to see how you can:</p>
-          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
-            <li>✅ Organize plants by location</li>
-            <li>✅ Keep photos and notes together</li>
-            <li>✅ Track watering, fertilizing, and harvests</li>
-            <li>✅ Store plant history in one place</li>
-            <li>✅ Build a living record of your garden over time</li>
-          </ul>
-        </div>
+        <p className="homeowner-demo-hero-tagline">Let ArborTag remember your garden so that you can enjoy growing it.</p>
 
         <section className="homeowner-panel homeowner-panel-info mt-4 companion-section">
           <div className="companion-header">
             <div>
               <p className="homeowner-heading text-base font-semibold">ArborTag is your garden's memory.</p>
-              <h2 className="homeowner-heading text-xl font-bold mt-1">I Am Your Garden Partner</h2>
-              <p className="homeowner-subtext text-sm">Talk with Garden Companion, then document important decisions to build long-term garden memory.</p>
+              <h2 className="homeowner-heading text-xl font-bold mt-1">Meet Your Garden Companion</h2>
+              <p className="homeowner-subtext text-sm">Let ArborTag remember your plants, journals, garden layouts, and history-so you don't have to.</p>
             </div>
           </div>
-
-          <p className="homeowner-subtext mt-3 text-sm">
-            Garden Companion is for whole-garden memory and planning. Plant Diagnostics remains focused on one plant at a time.
-          </p>
 
           <div className="companion-chat companion-chat-focus mt-3">
             <div className="flex flex-wrap gap-2">
@@ -635,7 +608,7 @@ export default function HomeownerDemoGarden() {
                   className="homeowner-button-primary rounded-md px-4 py-2 text-sm font-semibold"
                   disabled={companionLoading || !companionInput.trim()}
                 >
-                  {companionLoading ? 'Sending...' : 'Send'}
+                  {companionLoading ? 'Sending...' : 'Enter'}
                 </button>
               </div>
             </form>
@@ -686,6 +659,31 @@ export default function HomeownerDemoGarden() {
             </div>
           </div>
         </section>
+
+        <div className="homeowner-panel homeowner-panel-info mt-5">
+          <p className="homeowner-heading text-base font-semibold">Why not just use ChatGPT?</p>
+          <p className="homeowner-subtext mt-2 text-sm">ChatGPT answers gardening questions. ArborTag remembers this garden from what you record.</p>
+          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
+            <li>✔ Plant profiles</li>
+            <li>✔ Photos</li>
+            <li>✔ Journal history</li>
+            <li>✔ Growing locations</li>
+            <li>✔ Ongoing garden context</li>
+          </ul>
+          <p className="homeowner-subtext mt-2 text-sm">The more you record, the more personalized your Garden Companion becomes.</p>
+        </div>
+
+        <div className="homeowner-panel homeowner-panel-info mt-4">
+          <p className="homeowner-heading text-base font-semibold">Welcome to the ArborTag Demo Garden</p>
+          <p className="homeowner-subtext mt-2 text-sm">Browse sample plant profiles to see how you can:</p>
+          <ul className="homeowner-subtext homeowner-feature-list mt-2 space-y-1 text-sm">
+            <li>✅ Organize plants by location</li>
+            <li>✅ Keep photos and notes together</li>
+            <li>✅ Track watering, fertilizing, and harvests</li>
+            <li>✅ Store plant history in one place</li>
+            <li>✅ Build a living record of your garden over time</li>
+          </ul>
+        </div>
 
         {error && <p className="homeowner-alert homeowner-alert-error">{error}</p>}
         {loading && <p className="homeowner-subtext mt-4 text-sm">Loading demo garden plants...</p>}

@@ -70,6 +70,7 @@ export default function Home() {
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners/demo-garden")}>Explore A Demo Digital Garden</button>
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners/qr-tag-orders")}>QR Tag Orders</button>
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners")}>Your Digital Garden: HomeOwner's Edition</button>
+            <button className="home-btn home-btn-secondary" onClick={() => navigate("/help")}>Help / FAQ</button>
           </div>
 
           <div className="trust-strip" aria-label="ArborTag trust cues">
