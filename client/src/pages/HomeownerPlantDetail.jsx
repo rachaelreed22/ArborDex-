@@ -78,9 +78,24 @@ function computeHazardState(diagnostics) {
 
 const JOURNAL_EVENT_OPTIONS = [
   { value: 'planted', label: 'Planted' },
+  { value: 'transplanted', label: 'Transplanted' },
   { value: 'harvested', label: 'Harvested' },
   { value: 'fertilized', label: 'Fertilized' },
   { value: 'watered', label: 'Watered' },
+  { value: 'pruned', label: 'Pruned' },
+  { value: 'mulched', label: 'Mulched' },
+  { value: 'treated', label: 'Treated' },
+  { value: 'diagnosed', label: 'Diagnosed' },
+  { value: 'pest_observed', label: 'Pest Observed' },
+  { value: 'disease_observed', label: 'Disease Observed' },
+  { value: 'bloom', label: 'Bloom' },
+  { value: 'fruit_set', label: 'Fruit Set' },
+  { value: 'repotted', label: 'Repotted' },
+  { value: 'propagated', label: 'Propagated' },
+  { value: 'inspected', label: 'Inspected' },
+  { value: 'weather_note', label: 'Weather Note' },
+  { value: 'photo_note', label: 'Photo Note' },
+  { value: 'task_completed', label: 'Task Completed' },
   { value: 'note', label: 'Note' },
 ];
 

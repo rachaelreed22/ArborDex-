@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { getTierLabel, getTierLimit } from '../utils/homeownerTier';
 import { useHomeownerAuth } from '../context/HomeownerAuthContext';
@@ -96,6 +96,7 @@ function inferHazardFromDiagnostics(diagnostics) {
 
 export default function HomeownerPlants() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { getAccessToken, logout } = useHomeownerAuth();
   const companionBottomRef = useRef(null);
 
@@ -125,11 +126,18 @@ export default function HomeownerPlants() {
   const [gardenLayoutFile, setGardenLayoutFile] = useState(null);
   const [gardenLayoutUploading, setGardenLayoutUploading] = useState(false);
   const [documentedNotes, setDocumentedNotes] = useState([]);
+  const [contextGraph, setContextGraph] = useState(null);
+  const [contextGraphLoading, setContextGraphLoading] = useState(false);
+  const [contextGraphError, setContextGraphError] = useState('');
 
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
 
   const atLimit = useMemo(() => activeProfiles >= profileLimit, [activeProfiles, profileLimit]);
+  const showContextGraphDebug = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    return params.get('debug') === 'context-graph';
+  }, [location.search]);
   const documentationStorageKey = useMemo(() => {
     const slug = (gardenName || 'my-digital-garden')
       .toString()
@@ -206,12 +214,39 @@ export default function HomeownerPlants() {
     }
   }
 
+  async function loadContextGraphDebug() {
+    if (!showContextGraphDebug) return;
+
+    try {
+      setContextGraphLoading(true);
+      setContextGraphError('');
+      const payload = await authFetch('/api/homeowners/garden-companion/context-graph?include_records=1');
+      setContextGraph(payload || null);
+    } catch (err) {
+      setContextGraph(null);
+      setContextGraphError(err.message || 'Failed to load context graph debug data.');
+    } finally {
+      setContextGraphLoading(false);
+    }
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPlants();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadGardenCompanion();
   }, []);
+
+  useEffect(() => {
+    if (!showContextGraphDebug) {
+      setContextGraph(null);
+      setContextGraphError('');
+      setContextGraphLoading(false);
+      return;
+    }
+
+    void loadContextGraphDebug();
+  }, [showContextGraphDebug]);
 
   useEffect(() => {
     companionBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -753,6 +788,67 @@ export default function HomeownerPlants() {
                 <span>Photos: {gardenSummary?.photo_count ?? 0}</span>
               </div>
             </div>
+
+            {showContextGraphDebug && (
+              <section className="companion-layout mt-3">
+                <h3 className="homeowner-heading text-sm font-semibold">Context Graph Debug</h3>
+                <p className="homeowner-subtext mt-1 text-sm">
+                  Read-only snapshot of property, space, and garden bed memory. This panel is visible only with `?debug=context-graph`.
+                </p>
+                {contextGraphLoading ? (
+                  <p className="homeowner-subtext mt-2 text-sm">Loading context graph...</p>
+                ) : contextGraphError ? (
+                  <p className="homeowner-alert homeowner-alert-error mt-2">{contextGraphError}</p>
+                ) : contextGraph ? (
+                  <div className="companion-summary-grid mt-2">
+                    <span>Properties: {contextGraph.context_graph_summary?.property_count ?? 0}</span>
+                    <span>Spaces: {contextGraph.context_graph_summary?.space_count ?? 0}</span>
+                    <span>Garden Beds: {contextGraph.context_graph_summary?.garden_bed_count ?? 0}</span>
+                    <span>Properties Supported: {contextGraph.schema_support?.properties ? 'Yes' : 'No'}</span>
+                    <span>Spaces Supported: {contextGraph.schema_support?.spaces ? 'Yes' : 'No'}</span>
+                    <span>Garden Beds Supported: {contextGraph.schema_support?.garden_beds ? 'Yes' : 'No'}</span>
+                  </div>
+                ) : (
+                  <p className="homeowner-subtext mt-2 text-sm">No context graph data loaded.</p>
+                )}
+                {Array.isArray(contextGraph?.properties) && contextGraph.properties.length > 0 && (
+                  <div className="mt-3">
+                    <p className="homeowner-heading text-sm font-semibold">Properties</p>
+                    <ul className="homeowner-subtext mt-2 text-sm companion-layout-zones">
+                      {contextGraph.properties.slice(0, 5).map((property) => (
+                        <li key={property.id}>
+                          <strong>{property.name}</strong>{property.usda_zone ? ` - Zone ${property.usda_zone}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {Array.isArray(contextGraph?.spaces) && contextGraph.spaces.length > 0 && (
+                  <div className="mt-3">
+                    <p className="homeowner-heading text-sm font-semibold">Spaces</p>
+                    <ul className="homeowner-subtext mt-2 text-sm companion-layout-zones">
+                      {contextGraph.spaces.slice(0, 5).map((space) => (
+                        <li key={space.id}>
+                          <strong>{space.name}</strong>{space.space_type ? ` - ${space.space_type}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {Array.isArray(contextGraph?.garden_beds) && contextGraph.garden_beds.length > 0 && (
+                  <div className="mt-3">
+                    <p className="homeowner-heading text-sm font-semibold">Garden Beds</p>
+                    <ul className="homeowner-subtext mt-2 text-sm companion-layout-zones">
+                      {contextGraph.garden_beds.slice(0, 5).map((bed) => (
+                        <li key={bed.id}>
+                          <strong>{bed.bed_label}</strong>{bed.sun_exposure ? ` - ${bed.sun_exposure}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="companion-layout mt-3">
               <h3 className="homeowner-heading text-sm font-semibold">Garden Layout</h3>
