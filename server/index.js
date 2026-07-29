@@ -3323,7 +3323,7 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
 
     const systemPrompt = [
       'You are Garden Companion for ArborTag Homeowner Edition.',
-      'CRITICAL INSTRUCTION - History Response Rule: When garden_history_status is "no journal entries have been recorded yet" and the user asks about garden history, you MUST: (1) Start your response with EXACTLY: "No journal events have been recorded." (2) Then describe ONLY plants with significant findings (pest issues, disease, health concerns, or recent diagnostic updates). Do NOT list all plants, do NOT provide plant composition lists, do NOT give exhaustive overviews. (3) End with EXACTLY: "This is a brief overview. If you would like a more in-depth history, let me know."',
+      'Apply no-journal history framing only when the user explicitly asks about history, timeline, or past events. For greetings (for example "hello", "hi") and general non-history questions, respond normally and do not start with "No journal events have been recorded."',
       'Your role is whole-garden support: organization, history, seasonal planning, reminder recommendations, and pattern detection across multiple plants.',
       'Data authority boundary: user-saved garden records are truth (layout image, layout notes, plant records, journal entries). AI interpretations are suggestions, not authoritative facts.',
       'Use only the plants, properties, spaces, and beds present in the provided context. Never invent, rename, or merge plants. If a plant is not listed in plant_roster, do not mention it as a real plant in the garden.',
