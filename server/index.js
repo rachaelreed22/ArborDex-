@@ -1321,6 +1321,12 @@ function isInDepthHistoryRequest(text) {
   return /(more detail|more detailed|in[-\s]?depth|deeper history|full history|full details|comprehensive|expand on that)/i.test(normalized);
 }
 
+function isSimpleGreeting(text) {
+  const normalized = (text || '').toString().trim().toLowerCase();
+  if (!normalized) return false;
+  return /^(hi|hello|hey|hiya|howdy|good morning|good afternoon|good evening)[!.?\s]*$/.test(normalized);
+}
+
 function isSignificantDiagnosticFinding(diagnostic) {
   const text = `${diagnostic?.overall_condition || ''} ${diagnostic?.summary || ''}`.toLowerCase();
   if (!text.trim()) return false;
@@ -3291,6 +3297,26 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
     }
     if (messagesResult.error) {
       return res.status(500).json({ error: messagesResult.error.message || 'Failed to load Garden Companion history' });
+    }
+
+    if (isSimpleGreeting(userMessage)) {
+      const gardenName = (context.garden_name || HOMEOWNER_GARDEN_DEFAULT_NAME).toString().trim() || HOMEOWNER_GARDEN_DEFAULT_NAME;
+      const assistantText = `Hi! I am your Garden Companion for ${gardenName}. I can help with plant care, diagnostics summaries, reminders, and garden history. What would you like to work on today?`;
+      const assistantInsert = await createHomeownerGardenCompanionMessage(userId, 'assistant', assistantText);
+      if (assistantInsert.missingTable) {
+        return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+      }
+      if (assistantInsert.error) {
+        return res.status(500).json({ error: assistantInsert.error.message || 'Failed to save Garden Companion response' });
+      }
+
+      return res.json({
+        garden_name: context.garden_name,
+        requires_garden_name: false,
+        garden_layout: context.garden_layout || null,
+        summary: context.garden_summary,
+        assistant_message: assistantInsert.message,
+      });
     }
 
     if (
