@@ -30,8 +30,9 @@ import HomeownerAccount from './pages/HomeownerAccount';
 import HomeownerTierSelection from './pages/HomeownerTierSelection';
 import HomeownerPlants from './pages/HomeownerPlants';
 import HomeownerPlantDetail from './pages/HomeownerPlantDetail';
-import HomeownerDemoGarden from './pages/HomeownerDemoGarden';
+import HomeownerPlayFirstGarden from './pages/HomeownerPlayFirstGarden';
 import HomeownerDemoPlantDetail from './pages/HomeownerDemoPlantDetail';
+import HomeownerUnsavedDiagnostics from './pages/HomeownerUnsavedDiagnostics';
 import HomeownerPlantTagRedirect from './pages/HomeownerPlantTagRedirect';
 import HomeownerQrTagOrders from './pages/HomeownerQrTagOrders';
 import HomeownerAskArborAI from './pages/HomeownerAskArborAI';
@@ -147,7 +148,8 @@ export default function App() {
                 <Route path="/homeowners/signup" element={<HomeownerSignup />} />
                 <Route path="/homeowners/reset-password-request" element={<HomeownerResetPasswordRequest />} />
                 <Route path="/homeowners/reset-password" element={<HomeownerResetPassword />} />
-                <Route path="/homeowners/demo-garden" element={<HomeownerDemoGarden />} />
+                <Route path="/homeowners/demo-garden" element={<HomeownerPlayFirstGarden />} />
+                <Route path="/homeowners/demo-garden/unsaved-diagnostics" element={<HomeownerUnsavedDiagnostics />} />
                 <Route path="/homeowners/demo-garden/plants/:id" element={<HomeownerDemoPlantDetail />} />
                 <Route path="/homeowners/plant-tag/:token" element={<HomeownerPlantTagRedirect />} />
                 <Route path="/homeowners/qr-tag-orders" element={<HomeownerQrTagOrders />} />

@@ -360,7 +360,8 @@ export default function HomeownerDemoGarden() {
     setError('');
 
     try {
-      const nextPlants = typeof updater === 'function' ? updater(getCachedDemoGardenPlants()) : updater;
+      const basePlants = Array.isArray(plants) && plants.length > 0 ? plants : getCachedDemoGardenPlants();
+      const nextPlants = typeof updater === 'function' ? updater(basePlants) : updater;
       const savedPlants = await saveDemoGardenPlants(nextPlants, getDemoQueensPassToken());
       setPlants(savedPlants);
       return savedPlants;

@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { fileToDataUrl, getCachedDemoGardenPlants, getDemoPlantById, saveDemoGardenPlants } from '../utils/demoGardenStore';
-import { clearDemoQueensPass, getDemoQueensPassToken, isDemoQueensPassUnlocked, verifyDemoQueensPass } from '../utils/demoQueensPass';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { apiUrl } from '../utils/apiUrl';
+import { fetchDemoGardenPlants, fileToDataUrl, getDemoPlantById, saveDemoGardenPlants } from '../utils/demoGardenStore';
 import './HomeownerTheme.css';
 import './TreeDetail.css';
 import './HomeownerPlantDetail.css';
+
+const DEMO_DIAG_RUNS_KEY = 'arbordex-demo-diag-runs-v1';
+const DEMO_DIAG_MAX_RUNS = 3;
 
 function getLocationLabel(value) {
   if (value === 'indoor') return 'Indoor';
@@ -109,17 +112,23 @@ function toTextArray(value) {
   return text ? [text] : [];
 }
 
-function isQueensPassAuthError(message) {
-  const text = (message || '').toString().toLowerCase();
-  return text.includes('queen\'s pass authorization is required')
-    || text.includes('queen\'s pass is required')
-    || text.includes('unauthorized');
+function dataUrlToBlob(dataUrl) {
+  const [meta, content] = (dataUrl || '').split(',', 2);
+  if (!meta || !content) return null;
+  const mimeMatch = /data:([^;]+);base64/.exec(meta);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const binary = window.atob(content);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mimeType });
 }
 
 export default function HomeownerDemoPlantDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const pendingActionRef = useRef(null);
 
   const [plant, setPlant] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -146,13 +155,17 @@ export default function HomeownerDemoPlantDetail() {
   });
   const [journalSaving, setJournalSaving] = useState(false);
   const [journalError, setJournalError] = useState('');
-  const [showPassGate, setShowPassGate] = useState(false);
-  const [passError, setPassError] = useState('');
-  const [passLoading, setPassLoading] = useState(false);
-  const [queenPassForm, setQueenPassForm] = useState({
-    email: 'rachaelr@rrtech.dev',
-    pass_id: '',
-  });
+  const [diagRuns, setDiagRuns] = useState(0);
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diagError, setDiagError] = useState('');
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(DEMO_DIAG_RUNS_KEY);
+    const parsed = Number.parseInt((raw || '').toString(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setDiagRuns(Math.min(parsed, DEMO_DIAG_MAX_RUNS));
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -194,49 +207,24 @@ export default function HomeownerDemoPlantDetail() {
     };
   }, [id]);
 
-  function withPassGate(action) {
-    if (isDemoQueensPassUnlocked()) {
-      action();
-      return;
-    }
+  useEffect(() => {
+    const prefill = location.state?.prefillJournal;
+    if (!prefill || typeof prefill !== 'object') return;
 
-    pendingActionRef.current = action;
-    setShowPassGate(true);
-  }
+    if (prefill.plant_id && prefill.plant_id !== id) return;
 
-  async function handleVerifyPass() {
-    try {
-      setPassLoading(true);
-      setPassError('');
-      await verifyDemoQueensPass(queenPassForm.email, queenPassForm.pass_id);
-      setShowPassGate(false);
-      if (typeof pendingActionRef.current === 'function') {
-        const action = pendingActionRef.current;
-        pendingActionRef.current = null;
-        action();
-      }
-    } catch (err) {
-      setPassError(err.message || "Queen's Pass verification failed.");
-    } finally {
-      setPassLoading(false);
-    }
-  }
+    setJournalForm((prev) => ({
+      ...prev,
+      event_type: (prefill.event_type || prev.event_type || 'note').toString(),
+      occurred_at: toLocalDateTimeInputValue(prefill.occurred_at || new Date().toISOString()),
+      notes: (prefill.notes || '').toString(),
+    }));
+  }, [location.state, id]);
 
   async function persistPlant(updater) {
-    const plants = getCachedDemoGardenPlants();
+    const plants = await fetchDemoGardenPlants();
     const updatedPlants = plants.map((entry) => (entry.id === id ? updater(entry) : entry));
-    let savedPlants = [];
-
-    try {
-      savedPlants = await saveDemoGardenPlants(updatedPlants, getDemoQueensPassToken());
-    } catch (err) {
-      if (isQueensPassAuthError(err?.message)) {
-        clearDemoQueensPass();
-        setPassError("Please verify Queen's Pass to continue editing.");
-        setShowPassGate(true);
-      }
-      throw err;
-    }
+    const savedPlants = await saveDemoGardenPlants(updatedPlants);
 
     const next = savedPlants.find((entry) => entry.id === id) || null;
     setPlant(next);
@@ -254,19 +242,17 @@ export default function HomeownerDemoPlantDetail() {
   }
 
   function startEditDetails() {
-    withPassGate(() => {
-      if (!plant) return;
-      setDetailForm({
-        name: plant.name || '',
-        species: plant.species || '',
-        room_or_bed: plant.room_or_bed || '',
-        bed_number: plant.bed_number ?? '',
-        row_section_id: plant.row_section_id || '',
-        notes: plant.notes || '',
-      });
-      setEditingDetails(true);
-      setError('');
+    if (!plant) return;
+    setDetailForm({
+      name: plant.name || '',
+      species: plant.species || '',
+      room_or_bed: plant.room_or_bed || '',
+      bed_number: plant.bed_number ?? '',
+      row_section_id: plant.row_section_id || '',
+      notes: plant.notes || '',
     });
+    setEditingDetails(true);
+    setError('');
   }
 
   function cancelEditDetails() {
@@ -288,7 +274,7 @@ export default function HomeownerDemoPlantDetail() {
       return;
     }
 
-    withPassGate(async () => {
+    void (async () => {
       await persistPlant((entry) => ({
         ...entry,
         name: detailForm.name.trim(),
@@ -300,14 +286,14 @@ export default function HomeownerDemoPlantDetail() {
         updated_at: new Date().toISOString(),
       }));
       setEditingDetails(false);
-    });
+    })();
   }
 
   function createJournalEntry(e) {
     e.preventDefault();
     setJournalError('');
 
-    withPassGate(async () => {
+    void (async () => {
       try {
         setJournalSaving(true);
         const nextEntry = {
@@ -336,7 +322,7 @@ export default function HomeownerDemoPlantDetail() {
       } finally {
         setJournalSaving(false);
       }
-    });
+    })();
   }
 
   function startEditJournalEntry(entry) {
@@ -356,7 +342,7 @@ export default function HomeownerDemoPlantDetail() {
   function saveJournalEntry(entryId) {
     setJournalError('');
 
-    withPassGate(async () => {
+    void (async () => {
       try {
         setJournalSaving(true);
         await persistPlant((entry) => {
@@ -383,13 +369,13 @@ export default function HomeownerDemoPlantDetail() {
       } finally {
         setJournalSaving(false);
       }
-    });
+    })();
   }
 
   function deleteJournalEntry(entryId) {
     setJournalError('');
 
-    withPassGate(async () => {
+    void (async () => {
       const confirmed = window.confirm('Delete this journal entry?');
       if (!confirmed) return;
 
@@ -411,41 +397,107 @@ export default function HomeownerDemoPlantDetail() {
       } finally {
         setJournalSaving(false);
       }
-    });
+    })();
   }
 
   async function addPhoto(file) {
     if (!file) return;
-    withPassGate(async () => {
-      const dataUrl = await fileToDataUrl(file);
-      await persistPlant((entry) => {
-        const photos = Array.isArray(entry.photos) ? entry.photos : [];
-        if (photos.length >= 5) return entry;
-        return { ...entry, photos: [...photos, dataUrl], updated_at: new Date().toISOString() };
-      });
+    const dataUrl = await fileToDataUrl(file);
+    await persistPlant((entry) => {
+      const photos = Array.isArray(entry.photos) ? entry.photos : [];
+      if (photos.length >= 5) return entry;
+      return { ...entry, photos: [...photos, dataUrl], updated_at: new Date().toISOString() };
     });
   }
 
   async function replacePhoto(photoIndex, file) {
     if (!file) return;
-    withPassGate(async () => {
-      const dataUrl = await fileToDataUrl(file);
-      await persistPlant((entry) => {
-        const photos = Array.isArray(entry.photos) ? [...entry.photos] : [];
-        if (photoIndex < 0 || photoIndex >= photos.length) return entry;
-        photos[photoIndex] = dataUrl;
-        return { ...entry, photos, updated_at: new Date().toISOString() };
-      });
+    const dataUrl = await fileToDataUrl(file);
+    await persistPlant((entry) => {
+      const photos = Array.isArray(entry.photos) ? [...entry.photos] : [];
+      if (photoIndex < 0 || photoIndex >= photos.length) return entry;
+      photos[photoIndex] = dataUrl;
+      return { ...entry, photos, updated_at: new Date().toISOString() };
     });
   }
 
   function deletePhoto(photoIndex) {
-    withPassGate(async () => {
-      await persistPlant((entry) => {
-        const photos = Array.isArray(entry.photos) ? entry.photos.filter((_, index) => index !== photoIndex) : [];
-        return { ...entry, photos, updated_at: new Date().toISOString() };
-      });
+    void persistPlant((entry) => {
+      const photos = Array.isArray(entry.photos) ? entry.photos.filter((_, index) => index !== photoIndex) : [];
+      return { ...entry, photos, updated_at: new Date().toISOString() };
     });
+  }
+
+  async function rerunDiagnostics() {
+    if (!plant?.id) return;
+
+    setDiagError('');
+    if (diagRuns >= DEMO_DIAG_MAX_RUNS) {
+      setDiagError('Diagnostics run limit reached for this session. Sign in or sign up to continue.');
+      return;
+    }
+
+    const sourcePhoto = Array.isArray(plant.photos) ? plant.photos[0] : '';
+    if (!sourcePhoto) {
+      setDiagError('Add or replace a photo first, then run diagnostics.');
+      return;
+    }
+
+    setDiagBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append('question', `Diagnose this plant. Name: ${plant.name || 'Unknown'}. Species: ${plant.species || 'Unknown'}.`);
+
+      if (sourcePhoto.startsWith('data:image/')) {
+        const blob = dataUrlToBlob(sourcePhoto);
+        if (blob) {
+          formData.append('photos', blob, 'demo-plant-photo.jpg');
+        }
+      } else if (sourcePhoto.startsWith('/')) {
+        const fileResponse = await fetch(sourcePhoto);
+        if (fileResponse.ok) {
+          const blob = await fileResponse.blob();
+          formData.append('photos', blob, 'demo-plant-photo.jpg');
+        }
+      }
+
+      const response = await fetch(apiUrl('/api/ai/ask-arborai'), {
+        method: 'POST',
+        body: formData,
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Diagnostics request failed.');
+      }
+
+      const resolvedDiagnostics = payload?.diagnostics && typeof payload.diagnostics === 'object'
+        ? payload.diagnostics
+        : (payload && typeof payload === 'object' ? payload : null);
+
+      if (!resolvedDiagnostics) {
+        throw new Error('Diagnostics returned an unexpected format.');
+      }
+
+      await persistPlant((entry) => ({
+        ...entry,
+        last_diagnostics: {
+          ...resolvedDiagnostics,
+          likely_identification: resolvedDiagnostics.likely_identification || resolvedDiagnostics.species || 'Unknown',
+          confidence: resolvedDiagnostics.confidence || 'Unknown',
+          summary: resolvedDiagnostics.summary || resolvedDiagnostics.raw_ai_message || 'Diagnostics completed.',
+        },
+        updated_at: new Date().toISOString(),
+      }));
+
+      const nextRuns = Math.min(diagRuns + 1, DEMO_DIAG_MAX_RUNS);
+      setDiagRuns(nextRuns);
+      window.sessionStorage.setItem(DEMO_DIAG_RUNS_KEY, nextRuns.toString());
+    } catch (err) {
+      setDiagError(err?.message || 'Could not run diagnostics right now.');
+    } finally {
+      setDiagBusy(false);
+    }
   }
 
   const photos = useMemo(() => (Array.isArray(plant?.photos) ? plant.photos : []), [plant]);
@@ -509,47 +561,6 @@ export default function HomeownerDemoPlantDetail() {
       </div>
 
       {error && <div className="card"><p className="homeowner-detail-error">{error}</p></div>}
-
-      {showPassGate && (
-        <section className="card homeowner-panel homeowner-panel-warn mt-3 space-y-3">
-          <h2>Queen's Pass Required</h2>
-          <p>Enter Queen's Pass credentials to edit this demo profile.</p>
-          <label className="homeowner-detail-label">
-            Email
-            <input
-              className="homeowner-detail-input"
-              type="email"
-              value={queenPassForm.email}
-              onChange={(e) => setQueenPassForm((prev) => ({ ...prev, email: e.target.value }))}
-            />
-          </label>
-          <label className="homeowner-detail-label">
-            Queen's Pass ID
-            <input
-              className="homeowner-detail-input"
-              type="text"
-              value={queenPassForm.pass_id}
-              onChange={(e) => setQueenPassForm((prev) => ({ ...prev, pass_id: e.target.value }))}
-            />
-          </label>
-          {passError && <p className="homeowner-detail-error">{passError}</p>}
-          <div className="homeowner-journal-entry-actions">
-            <button className="btn btn-primary" onClick={handleVerifyPass} disabled={passLoading} type="button">
-              {passLoading ? 'Verifying...' : 'Unlock Editing'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setShowPassGate(false);
-                pendingActionRef.current = null;
-              }}
-              type="button"
-            >
-              Close
-            </button>
-          </div>
-        </section>
-      )}
 
       <div className="tree-detail-layout">
         <div className="tree-detail-main">
@@ -695,7 +706,7 @@ export default function HomeownerDemoPlantDetail() {
             )}
           </section>
 
-          <section className="card homeowner-journal-section">
+          <section id="journal-entry" className="card homeowner-journal-section">
             <h2>Plant Journal</h2>
             <p className="homeowner-journal-subtext">
               Track planted, harvested, fertilized, watered events plus notes over time.
@@ -820,7 +831,37 @@ export default function HomeownerDemoPlantDetail() {
             )}
           </section>
 
-          <section className="homeowner-diagnostics-board">
+          <section id="latest-diagnostics" className="homeowner-diagnostics-board">
+            <div className="card diag-card diag-card-span-full">
+              <div className="homeowner-journal-entry-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <p className="homeowner-diag-label" style={{ marginBottom: 0 }}>Diagnostics runs this session: {diagRuns}/{DEMO_DIAG_MAX_RUNS}</p>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => void rerunDiagnostics()}
+                  disabled={diagBusy || diagRuns >= DEMO_DIAG_MAX_RUNS}
+                >
+                  {diagBusy ? 'Running...' : 'Re-run Diagnostics'}
+                </button>
+              </div>
+              {diagError && <p className="homeowner-detail-error" style={{ marginTop: '0.65rem' }}>{diagError}</p>}
+              {diagRuns >= DEMO_DIAG_MAX_RUNS && (
+                <div style={{ marginTop: '0.65rem' }}>
+                  <p className="homeowner-subtext">
+                    You have used all {DEMO_DIAG_MAX_RUNS} demo diagnostics runs this session. Sign in or sign up to continue diagnostics.
+                  </p>
+                  <div className="homeowner-journal-entry-actions" style={{ marginTop: '0.6rem' }}>
+                    <button className="btn btn-secondary" type="button" onClick={() => navigate('/homeowners/login')}>
+                      Sign In
+                    </button>
+                    <button className="btn btn-primary" type="button" onClick={() => navigate('/homeowners/signup')}>
+                      Sign Up
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {!diagnostics && (
               <div className="card diag-card diag-card-span-full">
                 <h2>Latest Diagnostics</h2>

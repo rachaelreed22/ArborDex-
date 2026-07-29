@@ -1,8 +1,13 @@
-import { apiUrl } from './apiUrl';
-
 const DEMO_GARDEN_STORAGE_KEY = 'arbordex-demo-garden-plants';
 const DEMO_GARDEN_STORAGE_TS_KEY = 'arbordex-demo-garden-plants-ts';
 const DEMO_GARDEN_SESSION_TTL_MS = 3 * 60 * 60 * 1000;
+const DEMO_GARDEN_LAYOUT_KEY = 'arbordex-demo-garden-layout-v1';
+const DEMO_GARDEN_COMPANION_KEY = 'arbordex-demo-garden-companion-v1';
+const DEMO_GARDEN_DOCS_KEY = 'arbordex-demo-garden-docs-v1';
+const DEMO_FERN_ID = 'demo-plant-fern-01';
+const DEMO_HERBS_ID = 'demo-plant-herbs-02';
+const DEMO_FERN_IMAGE = '/images/FrontPorchFern.png';
+const DEMO_HERBS_IMAGE = '/images/HerbCluster.png';
 
 function buildDemoDiagnostics({ commonName, scientificName, condition }) {
   return {
@@ -58,14 +63,14 @@ function inferDefaultDiagnostics(plant) {
 
 const DEFAULT_DEMO_PLANTS = [
   {
-    id: 'demo-plant-fern-01',
+    id: DEMO_FERN_ID,
     name: 'Front Porch Fern',
     species: 'Boston Fern',
     room_or_bed: 'indoor',
     bed_number: null,
     row_section_id: 'A1',
     notes: 'This is how your homeowner plant profile cards will look and flow.',
-    photos: ['/images/RedMaple4ATag.jpg'],
+    photos: [DEMO_FERN_IMAGE],
     last_diagnostics: buildDemoDiagnostics({
       commonName: 'Boston Fern',
       scientificName: 'Nephrolepis exaltata',
@@ -89,14 +94,14 @@ const DEFAULT_DEMO_PLANTS = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'demo-plant-herbs-02',
+    id: DEMO_HERBS_ID,
     name: 'Kitchen Herb Cluster',
     species: 'Mixed Culinary Herbs',
     room_or_bed: 'indoor',
     bed_number: null,
     row_section_id: 'B3',
     notes: 'Tap into a profile to see full-page details, gallery, and editing flow.',
-    photos: [],
+    photos: [DEMO_HERBS_IMAGE],
     last_diagnostics: buildDemoDiagnostics({
       commonName: 'Herb Mix Cluster',
       scientificName: 'Ocimum basilicum / Mentha spp.',
@@ -151,6 +156,37 @@ function normalizePlant(plant) {
   return normalized;
 }
 
+function applySeedPhotoBackfill(plants) {
+  const rows = Array.isArray(plants) ? plants : [];
+  return rows.map((plant) => {
+    if (!plant || typeof plant !== 'object') return plant;
+
+    if (plant.id === DEMO_FERN_ID) {
+      const firstPhoto = Array.isArray(plant.photos) ? (plant.photos[0] || '').toString() : '';
+      if (!firstPhoto || firstPhoto === '/images/RedMaple4ATag.jpg') {
+        return {
+          ...plant,
+          photos: [DEMO_FERN_IMAGE],
+          updated_at: new Date().toISOString(),
+        };
+      }
+    }
+
+    if (plant.id === DEMO_HERBS_ID) {
+      const hasPhotos = Array.isArray(plant.photos) && plant.photos.length > 0;
+      if (!hasPhotos) {
+        return {
+          ...plant,
+          photos: [DEMO_HERBS_IMAGE],
+          updated_at: new Date().toISOString(),
+        };
+      }
+    }
+
+    return plant;
+  });
+}
+
 export function getCachedDemoGardenPlants() {
   const tsRaw = window.sessionStorage.getItem(DEMO_GARDEN_STORAGE_TS_KEY);
   const ts = Number.parseInt((tsRaw || '').toString(), 10);
@@ -163,14 +199,14 @@ export function getCachedDemoGardenPlants() {
   const parsed = safeParse(raw || '');
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    return DEFAULT_DEMO_PLANTS.map(normalizePlant);
+    return [];
   }
 
-  return parsed.map(normalizePlant);
+  return applySeedPhotoBackfill(parsed.map(normalizePlant));
 }
 
 export function cacheDemoGardenPlants(plants) {
-  const normalized = (Array.isArray(plants) ? plants : []).map(normalizePlant);
+  const normalized = applySeedPhotoBackfill((Array.isArray(plants) ? plants : []).map(normalizePlant));
   window.sessionStorage.setItem(DEMO_GARDEN_STORAGE_KEY, JSON.stringify(normalized));
   window.sessionStorage.setItem(DEMO_GARDEN_STORAGE_TS_KEY, Date.now().toString());
   return normalized;
@@ -182,7 +218,6 @@ export async function fetchDemoGardenPlants() {
     return cachedPlants;
   }
 
-  // Demo data should be temporary only, so we seed from defaults and keep it in session storage.
   return cacheDemoGardenPlants(DEFAULT_DEMO_PLANTS);
 }
 
@@ -211,4 +246,61 @@ export function fileToDataUrl(file) {
     reader.onerror = () => reject(new Error('Failed to read image file'));
     reader.readAsDataURL(file);
   });
+}
+
+function safeParseJson(raw, fallback) {
+  try {
+    const parsed = JSON.parse(raw || '');
+    return parsed == null ? fallback : parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+export function getDemoGardenDraftSnapshot() {
+  const plants = getCachedDemoGardenPlants();
+  const companionState = safeParseJson(window.sessionStorage.getItem(DEMO_GARDEN_COMPANION_KEY), {});
+  const documentedNotes = safeParseJson(window.sessionStorage.getItem(DEMO_GARDEN_DOCS_KEY), []);
+  const layout = safeParseJson(window.sessionStorage.getItem(DEMO_GARDEN_LAYOUT_KEY), null);
+
+  const gardenName = (companionState?.garden_name || '').toString().trim();
+  return {
+    garden_name: gardenName,
+    plants,
+    companion_messages: Array.isArray(companionState?.messages) ? companionState.messages : [],
+    documented_notes: Array.isArray(documentedNotes) ? documentedNotes : [],
+    layout,
+    captured_at: new Date().toISOString(),
+  };
+}
+
+export function clearDemoGardenSessionData() {
+  const keys = [
+    DEMO_GARDEN_STORAGE_KEY,
+    DEMO_GARDEN_STORAGE_TS_KEY,
+    DEMO_GARDEN_LAYOUT_KEY,
+    DEMO_GARDEN_COMPANION_KEY,
+    DEMO_GARDEN_DOCS_KEY,
+    'arbordex-demo-onboarding-v1',
+    'arbordex-onboarding-draft-v1',
+  ];
+
+  keys.forEach((key) => {
+    window.sessionStorage.removeItem(key);
+  });
+}
+
+export function saveDemoGardenLayoutSession(layout) {
+  const payload = layout && typeof layout === 'object' ? layout : null;
+  if (!payload) {
+    window.sessionStorage.removeItem(DEMO_GARDEN_LAYOUT_KEY);
+    return null;
+  }
+
+  window.sessionStorage.setItem(DEMO_GARDEN_LAYOUT_KEY, JSON.stringify(payload));
+  return payload;
+}
+
+export function readDemoGardenLayoutSession() {
+  return safeParseJson(window.sessionStorage.getItem(DEMO_GARDEN_LAYOUT_KEY), null);
 }

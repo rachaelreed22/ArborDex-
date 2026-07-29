@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { apiUrl } from '../utils/apiUrl';
 import { useHomeownerAuth } from '../context/HomeownerAuthContext';
 import { getTierLabel } from '../utils/homeownerTier';
+import { migrateOnboardingDraftToHomeowner, readOnboardingDraftSnapshot } from '../utils/sessionGardenMigration';
 import './HomeownerTheme.css';
 
 const PLANS = [
@@ -45,8 +46,13 @@ export default function HomeownerSignup() {
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
+  const [hasPendingGardenDraft, setHasPendingGardenDraft] = useState(false);
 
   const selectedPlan = useMemo(() => PLANS.find((p) => p.key === plan), [plan]);
+
+  useEffect(() => {
+    setHasPendingGardenDraft(Boolean(readOnboardingDraftSnapshot()));
+  }, []);
 
   useEffect(() => {
     if (plan === 'free') {
@@ -137,12 +143,16 @@ export default function HomeownerSignup() {
       await signup({ email, password });
       await login(email, password);
 
+      const token = await getAccessToken();
+      if (token && hasPendingGardenDraft) {
+        await migrateOnboardingDraftToHomeowner({ token });
+      }
+
       if (plan === 'free') {
         navigate('/homeowners/plants', { replace: true });
         return;
       }
 
-      const token = await getAccessToken();
       const res = await fetch(apiUrl('/api/stripe/create-checkout-session'), {
         method: 'POST',
         headers: {
@@ -172,6 +182,11 @@ export default function HomeownerSignup() {
       <div className="homeowner-surface mx-auto w-full max-w-3xl rounded-2xl p-8 shadow-2xl">
         <h1 className="homeowner-heading text-center text-3xl font-bold">Create Homeowner Account</h1>
         <p className="homeowner-subtext mt-2 text-center text-sm">Choose your tier and create your Homeowner's Edition login.</p>
+        {hasPendingGardenDraft && (
+          <p className="homeowner-subtext mt-2 text-center text-sm">
+            Your temporary garden session will be imported into your new account after signup.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
