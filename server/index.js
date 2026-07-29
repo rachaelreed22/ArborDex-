@@ -1321,6 +1321,12 @@ function isInDepthHistoryRequest(text) {
   return /(more detail|more detailed|in[-\s]?depth|deeper history|full history|full details|comprehensive|expand on that)/i.test(normalized);
 }
 
+function isGardenOverviewRequest(text) {
+  const normalized = (text || '').toString().trim().toLowerCase();
+  if (!normalized) return false;
+  return /(tell me about my garden|what can you tell me about my garden|how is my garden|garden overview|overview of my garden|status of my garden|summarize my garden)/i.test(normalized);
+}
+
 function isSimpleGreeting(text) {
   const normalized = (text || '').toString().trim().toLowerCase();
   if (!normalized) return false;
@@ -1377,6 +1383,39 @@ function buildNoJournalHistoryOverview(context) {
   }
 
   lines.push('', 'This is a brief overview. If you would like a more in-depth history, let me know.');
+  return lines.join('\n');
+}
+
+function buildNoJournalGardenOverview(context) {
+  const gardenName = (context?.garden_name || HOMEOWNER_GARDEN_DEFAULT_NAME).toString().trim() || HOMEOWNER_GARDEN_DEFAULT_NAME;
+  const diagnostics = Array.isArray(context?.previous_diagnostics)
+    ? context.previous_diagnostics
+      .filter((item) => item && typeof item === 'object')
+      .slice()
+      .sort((a, b) => toRecentTimestamp(b.updated_at) - toRecentTimestamp(a.updated_at) || (a.plant_name || '').localeCompare(b.plant_name || ''))
+    : [];
+
+  const significantDiagnostics = diagnostics.filter(isSignificantDiagnosticFinding);
+  const selectedDiagnostics = (significantDiagnostics.length > 0 ? significantDiagnostics : diagnostics)
+    .filter((item) => (item?.plant_name || item?.summary || item?.overall_condition))
+    .slice(0, significantDiagnostics.length > 0 ? 3 : 2);
+
+  const lines = [
+    `Here is a quick snapshot of ${gardenName}.`,
+    'No journal events have been recorded yet, so this overview is based on current diagnostics.',
+    '',
+  ];
+
+  if (selectedDiagnostics.length === 0) {
+    lines.push('I do not have diagnostic records yet, but I can help you set up your first care notes or journal entries.');
+  } else {
+    selectedDiagnostics.forEach((diagnostic) => {
+      const plantName = (diagnostic?.plant_name || 'Unnamed plant').toString().trim() || 'Unnamed plant';
+      lines.push(`- ${plantName}: ${summarizeDiagnosticFinding(diagnostic)}`);
+    });
+  }
+
+  lines.push('', 'If you want, I can give you a deeper history-style summary next.');
   return lines.join('\n');
 }
 
@@ -3325,6 +3364,30 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
       && !isInDepthHistoryRequest(userMessage)
     ) {
       const assistantText = buildNoJournalHistoryOverview(context);
+      const assistantInsert = await createHomeownerGardenCompanionMessage(userId, 'assistant', assistantText);
+      if (assistantInsert.missingTable) {
+        return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+      }
+      if (assistantInsert.error) {
+        return res.status(500).json({ error: assistantInsert.error.message || 'Failed to save Garden Companion response' });
+      }
+
+      return res.json({
+        garden_name: context.garden_name,
+        requires_garden_name: false,
+        garden_layout: context.garden_layout || null,
+        summary: context.garden_summary,
+        assistant_message: assistantInsert.message,
+      });
+    }
+
+    if (
+      context.garden_history_status === 'no journal entries have been recorded yet'
+      && isGardenOverviewRequest(userMessage)
+      && !isGardenHistoryRequest(userMessage)
+      && !isInDepthHistoryRequest(userMessage)
+    ) {
+      const assistantText = buildNoJournalGardenOverview(context);
       const assistantInsert = await createHomeownerGardenCompanionMessage(userId, 'assistant', assistantText);
       if (assistantInsert.missingTable) {
         return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
