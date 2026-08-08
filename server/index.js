@@ -1429,6 +1429,35 @@ function toCompanionMessage(row) {
   };
 }
 
+function toHomeownerObservation(row) {
+  if (!row || typeof row !== 'object') return null;
+
+  const tags = Array.isArray(row.tags)
+    ? row.tags.map((item) => (item == null ? '' : item.toString().trim())).filter(Boolean)
+    : [];
+
+  return {
+    id: row.id,
+    user_id: row.user_id || null,
+    property_id: row.property_id || null,
+    space_id: row.space_id || null,
+    garden_bed_id: row.garden_bed_id || null,
+    plant_id: row.plant_id || null,
+    journal_entry_id: row.journal_entry_id || null,
+    companion_message_id: row.companion_message_id || null,
+    observation_type: (row.observation_type || '').toString().trim(),
+    title: (row.title || '').toString().trim(),
+    details: (row.details || '').toString().trim(),
+    confidence: (row.confidence || '').toString().trim(),
+    source: (row.source || '').toString().trim(),
+    observed_at: row.observed_at || row.created_at || new Date().toISOString(),
+    photo_url: (row.photo_url || '').toString().trim(),
+    tags,
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || row.created_at || new Date().toISOString(),
+  };
+}
+
 function computeAverageScheduleDays(entries) {
   if (!Array.isArray(entries) || entries.length < 2) return null;
 
@@ -1600,6 +1629,84 @@ async function createHomeownerGardenCompanionMessage(userId, role, content) {
   };
 }
 
+async function listHomeownerObservations(userId, limit = 80) {
+  const cappedLimit = Math.max(1, Math.min(200, Number(limit) || 80));
+  const { data, error } = await writeSupabase
+    .from('homeowner_observations')
+    .select('id, user_id, property_id, space_id, garden_bed_id, plant_id, journal_entry_id, companion_message_id, observation_type, title, details, confidence, source, observed_at, photo_url, tags, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('observed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(cappedLimit);
+
+  if (error) {
+    if (isMissingRelationError(error, 'homeowner_observations')) {
+      return { rows: [], missingTable: true, error: null };
+    }
+    return { rows: [], missingTable: false, error };
+  }
+
+  const rows = Array.isArray(data) ? data.map(toHomeownerObservation).filter(Boolean) : [];
+  return { rows, missingTable: false, error: null };
+}
+
+async function createHomeownerObservation(userId, payload) {
+  const observationType = (payload?.observation_type || '').toString().trim().toLowerCase();
+  const details = (payload?.details || '').toString().trim();
+
+  if (!observationType || !details) {
+    return { row: null, missingTable: false, error: new Error('Observation type and details are required.') };
+  }
+
+  const allowedConfidence = new Set(['known', 'likely', 'possible', 'unknown']);
+  const confidence = (payload?.confidence || '').toString().trim().toLowerCase();
+  const normalizedConfidence = confidence && allowedConfidence.has(confidence) ? confidence : null;
+  const title = (payload?.title || '').toString().trim();
+  const source = (payload?.source || '').toString().trim();
+  const photoUrl = (payload?.photo_url || '').toString().trim();
+  const observedAt = payload?.observed_at ? new Date(payload.observed_at).toISOString() : new Date().toISOString();
+  const tags = Array.isArray(payload?.tags)
+    ? payload.tags.map((item) => (item == null ? '' : item.toString().trim().toLowerCase())).filter(Boolean).slice(0, 20)
+    : [];
+
+  const insertPayload = {
+    user_id: userId,
+    property_id: payload?.property_id || null,
+    space_id: payload?.space_id || null,
+    garden_bed_id: payload?.garden_bed_id || null,
+    plant_id: payload?.plant_id || null,
+    journal_entry_id: payload?.journal_entry_id || null,
+    companion_message_id: payload?.companion_message_id || null,
+    observation_type: observationType.slice(0, 80),
+    title: title ? title.slice(0, 160) : null,
+    details: details.slice(0, 8000),
+    confidence: normalizedConfidence,
+    source: source ? source.slice(0, 120) : null,
+    observed_at: observedAt,
+    photo_url: photoUrl || null,
+    tags,
+  };
+
+  const { data, error } = await writeSupabase
+    .from('homeowner_observations')
+    .insert([insertPayload])
+    .select('id, user_id, property_id, space_id, garden_bed_id, plant_id, journal_entry_id, companion_message_id, observation_type, title, details, confidence, source, observed_at, photo_url, tags, created_at, updated_at')
+    .single();
+
+  if (error) {
+    if (isMissingRelationError(error, 'homeowner_observations')) {
+      return { row: null, missingTable: true, error: null };
+    }
+    return { row: null, missingTable: false, error };
+  }
+
+  return {
+    row: toHomeownerObservation(data),
+    missingTable: false,
+    error: null,
+  };
+}
+
 async function listHomeownerProperties(userId) {
   const { data, error } = await writeSupabase
     .from('homeowner_properties')
@@ -1725,6 +1832,12 @@ async function buildHomeownerGardenCompanionContext(userId) {
   }
 
   const safeJournal = Array.isArray(journalRows) ? journalRows : [];
+  const observationsResult = await listHomeownerObservations(userId, 120);
+  if (observationsResult.error) {
+    throw observationsResult.error;
+  }
+
+  const safeObservations = Array.isArray(observationsResult.rows) ? observationsResult.rows : [];
   const totalPlantCount = safePlants.length;
   const journalCountByPlantId = safeJournal.reduce((accumulator, entry) => {
     const plantId = (entry?.plant_id || '').toString().trim();
@@ -1813,6 +1926,19 @@ async function buildHomeownerGardenCompanionContext(userId) {
       plant_id: entry.plant_id,
     }));
 
+  const recentCompanionObservations = safeObservations
+    .filter((entry) => /(garden_companion|companion)/i.test((entry.source || '').toString()))
+    .slice(0, 40)
+    .map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      details: entry.details,
+      observed_at: entry.observed_at,
+      tags: entry.tags,
+      plant_id: entry.plant_id,
+      companion_message_id: entry.companion_message_id,
+    }));
+
   const gardenStatistics = {
     property_count: contextGraph.properties.length,
     space_count: contextGraph.spaces.length,
@@ -1826,6 +1952,8 @@ async function buildHomeownerGardenCompanionContext(userId) {
     watering_event_count: wateringEntries.length,
     fertilizer_event_count: fertilizingEntries.length,
     has_layout_memory: Boolean(layout?.image_url),
+    observation_count: safeObservations.length,
+    companion_note_count: recentCompanionObservations.length,
   };
 
   const locationSunExposure = extractLocationSunMapFromLayout(layout?.analysis || null);
@@ -1859,6 +1987,8 @@ async function buildHomeownerGardenCompanionContext(userId) {
       .map((entry) => (entry.notes || '').toString().trim())
       .filter(Boolean)
       .slice(0, 60),
+    structured_observations: safeObservations.slice(0, 80),
+    companion_documented_notes: recentCompanionObservations,
     reminder_history: reminderHistory,
     garden_layout_truth: layout
       ? {
@@ -1893,6 +2023,7 @@ async function buildHomeownerGardenCompanionContext(userId) {
       journal_entry_count: safeJournal.length,
       photo_count: totalPhotoCount,
       has_layout_memory: Boolean(layout?.image_url),
+      observation_count: safeObservations.length,
     },
   };
 }
@@ -3474,6 +3605,100 @@ api.post('/homeowners/garden-companion/chat', requireHomeownerAuth, async (req, 
     });
   } catch (err) {
     return res.status(500).json({ error: err?.message || 'Failed to process Garden Companion message' });
+  }
+});
+
+api.get('/homeowners/garden-companion/observations', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const limit = Math.max(1, Math.min(200, Number(req.query?.limit) || 60));
+    const observationsResult = await listHomeownerObservations(userId, limit);
+    if (observationsResult.missingTable) {
+      return res.status(503).json({ error: 'Structured observations are not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (observationsResult.error) {
+      return res.status(500).json({ error: observationsResult.error.message || 'Failed to load structured observations' });
+    }
+
+    return res.json({
+      observations: observationsResult.rows,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to load structured observations' });
+  }
+});
+
+api.post('/homeowners/garden-companion/observations/document-latest', requireHomeownerAuth, async (req, res) => {
+  try {
+    const userId = req.homeownerUser.id;
+    const { error: profileError } = await ensureHomeownerProfileExists(userId);
+    if (profileError) {
+      return res.status(500).json({ error: profileError.message || 'Failed to initialize homeowner profile' });
+    }
+
+    const messagesResult = await listHomeownerGardenCompanionMessages(userId, 24);
+    if (messagesResult.missingTable) {
+      return res.status(503).json({ error: 'Garden Companion is not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (messagesResult.error) {
+      return res.status(500).json({ error: messagesResult.error.message || 'Failed to load Garden Companion history' });
+    }
+
+    const messages = Array.isArray(messagesResult.messages) ? messagesResult.messages : [];
+    const mostRecentAssistant = [...messages].reverse().find((entry) => entry.role === 'assistant');
+    const mostRecentUser = [...messages].reverse().find((entry) => entry.role === 'user');
+
+    const detailsParts = [];
+    if (mostRecentUser?.content) {
+      detailsParts.push(`You: ${mostRecentUser.content}`);
+    }
+    if (mostRecentAssistant?.content) {
+      detailsParts.push(`Garden Companion: ${mostRecentAssistant.content}`);
+    }
+
+    const details = detailsParts.join('\n\n').trim();
+    if (!details) {
+      return res.status(400).json({ error: 'Start a chat first, then document the discussion.' });
+    }
+
+    const context = await buildHomeownerGardenCompanionContext(userId);
+    const plantRoster = Array.isArray(context?.plant_roster) ? context.plant_roster : [];
+    const mergedText = `${mostRecentUser?.content || ''} ${mostRecentAssistant?.content || ''}`.toLowerCase();
+    const matchedPlant = plantRoster.find((plant) => {
+      const plantName = (plant?.name || '').toString().trim().toLowerCase();
+      if (plantName.length < 3) return false;
+      return mergedText.includes(plantName);
+    });
+
+    const createResult = await createHomeownerObservation(userId, {
+      observation_type: 'companion_note',
+      title: 'Documented Garden Companion discussion',
+      details,
+      confidence: 'known',
+      source: 'garden_companion',
+      observed_at: mostRecentAssistant?.created_at || mostRecentUser?.created_at || new Date().toISOString(),
+      companion_message_id: mostRecentAssistant?.id || mostRecentUser?.id || null,
+      plant_id: matchedPlant?.id || null,
+      tags: ['garden-companion', 'documented-chat'],
+    });
+
+    if (createResult.missingTable) {
+      return res.status(503).json({ error: 'Structured observations are not configured yet. Run the latest homeowner SQL migration.' });
+    }
+    if (createResult.error || !createResult.row) {
+      return res.status(500).json({ error: createResult.error?.message || 'Failed to save structured observation' });
+    }
+
+    return res.status(201).json({
+      observation: createResult.row,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to document Garden Companion discussion' });
   }
 });
 
@@ -6425,19 +6650,74 @@ api.post('/ai/ask-arborai', publicAiAskLimiter, upload.array('photos', 6), async
     }
 
     if (aiImageUrls.length === 0) {
+      const isGreetingOnly = isSimpleGreeting(question);
+      let conversationalNoPhotoMessage = '';
+
+      if (!isGreetingOnly && question) {
+        try {
+          const textOnlyResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              temperature: 0.45,
+              max_tokens: 260,
+              messages: [
+                {
+                  role: 'system',
+                  content: [
+                    'You are ArborAI in text-only mode (no photo was provided).',
+                    'Tone: lightly playful, neutral, practical, and credible.',
+                    'Provide helpful plant or garden guidance for the user question.',
+                    'Do not claim species certainty, visual diagnosis, or hazard confirmation without a photo.',
+                    'When visual confirmation matters, briefly invite the user to upload a clear photo.',
+                    'Keep responses concise and conversational.',
+                  ].join(' '),
+                },
+                {
+                  role: 'user',
+                  content: question,
+                },
+              ],
+            }),
+          });
+
+          if (textOnlyResponse.ok) {
+            const textOnlyPayload = await textOnlyResponse.json().catch(() => ({}));
+            conversationalNoPhotoMessage = extractAssistantTextFromOpenAiPayload(textOnlyPayload);
+          } else {
+            const errText = await textOnlyResponse.text().catch(() => '');
+            console.error('Ask ArborAI no-photo conversation error:', errText);
+          }
+        } catch (noPhotoConversationError) {
+          console.error('Ask ArborAI no-photo conversation exception:', noPhotoConversationError);
+        }
+      }
+
+      if (!conversationalNoPhotoMessage && !isGreetingOnly && question) {
+        conversationalNoPhotoMessage = 'That is a great question. I can help you think through it from a gardening perspective, and if you want a visual ID or a more precise health check, upload a clear photo and I’ll take a closer look.';
+      }
+
+      const noPhotoResponseText = isGreetingOnly
+        ? 'Hey there! I’m ready when you are — drop in a clear plant photo and I’ll help identify it and spot anything worth checking.'
+        : question
+          ? conversationalNoPhotoMessage || 'I can help you think this through from a gardening angle. If you want a more precise ID or health check, upload a clear photo and I’ll narrow it down.'
+          : 'Please upload at least one clear plant photo so I can give you a quick ID and health check.';
+
       return res.json({
         species: 'Unknown',
-        confidence: 'Low',
-        health_score: 0,
-        summary: 'No photos were provided, so image-based identification is not possible.',
+        confidence: 'Unknown',
+        health_score: null,
+        summary: 'No photo was provided. I’m answering from your question, and if you want a visual ID or health check, upload a clear photo.',
         risks: [],
-        recommendations: ['Upload at least one clear photo for image-first identification.'],
+        recommendations: [],
         photo_summaries: [],
         hazards_detected: 'No',
         hazard_details: [],
-        raw_ai_message: question
-          ? `You asked: "${question}". I need at least one clear photo before I can identify this safely.`
-          : 'Upload at least one clear photo before asking for species identification.',
+        raw_ai_message: noPhotoResponseText,
         photo_urls: uploadedPhotoUrls,
       });
     }
@@ -6463,7 +6743,8 @@ Critical safety rules:
 - For Apiaceae/umbel plants, explicitly compare Poison Hemlock vs Wild Carrot using stem evidence.
 - Purple-blotched smooth/hairless or hollow stems must trigger poisonous lookalike warnings.
 - If poisonous lookalike risk exists, do NOT output High confidence and include clear do-not-ingest language in risks/recommendations/raw_ai_message.
-If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.`;
+If information is uncertain, state best estimate and keep raw_ai_message supportive and non-technical.
+Tone for raw_ai_message: lightly playful, neutral, and practical with a touch of expertise. Avoid stiff report language.`;
 
     const identificationUserContent = [
       {
@@ -6601,27 +6882,44 @@ If information is uncertain, state best estimate and keep raw_ai_message support
     }
 
     const confidenceLabel = normalizeConfidenceTier(normalizedPayload.confidence);
-    const assistantParts = [
-      `Image-first result: ${normalizedPayload.species || 'Unknown'} (confidence: ${confidenceLabel}).`,
-    ];
+    const isGreetingLeadIn = isSimpleGreeting(questionText);
+    const existingModelMessage = (normalizedPayload.raw_ai_message || '').toString().trim();
 
-    if (questionText) {
-      assistantParts.push(`You asked: "${questionText}".`);
+    let assistantMessage = existingModelMessage;
+    if (!assistantMessage) {
+      const fallbackParts = [
+        isGreetingLeadIn
+          ? `Hey! Quick read from your photo: ${normalizedPayload.species || 'Unknown'} (confidence: ${confidenceLabel}).`
+          : `Quick read from your photo: ${normalizedPayload.species || 'Unknown'} (confidence: ${confidenceLabel}).`,
+      ];
+
+      if ((normalizedPayload.hazards_detected || '').toString().toLowerCase() === 'yes') {
+        fallbackParts.push('I do see potential hazard traits, so treat this as caution-level until an expert confirms it.');
+      }
+
+      if (Array.isArray(normalizedPayload.recommendations) && normalizedPayload.recommendations.length > 0) {
+        fallbackParts.push(`Next best step: ${normalizedPayload.recommendations[0]}`);
+      }
+
+      assistantMessage = fallbackParts.join(' ').trim();
     }
 
-    if (questionBiasDetected) {
-      assistantParts.push('Your wording suggested a different category/species, but ArborAI kept identification locked to visual evidence to reduce hallucinations.');
+    if (questionBiasDetected && !/image-first|visual evidence|anchoring/i.test(assistantMessage)) {
+      assistantMessage = `${assistantMessage} I stayed image-first so your wording did not steer the ID.`.trim();
     }
 
-    if ((normalizedPayload.hazards_detected || '').toString().toLowerCase() === 'yes') {
-      assistantParts.push('Safety note: potentially hazardous or toxic traits were detected, so treat this as potentially dangerous until expert verification.');
+    if (
+      (normalizedPayload.hazards_detected || '').toString().toLowerCase() === 'yes'
+      && !/hazard|toxic|danger|caution/i.test(assistantMessage)
+    ) {
+      assistantMessage = `${assistantMessage} Safety note: possible hazardous traits were detected, so handle with caution until verified.`.trim();
     }
 
-    if (Array.isArray(normalizedPayload.recommendations) && normalizedPayload.recommendations.length > 0) {
-      assistantParts.push(`Key qualifier: ${normalizedPayload.recommendations[0]}`);
+    if (isGreetingLeadIn && !/^(hi|hello|hey|howdy)\b/i.test(assistantMessage)) {
+      assistantMessage = `Hey there! ${assistantMessage}`.trim();
     }
 
-    normalizedPayload.raw_ai_message = assistantParts.join(' ').trim();
+    normalizedPayload.raw_ai_message = assistantMessage;
 
     res.json(normalizedPayload);
   } catch (err) {

@@ -14,7 +14,7 @@ export default function ForParksCities() {
           </p>
           <div className="info-actions">
             <Link className="btn btn-primary" to="/contact?subject=Partnership%20Inquiry">Request partnership onboarding</Link>
-            <Link className="btn btn-secondary" to="/parks">View public tree network</Link>
+            <Link className="btn btn-secondary" to="/parks">View An ArborTag Demo</Link>
           </div>
         </section>
 

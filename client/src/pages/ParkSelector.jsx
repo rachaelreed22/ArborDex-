@@ -59,9 +59,9 @@ export default function ParkSelector() {
     <main className="page park-selector-page">
       <section className="park-selector-card">
         <p className="park-selector-kicker">Step 1</p>
-        <h1>Select Your Park</h1>
+        <h1>Select A Demo</h1>
         <p className="park-selector-subtitle">
-          Choose which park you'd like to manage
+          Choose which demonstration of the ArborTag/ArborDex system you would like to view.
         </p>
 
         {error && (

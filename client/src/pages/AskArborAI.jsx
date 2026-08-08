@@ -311,38 +311,43 @@ export default function AskArborAI() {
       const assistantText =
         data.raw_ai_message ||
         `${species} appears to have ${confidence.toLowerCase()} confidence with a health score of ${healthScore}.`;
+      const textOnly = uploadedPhotos.length === 0;
 
       setMessages((prev) => [
         ...prev,
         createMessage({
           role: 'assistant',
           text: assistantText,
-          photoFiles: [...uploadedPhotos],
-          diagnostics: {
-            species,
-            confidence,
-            healthScore,
-            summary,
-            risks,
-            recommendations,
-            photoSummaries,
-            hazardsDetected,
-            hazardDetails: normalizedHazardDetails,
-          },
-          scanPayload: {
-            species,
-            confidence,
-            health_score: healthScore,
-            summary,
-            risks,
-            recommendations,
-            photo_summaries: photoSummaries,
-            hazards_detected: hazardsDetected,
-            hazard_details: normalizedHazardDetails,
-            raw_ai_message: assistantText,
-            photo_urls: Array.isArray(data.photo_urls) ? data.photo_urls : [],
-          },
-          showActions: true,
+          photoFiles: textOnly ? [] : [...uploadedPhotos],
+          diagnostics: textOnly
+            ? null
+            : {
+                species,
+                confidence,
+                healthScore,
+                summary,
+                risks,
+                recommendations,
+                photoSummaries,
+                hazardsDetected,
+                hazardDetails: normalizedHazardDetails,
+              },
+          scanPayload: textOnly
+            ? null
+            : {
+                species,
+                confidence,
+                health_score: healthScore,
+                summary,
+                risks,
+                recommendations,
+                photo_summaries: photoSummaries,
+                hazards_detected: hazardsDetected,
+                hazard_details: normalizedHazardDetails,
+                raw_ai_message: assistantText,
+                photo_urls: Array.isArray(data.photo_urls) ? data.photo_urls : [],
+              },
+          showActions: !textOnly,
         }),
       ]);
       maybePromptSignup();

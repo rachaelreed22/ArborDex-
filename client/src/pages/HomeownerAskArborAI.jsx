@@ -191,6 +191,8 @@ export default function HomeownerAskArborAI() {
     if (!trimmedQuestion && uploadedPhotos.length === 0) return;
     if (isLoading) return;
 
+    const hadSubmittedPhotos = uploadedPhotos.length > 0;
+
     const imagePreviewUrls = uploadedPhotos.map((file) => URL.createObjectURL(file));
     setMessages((prev) => [
       ...prev,
@@ -267,39 +269,49 @@ export default function HomeownerAskArborAI() {
         data.raw_ai_message ||
         `${species} appears to have ${confidence.toLowerCase()} confidence with a health score of ${healthScore}.`;
 
-      setMessages((prev) => [
-        ...prev,
-        createMessage({
-          role: 'assistant',
-          text: assistantText,
-          photoFiles: [...uploadedPhotos],
-          diagnostics: {
-            species,
-            confidence,
-            healthScore,
-            summary,
-            risks,
-            recommendations,
-            photoSummaries,
-            hazardsDetected,
-            hazardDetails: normalizedHazardDetails,
-          },
-          scanPayload: {
-            species,
-            confidence,
-            health_score: healthScore,
-            summary,
-            risks,
-            recommendations,
-            photo_summaries: photoSummaries,
-            hazards_detected: hazardsDetected,
-            hazard_details: normalizedHazardDetails,
-            raw_ai_message: assistantText,
-            photo_urls: Array.isArray(data.photo_urls) ? data.photo_urls : [],
-          },
-          showActions: true,
-        }),
-      ]);
+      if (!hadSubmittedPhotos) {
+        setMessages((prev) => [
+          ...prev,
+          createMessage({
+            role: 'assistant',
+            text: assistantText,
+          }),
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          createMessage({
+            role: 'assistant',
+            text: assistantText,
+            photoFiles: [...uploadedPhotos],
+            diagnostics: {
+              species,
+              confidence,
+              healthScore,
+              summary,
+              risks,
+              recommendations,
+              photoSummaries,
+              hazardsDetected,
+              hazardDetails: normalizedHazardDetails,
+            },
+            scanPayload: {
+              species,
+              confidence,
+              health_score: healthScore,
+              summary,
+              risks,
+              recommendations,
+              photo_summaries: photoSummaries,
+              hazards_detected: hazardsDetected,
+              hazard_details: normalizedHazardDetails,
+              raw_ai_message: assistantText,
+              photo_urls: Array.isArray(data.photo_urls) ? data.photo_urls : [],
+            },
+            showActions: true,
+          }),
+        ]);
+      }
 
       setQuestion('');
       setUploadedPhotos([]);
@@ -517,9 +529,12 @@ export default function HomeownerAskArborAI() {
                 {atProfileLimit ? `Limit Reached ${activeProfiles}/${profileLimit}` : `Capacity ${activeProfiles}/${profileLimit}`}
               </div>
             </div>
-            <button className="homeowner-button-secondary homeowner-ask-back-button" onClick={() => navigate('/homeowners/account')}>
-              Back to Account
-            </button>
+            <div className="homeowner-ask-header-actions">
+              <button className="homeowner-button-secondary homeowner-ask-back-button" onClick={() => navigate('/')}>Home</button>
+              <button className="homeowner-button-secondary homeowner-ask-back-button" onClick={() => navigate('/homeowners/account')}>
+                Back to Account
+              </button>
+            </div>
           </div>
 
           <div className="homeowner-ask-intro-grid">

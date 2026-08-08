@@ -15,7 +15,10 @@
   box-shadow: 0 24px 46px rgba(8, 25, 17, 0.2);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
-
+  display: flex;
+  flex-direction: column;
+  height: min(92vh, 640px);
+  max-height: 92vh;
 }
 
 .ask-header {
@@ -31,6 +34,12 @@
   gap: 0.75rem;
 }
 
+.homeowner-ask-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .ask-header h1 {
   margin: 0;
   font-size: 1.46rem;
@@ -44,7 +53,8 @@
 
 .ask-chat {
   padding: 0.95rem;
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   display: flex;
@@ -182,6 +192,9 @@
   border-top: 1px solid rgba(20, 56, 38, 0.16);
   padding: 0.9rem;
   background: rgba(248, 246, 238, 0.94);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
 .ask-error {
@@ -352,8 +365,12 @@
     align-items: flex-start;
   }
 
+  .ask-shell {
+    min-height: min(92vh, calc(100vh - 2rem));
+  }
+
   .ask-chat {
-    max-height: 55vh;
+    min-height: 60vh;
   }
 
   .ask-diag-grid {

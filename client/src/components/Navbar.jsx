@@ -57,8 +57,8 @@ export default function Navbar() {
           Home
         </NavLink>
 
-        <NavLink to="/database" onClick={() => setMenuOpen(false)}>
-          Tree Database
+        <NavLink to="/parks" onClick={() => setMenuOpen(false)}>
+          Demo Selection
         </NavLink>
 
         {isStaff && (

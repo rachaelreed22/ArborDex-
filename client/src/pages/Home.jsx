@@ -66,7 +66,7 @@ export default function Home() {
           </div>
 
           <div className="hero-ctas">
-            <button className="home-btn home-btn-primary" onClick={() => navigate("/parks")}>View Public Tree Network</button>
+            <button className="home-btn home-btn-primary" onClick={() => navigate("/parks")}>View An ArborTag Demo</button>
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners/demo-garden")}>Explore A Demo Digital Garden</button>
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners/qr-tag-orders")}>QR Tag Orders</button>
             <button className="home-btn home-btn-secondary" onClick={() => navigate("/homeowners")}>Your Digital Garden: HomeOwner's Edition</button>
