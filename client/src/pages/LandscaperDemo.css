@@ -1,0 +1,187 @@
+.landscaper-demo-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.landscaper-hero-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 18px 40px rgba(11, 34, 21, 0.08);
+  border: 1px solid rgba(20, 56, 38, 0.1);
+}
+
+.landscaper-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #d8c18b;
+  margin: 0 0 0.75rem;
+}
+
+.landscaper-hero-card h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  color: #103223;
+}
+
+.landscaper-intro {
+  max-width: 720px;
+  line-height: 1.75;
+  color: #3f5642;
+  margin: 0 0 1.75rem;
+}
+
+.landscaper-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.landscaper-overview-grid,
+.landscaper-client-grid,
+.landscaper-investor-section {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.landscaper-overview-grid,
+.landscaper-investor-section {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.investor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.landscaper-summary-card,
+.landscaper-feature-card,
+.landscaper-client-card,
+.investor-card {
+  background: #f9faf7;
+  border-radius: 16px;
+  padding: 1.6rem;
+  border: 1px solid rgba(20, 56, 38, 0.08);
+}
+
+.landscaper-summary-card h2,
+.landscaper-feature-card h3,
+.landscaper-client-card h3,
+.investor-card h3 {
+  margin-top: 0;
+  color: #1b3326;
+}
+
+.landscaper-client-section h2 {
+  color: #d8c18b;
+}
+
+.landscaper-summary-card p,
+.landscaper-feature-card p,
+.landscaper-client-card p,
+.investor-card p {
+  color: #415b46;
+  line-height: 1.7;
+}
+
+.landscaper-client-card span {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 0.9rem;
+  background: rgba(31, 93, 69, 0.08);
+  border-radius: 999px;
+  color: #1f5d45;
+  font-size: 0.9rem;
+}
+
+.landscaper-item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landscaper-item-list li {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(20, 56, 38, 0.12);
+}
+
+.landscaper-item-list li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.landscaper-item-list strong {
+  display: block;
+  color: #1b3326;
+  margin-bottom: 0.25rem;
+}
+
+.landscaper-item-list span {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2f6a3b;
+}
+
+.landscaper-item-list p {
+  margin: 0;
+  color: #4b5f4c;
+}
+
+.client-card-button {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.client-card-button:hover {
+  transform: translateY(-2px);
+}
+
+.client-card-image {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 14px 14px 0 0;
+  display: block;
+}
+
+.client-card-content {
+  padding: 1.25rem;
+}
+
+.investor-card {
+  background: #eef7ed;
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid rgba(31, 93, 69, 0.12);
+}
+
+.investor-card h3 {
+  margin-top: 0;
+  color: #18472a;
+}
+
+.investor-card p {
+  margin: 0.85rem 0 0;
+  color: #415d47;
+  line-height: 1.7;
+}
+
+@media (max-width: 900px) {
+  .landscaper-overview-grid,
+  .landscaper-client-grid,
+  .investor-grid,
+  .landscaper-investor-section {
+    grid-template-columns: 1fr;
+  }
+}
